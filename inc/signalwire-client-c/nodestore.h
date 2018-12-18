@@ -45,6 +45,14 @@ typedef void (*swclt_store_cb_protocol_provider_remove_t)(
 	const blade_netcast_rqu_t* rqu,
 	const blade_netcast_protocol_provider_remove_param_t *params);
 
+typedef void (*swclt_store_cb_protocol_provider_rank_update_t)(swclt_sess_t sess,
+	const blade_netcast_rqu_t *rqu,
+	const blade_netcast_protocol_provider_rank_update_param_t *params);
+
+typedef void (*swclt_store_cb_protocol_provider_data_update_t)(swclt_sess_t sess,
+	const blade_netcast_rqu_t *rqu,
+	const blade_netcast_protocol_provider_data_update_param_t *params);
+
 typedef void (*swclt_store_cb_route_add_t)(swclt_sess_t sess,
 	const blade_netcast_rqu_t *rqu,
 	const blade_netcast_route_add_param_t *params);
@@ -86,6 +94,8 @@ SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_add(swclt_store_t store, swcl
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_remove(swclt_store_t store, swclt_store_cb_protocol_remove_t cb);
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_provider_add(swclt_store_t store, swclt_store_cb_protocol_provider_add_t cb);
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_provider_remove(swclt_store_t store, swclt_store_cb_protocol_provider_remove_t cb);
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_provider_rank_update(swclt_store_t store, swclt_store_cb_protocol_provider_rank_update_t cb);
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_provider_data_update(swclt_store_t store, swclt_store_cb_protocol_provider_data_update_t cb);
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_authority_add(swclt_store_t store, swclt_store_cb_authority_add_t cb);
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_authority_remove(swclt_store_t store, swclt_store_cb_authority_remove_t cb);
 

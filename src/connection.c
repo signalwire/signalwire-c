@@ -89,7 +89,7 @@ static ks_status_t __wait_cmd_result(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, SWC
 			case SWCLT_CMD_TYPE_REQUEST:
 				break;
 
-		    case SWCLT_CMD_TYPE_FAILURE:
+			case SWCLT_CMD_TYPE_FAILURE:
 				ks_log(KS_LOG_WARNING, "Command failure", status);
 				goto done;
 			default:

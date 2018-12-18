@@ -109,21 +109,29 @@ SWCLT_JSON_PARSE_END()
 typedef struct blade_provider_s {
 	const char *nodeid;
 	ks_json_t *identities;	/* list of identity uri's string's */
+	int rank;
+	ks_json_t *data;
 } blade_provider_t;
 
 SWCLT_JSON_MARSHAL_BEG(BLADE_PROVIDER, blade_provider_t)
 	SWCLT_JSON_MARSHAL_STRING(nodeid)
 	SWCLT_JSON_MARSHAL_ITEM_OPT(identities)
+	SWCLT_JSON_MARSHAL_INT(rank)
+	SWCLT_JSON_MARSHAL_ITEM_OPT(data)
 SWCLT_JSON_MARSHAL_END()
 
 SWCLT_JSON_DESTROY_BEG(BLADE_PROVIDER, blade_provider_t)
 	SWCLT_JSON_DESTROY_STRING(nodeid)
 	SWCLT_JSON_DESTROY_ITEM(identities)
+	SWCLT_JSON_DESTROY_INT(rank)
+	SWCLT_JSON_DESTROY_ITEM(data)
 SWCLT_JSON_DESTROY_END()
 
 SWCLT_JSON_PARSE_BEG(BLADE_PROVIDER, blade_provider_t)
 	SWCLT_JSON_PARSE_STRING(nodeid)
 	SWCLT_JSON_PARSE_ITEM_OPT(identities)
+	SWCLT_JSON_PARSE_INT_OPT_DEF(rank, 1)
+	SWCLT_JSON_PARSE_ITEM_OPT(data)
 SWCLT_JSON_PARSE_END()
 
 typedef struct blade_subscription_s {
