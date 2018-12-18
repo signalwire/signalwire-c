@@ -16,7 +16,14 @@ if (WIN32)
 	endif()
 endif()
 
+# Declare our project, libks
 project(Signalwire-Client-C VERSION 1.0.0 LANGUAGES C)
+message("Signalwire-Client-C ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
+
+# Set package version
+set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH "0")
 
 include(cmake/FindLibKS.cmake)
 include(${LIBKS_CMAKE_DIR}/ksutil.cmake)
@@ -76,11 +83,14 @@ endif()
 if("${CMAKE_OS_NAME}" STREQUAL "Debian")
 
 	# https://gitlab.kitware.com/cmake/cmake/issues/16517
-	set(CPACK_COMPONENTS_ALL main)
+	set(CPACK_COMPONENTS_ALL runtime)
 	set(CPACK_DEB_COMPONENT_INSTALL "ON")
 
 	# Set package name
 	set(CPACK_DEBIAN_PACKAGE_NAME "signalwire-client-c")
+
+ 	# Abuse Cmake component name
+ 	set(CPACK_DEBIAN_RUNTIME_PACKAGE_NAME ${CPACK_DEBIAN_PACKAGE_NAME})
 
 	# Find stuff we need for packaging on Debian
 	find_program(DPKG_CMD dpkg)
@@ -97,7 +107,7 @@ if("${CMAKE_OS_NAME}" STREQUAL "Debian")
 	# Detect package dependencies
 	set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 	set(CPACK_DEBIAN_PACKAGE_GENERATE_SHLIBS ON)
-	set(CPACK_DEBIAN_PACKAGE_GENERATE_SHLIBS_POLIC ">=")
+	set(CPACK_DEBIAN_PACKAGE_GENERATE_SHLIBS_POLICY ">=")
 
 	# Set package description
 	set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "SignalWire Client C")
@@ -113,9 +123,6 @@ if("${CMAKE_OS_NAME}" STREQUAL "Debian")
 
 	# Enforce Debian policy permission rules
 	set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION ON)
-
-	# Set a Debian compliant changelog header
-	set(CHANGELOG_HEADER "${PACKAGE_NAME} (${CPACK_DEBIAN_PACKAGE_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE}) ${DISTRO_CODENAME}\; urgency=${CPACK_DEBIAN_PACKAGE_PRIORITY}")
 
 	# Set a Debian compliant changelog footer
 	if(DATE_CMD)
@@ -142,6 +149,9 @@ if("${CMAKE_OS_NAME}" STREQUAL "Debian")
 	# Set debian file name format
 	set(CPACK_DEBIAN_FILE_NAME "${PACKAGE_NAME}_${PROJECT_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE}_${DISTRO_CODENAME}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}.deb")
 
+	# Set a Debian compliant changelog header
+	set(CHANGELOG_HEADER "${PACKAGE_NAME} (${CPACK_DEBIAN_PACKAGE_VERSION}) ${DISTRO_CODENAME}\; urgency=${CPACK_DEBIAN_PACKAGE_PRIORITY}")
+
 	# Generate a Debian compliant changelog
 	if(GIT_FOUND AND GZIP_CMD AND DATE_CMD)
 		# Get git log info
@@ -156,7 +166,7 @@ if("${CMAKE_OS_NAME}" STREQUAL "Debian")
 		execute_process(COMMAND ${GZIP_CMD} -f -9 -n changelog.Debian)
 
 		# Install changelog
-		install(FILES "${CMAKE_BINARY_DIR}/changelog.Debian.gz" COMPONENT "main" DESTINATION "share/doc/${CPACK_DEBIAN_PACKAGE_NAME}")
+		install(FILES "${CMAKE_BINARY_DIR}/changelog.Debian.gz" COMPONENT "runtime" DESTINATION "share/doc/${CPACK_DEBIAN_PACKAGE_NAME}")
 
 		# Delete changelog related variables
 		unset(CHANGELOG_HEADER)
@@ -216,6 +226,9 @@ if (SWCLT_DEBUG_JSON)
 	)
 endif()
 
+# Copy our ca dir to the binary dir so we can run these things in the build env
+file(COPY ${CMAKE_CURRENT_LIST_DIR}/ca DESTINATION ${CMAKE_BINARY_DIR})
+
 # Setup ks core dependent linkages
 if (NOT WIN32)
 		target_link_libraries(signalwire_client PUBLIC ks)
@@ -253,11 +266,11 @@ set(CONF_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
 
 if (NOT KS_PLAT_WIN)
 	# Set install targets
-	install(TARGETS signalwire_client COMPONENT "main" EXPORT SignalWireClientConfig DESTINATION lib)
-	install(DIRECTORY inc/signalwire-client-c COMPONENT "main" DESTINATION include PATTERN internal EXCLUDE)
-	install(FILES ${PROJECT_BINARY_DIR}/signalwire_client.pc COMPONENT "main" DESTINATION lib/pkgconfig)
-	install(EXPORT SignalWireClientConfig COMPONENT "main" DESTINATION include/signalwire-client-c/cmake)
-	install(FILES ${PROJECT_BINARY_DIR}/copyright COMPONENT "main" DESTINATION share/doc/signalwire-client-c)
+	install(TARGETS signalwire_client COMPONENT "runtime" EXPORT SignalWireClientConfig DESTINATION lib)
+	install(DIRECTORY inc/signalwire-client-c COMPONENT "runtime" DESTINATION include PATTERN internal EXCLUDE)
+	install(FILES ${PROJECT_BINARY_DIR}/signalwire_client.pc COMPONENT "runtime" DESTINATION lib/pkgconfig)
+	install(EXPORT SignalWireClientConfig COMPONENT "runtime" DESTINATION include/signalwire-client-c/cmake)
+	install(FILES ${PROJECT_BINARY_DIR}/copyright COMPONENT "runtime" DESTINATION share/doc/signalwire-client-c)
 
 	# Set uninstall target
 	if(NOT TARGET uninstall)
