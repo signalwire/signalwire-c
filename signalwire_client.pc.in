@@ -1,0 +1,12 @@
+prefix=@PC_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+definitions=@PC_DEFINITIONS@
+
+Name: @PACKAGE_NAME@
+Version: @PACKAGE_VERSION@
+Description: SignalWire C Client SDK
+
+Cflags: -I${includedir}/signalwire-client-c
+Libs: -L${libdir} -lsignalwire_client

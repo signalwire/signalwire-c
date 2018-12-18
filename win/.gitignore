@@ -1,0 +1,12 @@
+.vs/*
+signalwire-client-c.2017.VC.db
+Win32/*
+x64/*
+out/*
+libks-*.zip
+libks-*/
+7za*.exe
+openssl-*.zip
+openssl-*/
+Debug/
+Release/

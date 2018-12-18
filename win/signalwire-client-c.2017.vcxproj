@@ -1,0 +1,56 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectName>signalwire-client-c</ProjectName>
+    <RootNamespace>signalwire-client-c</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <ProjectGuid>{EFFC9BFD-DE46-47E7-9EF1-564DC87E89A8}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <PlatformToolset>v141</PlatformToolset>
+    <OpenSSLPlatform>x86</OpenSSLPlatform>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PlatformToolset>v141</PlatformToolset>
+    <OpenSSLPlatform>x64</OpenSSLPlatform>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <PlatformToolset>v141</PlatformToolset>
+    <OpenSSLPlatform>x86</OpenSSLPlatform>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <PlatformToolset>v141</PlatformToolset>
+    <OpenSSLPlatform>x64</OpenSSLPlatform>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="buildpackages.task" />
+  <Import Project="libks.props" />
+  <Import Project="signalwire-client-c-version.props" />
+  <Import Project="openssl-version.props" />
+  <PropertyGroup Label="UserMacros" />
+  <Target Name="Build">
+    <MakeDir Directories="../build-$(Platform)" />
+    <Exec Command="cmake .. -DCMAKE_GENERATOR_PLATFORM=$(Platform) -DLIBKS_LIBRARY_PATH=$(BaseDir)/libks-$(libksVersion)/binaries/$(Platform)/$(Configuration)/ -DLIBKS_INCLUDE_DIRS=$(BaseDir)/libks-$(libksVersion) -DOPENSSL_INCLUDE_DIR=$(BaseDir)openssl-$(OpenSSLVersion)/include_$(OpenSSLPlatform)/;$(BaseDir)openssl-$(OpenSSLVersion)/include/ -DOPENSSL_LIBRARIES=$(BaseDir)openssl-$(OpenSSLVersion)/binaries/$(Platform)/$(Configuration)/lib -DOPENSSL_ROOT=$(BaseDir)openssl-$(OpenSSLVersion)/binaries/$(Platform)/$(Configuration)/ -T v141" WorkingDirectory="../build-$(Platform)" />
+    <MsBuild Projects="$(signalwire-client-cLibDir)\build-$(Platform)\signalwire_client.vcxproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+  </Target>
+</Project>

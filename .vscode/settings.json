@@ -1,0 +1,31 @@
+{
+    "clang.cflags": [
+        "-DHAVE_CLOCK_GETRES=1",
+        "-DHAVE_CLOCK_GETTIME=1",
+        "-DHAVE_CLOCK_NANOSLEEP=1",
+        "-DHAVE_LIBCRYPTO=1",
+        "-DHAVE_LIBSSL=1",
+        "-DHAVE_MALLOC=1",
+        "-DHAVE_MEMMEM=1",
+        "-DHAVE_PTHREAD_SETSCHEDPARAM=1",
+        "-DHAVE_SCHED_SETSCHEDULER=1",
+        "-DHAVE_STRFTIME=1",
+        "-DHAVE_USLEEP=1",
+        "-DKS_PLAT_LIN=1",
+        "-DRETSIGTYPE=void",
+        "-DSTDC_HEADERS=1",
+        "-DSWCLT_EXPORTS",
+        "-DSWCLT_VERSION_MAJOR=1",
+        "-DSWCLT_VERSION_MINOR=0",
+        "-DSWCLT_VERSION_REVISION=0",
+        "-DTIME_WITH_SYS_TIME=1",
+        "-D_REENTRANT=1",
+        "-D__BYTE_ORDER=__LITTLE_ENDIAN",
+        "-DKS_BUILD_DEBUG=1",
+        "-I/home/jason/signalwire/signalwire-client-c/inc",
+        "-std=c11",
+        "-I/home/jason/signalwire/signalwire-client-c/swclt_bench",
+        "-I/home/jason/signalwire/signalwire-client-c/swclt_test"
+    ],
+    "clang.cxxflags": []
+}
