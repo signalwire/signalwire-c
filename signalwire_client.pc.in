@@ -8,5 +8,5 @@ Name: @PACKAGE_NAME@
 Version: @PACKAGE_VERSION@
 Description: SignalWire C Client SDK
 
-Cflags: -I${includedir}/signalwire-client-c
+Cflags: -I${includedir}
 Libs: -L${libdir} -lsignalwire_client
