@@ -227,7 +227,9 @@ if (SWCLT_DEBUG_JSON)
 endif()
 
 # Copy our ca dir to the binary dir so we can run these things in the build env
-file(COPY ${CMAKE_CURRENT_LIST_DIR}/ca DESTINATION ${CMAKE_BINARY_DIR})
+if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/ca)
+	file(COPY ${CMAKE_CURRENT_LIST_DIR}/ca DESTINATION ${CMAKE_BINARY_DIR})
+endif()
 
 # Setup ks core dependent linkages
 if (NOT WIN32)
