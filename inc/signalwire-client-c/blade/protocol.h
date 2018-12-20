@@ -64,39 +64,43 @@ SWCLT_JSON_PARSE_END()
 
 /* The params definition for BLADE_PROTOCOL_CMD_PROVIDER_ADD */
 typedef struct blade_protocol_provider_add_param_s {
-	ks_json_t *provider_data;
 	blade_access_control_t default_method_execute_access;
 	blade_access_control_t default_channel_subscribe_access;
 	blade_access_control_t default_channel_broadcast_access;
 	ks_json_t *methods;
 	ks_json_t *channels;
+	int rank;
+	ks_json_t *data;
 } blade_protocol_provider_add_param_t;
 
 SWCLT_JSON_MARSHAL_BEG(BLADE_PROTOCOL_PROVIDER_ADD_PARAM, blade_protocol_provider_add_param_t)
-	SWCLT_JSON_MARSHAL_ITEM_OPT(provider_data)
 	SWCLT_JSON_MARSHAL_INT(default_method_execute_access)
 	SWCLT_JSON_MARSHAL_INT(default_channel_subscribe_access)
 	SWCLT_JSON_MARSHAL_INT(default_channel_broadcast_access)
 	SWCLT_JSON_MARSHAL_ITEM_OPT(methods)
 	SWCLT_JSON_MARSHAL_ITEM_OPT(channels)
+	SWCLT_JSON_MARSHAL_INT(rank)
+	SWCLT_JSON_MARSHAL_ITEM_OPT(data)
 SWCLT_JSON_MARSHAL_END()
 
 SWCLT_JSON_DESTROY_BEG(BLADE_PROTOCOL_PROVIDER_ADD_PARAM, blade_protocol_provider_add_param_t)
-	SWCLT_JSON_DESTROY_ITEM(provider_data)
 	SWCLT_JSON_DESTROY_INT(default_method_execute_access)
 	SWCLT_JSON_DESTROY_INT(default_channel_subscribe_access)
 	SWCLT_JSON_DESTROY_INT(default_channel_broadcast_access)
 	SWCLT_JSON_DESTROY_ITEM(methods)
 	SWCLT_JSON_DESTROY_ITEM(channels)
+	SWCLT_JSON_DESTROY_INT(rank)
+	SWCLT_JSON_DESTROY_ITEM(data)
 SWCLT_JSON_DESTROY_END()
 
 SWCLT_JSON_PARSE_BEG(BLADE_PROTOCOL_PROVIDER_ADD_PARAM, blade_protocol_provider_add_param_t)
-	SWCLT_JSON_PARSE_ITEM_OPT(provider_data)
 	SWCLT_JSON_PARSE_INT_OPT_DEF(default_method_execute_access, BLADE_ACL_SYSTEM)
 	SWCLT_JSON_PARSE_INT_OPT_DEF(default_channel_subscribe_access, BLADE_ACL_SYSTEM)
 	SWCLT_JSON_PARSE_INT_OPT_DEF(default_channel_broadcast_access, BLADE_ACL_SYSTEM)
 	SWCLT_JSON_PARSE_ITEM_OPT(methods)
 	SWCLT_JSON_PARSE_ITEM_OPT(channels)
+	SWCLT_JSON_PARSE_INT_OPT_DEF(rank, 1)
+	SWCLT_JSON_PARSE_ITEM_OPT(data)
 SWCLT_JSON_PARSE_END()
 
 
@@ -114,7 +118,7 @@ SWCLT_JSON_DESTROY_BEG(BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_PARAM, blade_protocol
 SWCLT_JSON_DESTROY_END()
 
 SWCLT_JSON_PARSE_BEG(BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_PARAM, blade_protocol_provider_rank_update_param_t)
-    SWCLT_JSON_PARSE_INT_OPT_DEF(rank, 1)
+	SWCLT_JSON_PARSE_INT_OPT_DEF(rank, 1)
 SWCLT_JSON_PARSE_END()
 
 
@@ -130,12 +134,13 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *protocol,
-	ks_json_t **provider_data,
 	blade_access_control_t default_method_execute_access,
 	blade_access_control_t default_channel_subscribe_access,
 	blade_access_control_t default_channel_broadcast_access,
 	ks_json_t **methods,
-	ks_json_t **channels)
+	ks_json_t **channels,
+	int rank,
+	ks_json_t **data)
 {
 	swclt_cmd_t cmd = KS_NULL_HANDLE;
 	ks_status_t status;
@@ -148,12 +153,13 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 
 	if (!(params = BLADE_PROTOCOL_PROVIDER_ADD_PARAM_MARSHAL(pool,
 															 &(blade_protocol_provider_add_param_t){
-																 provider_data ? *provider_data : NULL,
 																 default_method_execute_access,
 																 default_channel_subscribe_access,
 																 default_channel_broadcast_access,
 																 methods ? *methods : NULL,
-																 channels ? *channels : NULL}))) {
+																 channels ? *channels : NULL,
+																 rank,
+ 																 data ? *data : NULL}))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol request params");
 
 		/* Since provider_data and channels was at the end of the macro declartaion, it will have
@@ -163,7 +169,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 	}
 											  
 	/* We have taken ownership of the provider_data and channels from here on out */
-	if (provider_data) *provider_data = NULL;
+	if (data) *data = NULL;
 	if (channels) *channels = NULL;
 	
 	if (!(request = BLADE_PROTOCOL_RQU_MARSHAL(
@@ -207,23 +213,25 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 
 static inline swclt_cmd_t CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD(
 	const char *protocol,
-	ks_json_t **provider_data,
 	blade_access_control_t default_method_execute_access,
 	blade_access_control_t default_channel_subscribe_access,
 	blade_access_control_t default_channel_broadcast_access,
 	ks_json_t **methods,
- 	ks_json_t **channels)
+ 	ks_json_t **channels,
+	int rank,
+	ks_json_t **data)
 {
 	return CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 		NULL,
 		NULL,
 		protocol,
-		provider_data,
 		default_method_execute_access,
 		default_channel_subscribe_access,
 		default_channel_broadcast_access,
 		methods,
-		channels);
+		channels,
+		rank,
+		data);
 }
 
 

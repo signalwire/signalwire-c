@@ -156,6 +156,46 @@ static void __invoke_cb_protocol_provider_remove(swclt_store_ctx_t *ctx,
 	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
 }
 
+static ks_status_t __add_cb_protocol_provider_rank_update(swclt_store_ctx_t *ctx, swclt_store_cb_protocol_provider_rank_update_t cb)
+{
+	return ks_hash_insert(ctx->callbacks, (const void *)BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_RANK_UPDATE, (void *)cb);
+}
+
+static void __invoke_cb_protocol_provider_rank_update(swclt_store_ctx_t *ctx,
+													  const blade_netcast_rqu_t *rqu,
+													  const blade_netcast_protocol_provider_rank_update_param_t *params)
+{
+	swclt_store_cb_protocol_provider_rank_update_t cb;
+
+	ks_hash_read_lock(ctx->callbacks);
+	cb = (swclt_store_cb_protocol_provider_rank_update_t)ks_hash_search(ctx->callbacks,
+																		(const void *)BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_RANK_UPDATE,
+																		KS_UNLOCKED);
+	ks_hash_read_unlock(ctx->callbacks);
+
+	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+}
+
+static ks_status_t __add_cb_protocol_provider_data_update(swclt_store_ctx_t *ctx, swclt_store_cb_protocol_provider_data_update_t cb)
+{
+	return ks_hash_insert(ctx->callbacks, (const void *)BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_DATA_UPDATE, (void *)cb);
+}
+
+static void __invoke_cb_protocol_provider_data_update(swclt_store_ctx_t *ctx,
+													  const blade_netcast_rqu_t *rqu,
+													  const blade_netcast_protocol_provider_data_update_param_t *params)
+{
+	swclt_store_cb_protocol_provider_data_update_t cb;
+
+	ks_hash_read_lock(ctx->callbacks);
+	cb = (swclt_store_cb_protocol_provider_data_update_t)ks_hash_search(ctx->callbacks,
+																		(const void *)BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_DATA_UPDATE,
+																		KS_UNLOCKED);
+	ks_hash_read_unlock(ctx->callbacks);
+
+	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+}
+
 static ks_status_t __add_cb_authority_add(swclt_store_ctx_t *ctx, swclt_store_cb_authority_add_t cb)
 {
 	ks_log(KS_LOG_DEBUG, "Adding authority add handler for method: %s", BLADE_NETCAST_CMD_AUTHORITY_ADD);
@@ -443,7 +483,7 @@ static ks_status_t __add_authority_obj(swclt_store_ctx_t *ctx, ks_json_t *obj)
 	blade_netcast_authority_add_param_t *params;
 	ks_status_t status;
 
-    if (status = BLADE_NETCAST_AUTHORITY_ADD_PARAM_PARSE(ctx->base.pool, obj, &params)) {
+	if (status = BLADE_NETCAST_AUTHORITY_ADD_PARAM_PARSE(ctx->base.pool, obj, &params)) {
 		ks_log(KS_LOG_ERROR, "Failed to parse authority: %d", status);
 		return status;
 	}
@@ -547,7 +587,7 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 		protocol->name = ks_pstrdup(ctx->base.pool, params->protocol);
 
 		if (!(protocol->providers = ks_json_pcreate_array_inline(ctx->base.pool, 1, BLADE_PROVIDER_MARSHAL(NULL,
-				&(blade_provider_t){params->nodeid, NULL})))) {
+																										   &(blade_provider_t){params->nodeid, NULL, params->rank, params->data})))) {
 			ks_pool_free(&protocol);
 			BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_DESTROY(&params);
 			return KS_STATUS_NO_MEM;
@@ -577,7 +617,7 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 
 	/* Now add any provider entries to the protocol */
 	if (!ks_json_add_item_to_array(protocol->providers,
-			BLADE_PROVIDER_MARSHAL(NULL, &(blade_provider_t){params->nodeid, NULL})))
+								   BLADE_PROVIDER_MARSHAL(NULL, &(blade_provider_t){params->nodeid, NULL, params->rank, params->data})))
 		return KS_STATUS_NO_MEM;
 
 	ks_log(KS_LOG_INFO, "Protocol %s add complete, provider count %lu", protocol->name, ks_json_get_array_size(protocol->providers));
@@ -647,6 +687,96 @@ done:
 
 	return status;
 }
+
+// Provider rank update
+static ks_status_t __update_protocol_provider_rank_update(swclt_store_ctx_t *ctx, const blade_netcast_rqu_t *netcast_rqu)
+{
+	blade_netcast_protocol_provider_rank_update_param_t *params = NULL;
+	blade_protocol_t *protocol = NULL;
+	ks_json_t *entry = NULL;
+	blade_provider_t *provider = NULL;
+	ks_status_t status = KS_STATUS_SUCCESS;
+	ks_bool_t found = KS_FALSE;
+
+	if (status = BLADE_NETCAST_PROTOCOL_PROVIDER_RANK_UPDATE_PARAM_PARSE(ctx->base.pool, netcast_rqu->params, &params))
+		return status;
+
+	ks_hash_write_lock(ctx->protocols);
+
+	ks_log(KS_LOG_INFO, "Request to update rank for provider %s to %d for protocol %s", params->nodeid, params->rank, params->protocol);
+
+	/* Lookup the protocol */
+	if (status = __lookup_protocol(ctx, params->protocol, &protocol))
+		goto done;
+
+	// find provider
+	for (int32_t index = 0; index < ks_json_get_array_size(protocol->providers); ++index) {
+		entry = ks_json_get_array_item(protocol->providers, index);
+
+		ks_assertd(!BLADE_PROVIDER_PARSE(ctx->base.pool, entry, &provider));
+
+		if (!strcmp(provider->nodeid, params->nodeid)) {
+			found = KS_TRUE;
+			provider->rank = params->rank;
+		}
+		BLADE_PROVIDER_DESTROY(&provider);
+	}
+		
+done:
+	ks_hash_write_unlock(ctx->protocols);
+
+	if (found) __invoke_cb_protocol_provider_rank_update(ctx, netcast_rqu, params);
+
+	BLADE_NETCAST_PROTOCOL_PROVIDER_RANK_UPDATE_PARAM_DESTROY(&params);
+	
+	return status;
+}
+
+// Provider data update
+static ks_status_t __update_protocol_provider_data_update(swclt_store_ctx_t *ctx, const blade_netcast_rqu_t *netcast_rqu)
+{
+	blade_netcast_protocol_provider_data_update_param_t *params = NULL;
+	blade_protocol_t *protocol = NULL;
+	ks_json_t *entry = NULL;
+	blade_provider_t *provider = NULL;
+	ks_status_t status = KS_STATUS_SUCCESS;
+	ks_bool_t found = KS_FALSE;
+
+	if (status = BLADE_NETCAST_PROTOCOL_PROVIDER_DATA_UPDATE_PARAM_PARSE(ctx->base.pool, netcast_rqu->params, &params))
+		return status;
+
+	ks_hash_write_lock(ctx->protocols);
+
+	ks_log(KS_LOG_INFO, "Request to update data for provider %s for protocol %s", params->nodeid, params->protocol);
+
+	/* Lookup the protocol */
+	if (status = __lookup_protocol(ctx, params->protocol, &protocol))
+		goto done;
+
+	// find provider
+	for (int32_t index = 0; index < ks_json_get_array_size(protocol->providers); ++index) {
+		entry = ks_json_get_array_item(protocol->providers, index);
+
+		ks_assertd(!BLADE_PROVIDER_PARSE(ctx->base.pool, entry, &provider));
+
+		if (!strcmp(provider->nodeid, params->nodeid)) {
+			found = KS_TRUE;
+			if (provider->data) ks_json_delete(&provider->data);
+			provider->data = ks_json_pduplicate(ctx->base.pool, params->data, KS_TRUE);
+		}
+		BLADE_PROVIDER_DESTROY(&provider);
+	}
+		
+done:
+	ks_hash_write_unlock(ctx->protocols);
+
+	if (found) __invoke_cb_protocol_provider_data_update(ctx, netcast_rqu, params);
+
+	BLADE_NETCAST_PROTOCOL_PROVIDER_DATA_UPDATE_PARAM_DESTROY(&params);
+	
+	return status;
+}
+
 
 // Route add/remove
 static ks_status_t __update_route_add(swclt_store_ctx_t *ctx, blade_netcast_rqu_t *netcast_rqu)
@@ -806,6 +936,10 @@ static ks_status_t __update(swclt_store_ctx_t *ctx, blade_netcast_rqu_t *netcast
 		return __update_protocol_provider_add(ctx, netcast_rqu);
 	else if (!strcmp(netcast_rqu->command, BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_REMOVE))
 		return __update_protocol_provider_remove(ctx, netcast_rqu);
+	else if (!strcmp(netcast_rqu->command, BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_RANK_UPDATE))
+		return __update_protocol_provider_rank_update(ctx, netcast_rqu);
+	else if (!strcmp(netcast_rqu->command, BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_DATA_UPDATE))
+		return __update_protocol_provider_data_update(ctx, netcast_rqu);
 	else if (!strcmp(netcast_rqu->command, BLADE_NETCAST_CMD_ROUTE_ADD))
 		return __update_route_add(ctx, netcast_rqu);
 	else if (!strcmp(netcast_rqu->command, BLADE_NETCAST_CMD_ROUTE_REMOVE))
@@ -1115,6 +1249,20 @@ SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_provider_remove(swclt_store_t
 {
 	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
 	status = __add_cb_protocol_provider_remove(ctx, cb);
+	SWCLT_STORE_SCOPE_END(store, ctx, status)
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_provider_rank_update(swclt_store_t store, swclt_store_cb_protocol_provider_rank_update_t cb)
+{
+	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
+	status = __add_cb_protocol_provider_rank_update(ctx, cb);
+	SWCLT_STORE_SCOPE_END(store, ctx, status)
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_provider_data_update(swclt_store_t store, swclt_store_cb_protocol_provider_data_update_t cb)
+{
+	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
+	status = __add_cb_protocol_provider_data_update(ctx, cb);
 	SWCLT_STORE_SCOPE_END(store, ctx, status)
 }
 

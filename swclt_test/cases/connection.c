@@ -52,12 +52,13 @@ void test_async(ks_pool_t *pool)
 			__on_protocol_response,
 			NULL,
 			"a_protocol",
-			NULL,
 			0,
 			0,
 			0,
 			NULL,
-			&channels));
+			&channels,
+			1,
+			NULL));
 
 	/* And submit it */
 	REQUIRE(!swclt_conn_submit_request(conn, cmd));
@@ -106,12 +107,13 @@ void test_ttl(ks_pool_t *pool)
 			__on_protocol_response,
 			NULL,
 			"a_protocol",
-			NULL,
 			0,
 			0,
 			0,
 			NULL,
-		    &channels));
+		    &channels,
+			1,
+			NULL));
 
 	/* Lock the reader so we never get a response, forcing a timeout */
 	conn_ctx = conn_get(conn);

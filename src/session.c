@@ -532,12 +532,12 @@ static ks_status_t __swclt_sess_metric_current(swclt_sess_ctx_t *ctx, const char
 
 static void __context_service(swclt_sess_ctx_t *ctx)
 {
-    ks_hash_read_lock(ctx->metrics);
+	ks_hash_read_lock(ctx->metrics);
 	for (ks_hash_iterator_t *itt = ks_hash_first(ctx->metrics, KS_UNLOCKED); itt; itt = ks_hash_next(&itt)) {
 		const char *key = NULL;
 		swclt_metric_reg_t *value = NULL;
 
-        ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
+		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
 
 		if (ks_time_now() >= value->timeout && value->dirty) {
 			value->timeout = ks_time_now() + (value->interval * KS_USEC_PER_SEC);
@@ -546,10 +546,10 @@ static void __context_service(swclt_sess_ctx_t *ctx)
 			swclt_sess_protocol_provider_rank_update_async(ctx->base.handle, key, value->rank, NULL, NULL, NULL);
 		}
 	}
-    ks_hash_read_unlock(ctx->metrics);
+	ks_hash_read_unlock(ctx->metrics);
 
-    /* Now ask to be serviced again in 1 second */
-    swclt_hmgr_request_service_in(&ctx->base, 1000);
+	/* Now ask to be serviced again in 1 second */
+	swclt_hmgr_request_service_in(&ctx->base, 1000);
 }
 
 static ks_status_t __context_init(
@@ -730,7 +730,7 @@ static ks_status_t __register_setup(swclt_sess_ctx_t *ctx, const char *service, 
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_set_auth_failed_cb(swclt_sess_t sess, swclt_sess_auth_failed_cb_t cb)
 {
-    swclt_sess_ctx_t *ctx;
+	swclt_sess_ctx_t *ctx;
 	ks_status_t result = KS_STATUS_SUCCESS;
 
 	if(ks_handle_get(SWCLT_HTYPE_SESS, sess, &ctx))
@@ -746,14 +746,14 @@ done:
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_target_set(swclt_sess_t sess, const char *target)
 {
-    swclt_sess_ctx_t *ctx;
+	swclt_sess_ctx_t *ctx;
 	ks_status_t result = KS_STATUS_SUCCESS;
 
 	if(ks_handle_get(SWCLT_HTYPE_SESS, sess, &ctx))
 		return result;
 
-    /* Parse the identity, it will contain the connection target address etc. */
-    if (result = swclt_ident_from_str(&ctx->ident, ctx->base.pool, target)) {
+	/* Parse the identity, it will contain the connection target address etc. */
+	if (result = swclt_ident_from_str(&ctx->ident, ctx->base.pool, target)) {
 		ks_log(KS_LOG_ERROR, "Invalid identity uri: %s", target);
 		goto done;
 	}
@@ -827,7 +827,7 @@ SWCLT_DECLARE(ks_bool_t) swclt_sess_has_authentication(swclt_sess_t sess)
 	if(ks_handle_get(SWCLT_HTYPE_SESS, sess, &ctx))
 		return result;
 
-    result = (ctx->config->private_key_path && ctx->config->client_cert_path) || ctx->config->authentication;
+	result = (ctx->config->private_key_path && ctx->config->client_cert_path) || ctx->config->authentication;
 
 	ks_handle_put(SWCLT_HTYPE_SESS, &ctx);
 
@@ -1129,7 +1129,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 	swclt_cmd_t cmd = KS_NULL_HANDLE;
 
 	/* Unregister this subscription if it exists, if not then just continue with subscription removal
-     * because the callback may have been removed manually */
+	 * because the callback may have been removed manually */
 	__unregister_subscription(ctx, protocol, channel);
 
 	/* Allocate the request */
@@ -1170,21 +1170,25 @@ done:
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
 	swclt_sess_t sess,
 	const char * protocol,
-	ks_json_t **methods,
-	ks_json_t **channels,
 	blade_access_control_t default_method_execute_access,
 	blade_access_control_t default_channel_subscribe_access,
 	blade_access_control_t default_channel_broadcast_access,
+	ks_json_t **methods,
+	ks_json_t **channels,
+	int rank,
+	ks_json_t **data,
 	swclt_cmd_t *cmdP)
 {
 	return swclt_sess_protocol_provider_add_async(
 		sess,
 		protocol,
-		methods,
-		channels,
 		default_method_execute_access,
 		default_channel_subscribe_access,
 		default_channel_broadcast_access,
+		methods,
+		channels,
+		rank,
+		data,
 		NULL,		/* By passing null here we make this synchronous by implication */
 		NULL,
 		cmdP);
@@ -1193,11 +1197,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 	swclt_sess_t sess,
 	const char * protocol,
-	ks_json_t **methods,
-	ks_json_t **channels,
 	blade_access_control_t default_method_execute_access,
 	blade_access_control_t default_channel_subscribe_access,
 	blade_access_control_t default_channel_broadcast_access,
+	ks_json_t **methods,
+	ks_json_t **channels,
+	int rank,
+	ks_json_t **data,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
 	swclt_cmd_t *cmdP)
@@ -1208,12 +1214,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 	/* Create the command */
 	if (!(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD(
 			protocol,
-			NULL,
 			default_method_execute_access,
 			default_channel_subscribe_access,
 			default_channel_broadcast_access,
 			methods,
-		    channels))) {
+			channels,
+			rank,
+			data))) {
 		status = KS_STATUS_NO_MEM;
 		goto done;
 	}
@@ -1286,8 +1293,8 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
 			goto done;
 	}
 
-    /* Now hand it to the connection to submit it, it will block until the
-     * reply is received */
+	/* Now hand it to the connection to submit it, it will block until the
+	 * reply is received */
 	if (status = swclt_conn_submit_request(ctx->conn, cmd))
 		goto done;
 
@@ -1477,7 +1484,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 	if (status = swclt_conn_submit_request(ctx->conn, cmd))
 		goto done;
 
-    /* If not async, and caller didnt pass in a spot for the command, destroy it */
+	/* If not async, and caller didnt pass in a spot for the command, destroy it */
 	if (!cmdP && !response_callback)
 		ks_handle_destroy(&cmd);
 	else {

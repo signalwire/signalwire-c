@@ -117,21 +117,25 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
 	swclt_sess_t sess,
 	const char * protocol,
-	ks_json_t **methods,
-	ks_json_t **channels,
 	blade_access_control_t default_method_execute_access,
 	blade_access_control_t default_channel_subscribe_access,
 	blade_access_control_t default_channel_broadcast_access,
+	ks_json_t **methods,
+	ks_json_t **channels,
+	int rank,
+	ks_json_t **data,
 	swclt_cmd_t *cmdP);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 	swclt_sess_t sess,
 	const char * protocol,
-	ks_json_t **methods,
-	ks_json_t **channels,
 	blade_access_control_t default_method_execute_access,
 	blade_access_control_t default_channel_subscribe_access,
 	blade_access_control_t default_channel_broadcast_access,
+	ks_json_t **methods,
+	ks_json_t **channels,
+	int rank,
+	ks_json_t **data,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
 	swclt_cmd_t *cmd);

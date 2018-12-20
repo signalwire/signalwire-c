@@ -32,6 +32,8 @@ static const char *BLADE_NETCAST_CMD_PROTOCOL_REMOVE = "protocol.remove";
 static const char *BLADE_NETCAST_CMD_PROTOCOL_UPDATE = "protocol.update";
 static const char *BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_ADD = "protocol.provider.add";
 static const char *BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_REMOVE = "protocol.provider.remove";
+static const char *BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_RANK_UPDATE = "protocol.provider.rank.update";
+static const char *BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_DATA_UPDATE = "protocol.provider.data.update";
 static const char *BLADE_NETCAST_CMD_PROTOCOL_CHANNEL_ADD = "protocol.channel.add";
 static const char *BLADE_NETCAST_CMD_PROTOCOL_CHANNEL_REMOVE = "protocol.channel.remove";
 static const char *BLADE_NETCAST_CMD_SUBSCRIPTION_ADD = "subscription.add";
@@ -121,33 +123,41 @@ typedef struct blade_netcast_protocol_provider_add_param_s {
 	blade_access_control_t default_channel_subscribe_access;
 	blade_access_control_t default_channel_broadcast_access;
 	ks_json_t *channels;
+	int rank;
+	ks_json_t *data;
 } blade_netcast_protocol_provider_add_param_t;
 
 SWCLT_JSON_MARSHAL_BEG(BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM, blade_netcast_protocol_provider_add_param_t)
 	SWCLT_JSON_MARSHAL_STRING(protocol)
 	SWCLT_JSON_MARSHAL_STRING(nodeid)
-    SWCLT_JSON_MARSHAL_INT(default_method_execute_access)
-    SWCLT_JSON_MARSHAL_INT(default_channel_subscribe_access)
-    SWCLT_JSON_MARSHAL_INT(default_channel_broadcast_access)
+	SWCLT_JSON_MARSHAL_INT(default_method_execute_access)
+	SWCLT_JSON_MARSHAL_INT(default_channel_subscribe_access)
+	SWCLT_JSON_MARSHAL_INT(default_channel_broadcast_access)
 	SWCLT_JSON_MARSHAL_ITEM_OPT(channels)
+	SWCLT_JSON_MARSHAL_INT(rank)
+	SWCLT_JSON_MARSHAL_ITEM_OPT(data)
 SWCLT_JSON_MARSHAL_END()
 
 SWCLT_JSON_DESTROY_BEG(BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM, blade_netcast_protocol_provider_add_param_t)
 	SWCLT_JSON_DESTROY_STRING(protocol)
 	SWCLT_JSON_DESTROY_STRING(nodeid)
-    SWCLT_JSON_DESTROY_INT(default_method_execute_access)
-    SWCLT_JSON_DESTROY_INT(default_channel_subscribe_access)
-    SWCLT_JSON_DESTROY_INT(default_channel_broadcast_access)
+	SWCLT_JSON_DESTROY_INT(default_method_execute_access)
+	SWCLT_JSON_DESTROY_INT(default_channel_subscribe_access)
+	SWCLT_JSON_DESTROY_INT(default_channel_broadcast_access)
 	SWCLT_JSON_DESTROY_ITEM(channels)
+	SWCLT_JSON_DESTROY_INT(rank)
+	SWCLT_JSON_DESTROY_ITEM(data)
 SWCLT_JSON_DESTROY_END()
 
 SWCLT_JSON_PARSE_BEG(BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM, blade_netcast_protocol_provider_add_param_t)
 	SWCLT_JSON_PARSE_STRING(protocol)
 	SWCLT_JSON_PARSE_STRING(nodeid)
-    SWCLT_JSON_PARSE_INT_OPT_DEF(default_method_execute_access, BLADE_ACL_SYSTEM)
-    SWCLT_JSON_PARSE_INT_OPT_DEF(default_channel_subscribe_access, BLADE_ACL_SYSTEM)
-    SWCLT_JSON_PARSE_INT_OPT_DEF(default_channel_broadcast_access, BLADE_ACL_SYSTEM)
+	SWCLT_JSON_PARSE_INT_OPT_DEF(default_method_execute_access, BLADE_ACL_SYSTEM)
+	SWCLT_JSON_PARSE_INT_OPT_DEF(default_channel_subscribe_access, BLADE_ACL_SYSTEM)
+	SWCLT_JSON_PARSE_INT_OPT_DEF(default_channel_broadcast_access, BLADE_ACL_SYSTEM)
 	SWCLT_JSON_PARSE_ITEM_OPT(channels)
+	SWCLT_JSON_PARSE_INT_OPT_DEF(rank, 1)
+	SWCLT_JSON_PARSE_ITEM_OPT(data)
 SWCLT_JSON_PARSE_END()
 
 /* The params definition for BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_REMOVE */
@@ -170,6 +180,57 @@ SWCLT_JSON_PARSE_BEG(BLADE_NETCAST_PROTOCOL_PROVIDER_REMOVE_PARAM, blade_netcast
 	SWCLT_JSON_PARSE_STRING(protocol)
 	SWCLT_JSON_PARSE_STRING(nodeid)
 SWCLT_JSON_PARSE_END()
+
+/* The params definition for BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_RANK_UPDATE */
+typedef struct blade_netcast_protocol_provider_rank_update_param_s {
+	const char *protocol;
+	const char *nodeid;
+	int rank;
+} blade_netcast_protocol_provider_rank_update_param_t;
+
+SWCLT_JSON_MARSHAL_BEG(BLADE_NETCAST_PROTOCOL_PROVIDER_RANK_UPDATE_PARAM, blade_netcast_protocol_provider_rank_update_param_t)
+	SWCLT_JSON_MARSHAL_STRING(protocol)
+	SWCLT_JSON_MARSHAL_STRING(nodeid)
+	SWCLT_JSON_MARSHAL_INT(rank)
+SWCLT_JSON_MARSHAL_END()
+
+SWCLT_JSON_DESTROY_BEG(BLADE_NETCAST_PROTOCOL_PROVIDER_RANK_UPDATE_PARAM, blade_netcast_protocol_provider_rank_update_param_t)
+	SWCLT_JSON_DESTROY_STRING(protocol)
+	SWCLT_JSON_DESTROY_STRING(nodeid)
+	SWCLT_JSON_DESTROY_INT(rank)
+SWCLT_JSON_DESTROY_END()
+
+SWCLT_JSON_PARSE_BEG(BLADE_NETCAST_PROTOCOL_PROVIDER_RANK_UPDATE_PARAM, blade_netcast_protocol_provider_rank_update_param_t)
+	SWCLT_JSON_PARSE_STRING(protocol)
+	SWCLT_JSON_PARSE_STRING(nodeid)
+	SWCLT_JSON_PARSE_INT_OPT_DEF(rank, 1)
+SWCLT_JSON_PARSE_END()
+
+/* The params definition for BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_DATA_UPDATE */
+typedef struct blade_netcast_protocol_provider_data_update_param_s {
+	const char *protocol;
+	const char *nodeid;
+	ks_json_t *data;
+} blade_netcast_protocol_provider_data_update_param_t;
+
+SWCLT_JSON_MARSHAL_BEG(BLADE_NETCAST_PROTOCOL_PROVIDER_DATA_UPDATE_PARAM, blade_netcast_protocol_provider_data_update_param_t)
+	SWCLT_JSON_MARSHAL_STRING(protocol)
+	SWCLT_JSON_MARSHAL_STRING(nodeid)
+	SWCLT_JSON_MARSHAL_ITEM_OPT(data)
+SWCLT_JSON_MARSHAL_END()
+
+SWCLT_JSON_DESTROY_BEG(BLADE_NETCAST_PROTOCOL_PROVIDER_DATA_UPDATE_PARAM, blade_netcast_protocol_provider_data_update_param_t)
+	SWCLT_JSON_DESTROY_STRING(protocol)
+	SWCLT_JSON_DESTROY_STRING(nodeid)
+	SWCLT_JSON_DESTROY_ITEM(data)
+SWCLT_JSON_DESTROY_END()
+
+SWCLT_JSON_PARSE_BEG(BLADE_NETCAST_PROTOCOL_PROVIDER_DATA_UPDATE_PARAM, blade_netcast_protocol_provider_data_update_param_t)
+	SWCLT_JSON_PARSE_STRING(protocol)
+	SWCLT_JSON_PARSE_STRING(nodeid)
+	SWCLT_JSON_PARSE_ITEM_OPT(data)
+SWCLT_JSON_PARSE_END()
+
 
 /* The params definition for BLADE_NETCAST_CMD_AUTHORITY_ADD */
 typedef struct blade_netcast_authority_add_param_s {
