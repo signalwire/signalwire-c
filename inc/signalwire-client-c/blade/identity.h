@@ -100,7 +100,7 @@ static inline swclt_cmd_t __CREATE_BLADE_IDENTITY_CMD_ASYNC(
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if (status = swclt_cmd_create_ex(
+	if ((status = swclt_cmd_create_ex(
 			&cmd,
 			&pool,
 			cb,
@@ -109,7 +109,7 @@ static inline swclt_cmd_t __CREATE_BLADE_IDENTITY_CMD_ASYNC(
 			&request,
 			BLADE_IDENTITY_TTL_MS,
 			BLADE_IDENTITY_FLAGS,
-			ks_uuid_null())) {
+			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate identity cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it

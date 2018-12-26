@@ -188,7 +188,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if (status = swclt_cmd_create_ex(
+	if ((status = swclt_cmd_create_ex(
 			&cmd,
 			&pool,
 			cb,
@@ -197,7 +197,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 			&request,
 			BLADE_PROTOCOL_TTL_MS,
 			BLADE_PROTOCOL_FLAGS,
-			ks_uuid_null())) {
+			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
@@ -270,7 +270,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if (status = swclt_cmd_create_ex(
+	if ((status = swclt_cmd_create_ex(
 			&cmd,
 			&pool,
 			cb,
@@ -279,7 +279,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
 			&request,
 			BLADE_PROTOCOL_TTL_MS,
 			BLADE_PROTOCOL_FLAGS,
-			ks_uuid_null())) {
+			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
@@ -348,7 +348,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if (status = swclt_cmd_create_ex(
+	if ((status = swclt_cmd_create_ex(
 			&cmd,
 			&pool,
 			cb,
@@ -357,7 +357,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC
 			&request,
 			BLADE_PROTOCOL_TTL_MS,
 			BLADE_PROTOCOL_FLAGS,
-			ks_uuid_null())) {
+			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
