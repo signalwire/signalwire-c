@@ -119,7 +119,7 @@ static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 	/* Request object has been created, channels will now reside in it */
 
 	/* Now wrap it in a command */
-	if (status = swclt_cmd_create_ex(
+	if ((status = swclt_cmd_create_ex(
 			&cmd,
 			&pool,
 			cb,
@@ -128,7 +128,7 @@ static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 			&request_obj,
 			BLADE_SUBSCRIPTION_FLAGS,
 			BLADE_SUBSCRIPTION_TTL_MS,
-			ks_uuid_null())) {
+			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate subscription command: %lu", status);
 		ks_json_delete(&request_obj);
 		ks_pool_close(&pool);

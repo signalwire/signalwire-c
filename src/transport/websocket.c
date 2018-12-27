@@ -303,7 +303,7 @@ static ks_status_t __connect_socket(swclt_wss_ctx_t *ctx)
 		goto done;
 	}
 
-	snprintf(buf, sizeof(buf), "/%s:%s:swclt", ctx->info.path ? ctx->info.path : "", ctx->info.address);
+	snprintf(buf, sizeof(buf), "/%s:%s:swclt", ctx->info.path, ctx->info.address);
 	
 	if (status = kws_init(&ctx->wss, ctx->socket,
 			ctx->info.ssl, buf, KWS_BLOCK | KWS_CLOSE_SOCK, ctx->base.pool))

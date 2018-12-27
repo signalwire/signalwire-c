@@ -31,17 +31,16 @@ KS_BEGIN_EXTERN_C
 	static inline ks_status_t function_name##_ALLOC(ks_pool_t *pool,					\
 		target_type **result)															\
 	{																					\
+                ks_status_t status = KS_STATUS_SUCCESS;\
 		void (*release_cb)(target_type **) = function_name##_DESTROY;					\
 		target_type *target = (target_type *)ks_pool_alloc(pool, sizeof(target_type));	\
 																						\
-		if (!target) return KS_STATUS_NO_MEM;
+		if (!target) {status = KS_STATUS_NO_MEM; goto end;}
 
 #define SWCLT_JSON_ALLOC_CUSTOM(function_name, key)						\
 	{																	\
-		ks_status_t status;												\
-		if (status = function_name##_ALLOC(pool, &target->key)) {		\
-			release_cb(&target);										\
-			return status;												\
+		if ((status = function_name##_ALLOC(pool, &target->key))) { \
+		  goto end;\
 		}																\
 	}
 
@@ -50,6 +49,11 @@ KS_BEGIN_EXTERN_C
 
 
 #define SWCLT_JSON_ALLOC_END()											\
+  end:\
+        if (status) {								\
+	  if (target) release_cb(&target);				\
+	  return status;\
+        }\
 	*result = target;													\
 	return KS_STATUS_SUCCESS;											\
 	}
@@ -77,7 +81,7 @@ KS_BEGIN_EXTERN_C
 				release_cb(&target);											\
 				return KS_STATUS_INVALID_ARGUMENT;								\
 			}																	\
-			if (status = function_name##_PARSE(pool, object, &target->key)) { \
+			if ((status = function_name##_PARSE(pool, object, &target->key))) { \
 				release_cb(&target);											\
 				return status;													\
 			}																	\
@@ -163,7 +167,7 @@ KS_BEGIN_EXTERN_C
 			release_cb(&target);											\
 			return KS_STATUS_INVALID_ARGUMENT;								\
 		}																	\
-		if (status = function_name##_PARSE(pool, object, &target->key)) { \
+		if ((status = function_name##_PARSE(pool, object, &target->key))) { \
 			release_cb(&target);											\
 			return status;													\
 		}																	\

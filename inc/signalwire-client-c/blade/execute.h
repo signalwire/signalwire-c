@@ -139,7 +139,7 @@ static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
 	/* Forward declare the pool we're going to use for allocations relative to
 	 * the command, we will hand this pool to the command and it will use it
 	 * for its allocation */
-	if (status = ks_pool_open(&pool))
+	if ((status = ks_pool_open(&pool)))
 		return status;
 
 	request = ks_json_create_object();
@@ -153,7 +153,7 @@ static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if (status = swclt_cmd_create_ex(
+	if ((status = swclt_cmd_create_ex(
 			&cmd,
 			&pool,
 			cb,
@@ -162,7 +162,7 @@ static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
 			&request,
 			BLADE_EXECUTE_TTL_MS,
 			BLADE_EXECUTE_FLAGS,
-			ks_uuid_null())) {
+			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate execute cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
