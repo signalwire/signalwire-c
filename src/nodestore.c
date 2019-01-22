@@ -451,6 +451,29 @@ done:
 	return status;
 }
 
+static ks_status_t __get_protocols(swclt_store_ctx_t *ctx,
+								   ks_pool_t *pool,
+								   ks_json_t **protocols)
+{
+	ks_status_t status = KS_STATUS_SUCCESS;
+
+	*protocols = ks_json_pcreate_array(pool);
+
+	ks_hash_read_lock(ctx->protocols);
+
+	for (ks_hash_iterator_t *it = ks_hash_first(ctx->protocols, KS_UNLOCKED); it; it = ks_hash_next(&it)) {
+		const char *key = NULL;
+		blade_protocol_t *proto = NULL;
+
+		ks_hash_this(it, (const void **)&key, NULL, (void **)&proto);
+
+		ks_json_padd_string_to_array(pool, *protocols, key);
+	}
+
+	ks_hash_read_unlock(ctx->protocols);
+	return status;
+}
+
 static ks_status_t __get_protocol_providers(swclt_store_ctx_t *ctx,
 											const char *name,
 											ks_pool_t *pool,
@@ -1170,6 +1193,13 @@ SWCLT_DECLARE(ks_status_t) swclt_store_create(swclt_store_t *store)
 		__context_describe,
 		__context_deinit,
 		__context_init)
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_store_get_protocols(swclt_store_t store, ks_pool_t *pool, ks_json_t **protocols)
+{
+	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
+	status = __get_protocols(ctx, pool, protocols);
+	SWCLT_STORE_SCOPE_END(store, ctx, status)
 }
 
 /* Returns success if the protocol exists and the store is valid, also works for uncertified client protocols check. */
