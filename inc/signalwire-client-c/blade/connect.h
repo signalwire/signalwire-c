@@ -66,6 +66,7 @@ SWCLT_JSON_PARSE_END()
 
 /* Define our reply structure */
 typedef struct blade_connect_rpl_s {
+	ks_bool_t session_restored;
 	ks_uuid_t sessionid;
 	const char *nodeid;
 	const char *master_nodeid;
@@ -78,6 +79,7 @@ typedef struct blade_connect_rpl_s {
 } blade_connect_rpl_t;
 
 SWCLT_JSON_MARSHAL_BEG(BLADE_CONNECT_RPL, blade_connect_rpl_t)
+    SWCLT_JSON_MARSHAL_BOOL(session_restored)
 	SWCLT_JSON_MARSHAL_UUID(sessionid)
 	SWCLT_JSON_MARSHAL_STRING(nodeid)
 	SWCLT_JSON_MARSHAL_STRING(master_nodeid)
@@ -90,7 +92,8 @@ SWCLT_JSON_MARSHAL_BEG(BLADE_CONNECT_RPL, blade_connect_rpl_t)
 SWCLT_JSON_MARSHAL_END()
 
 SWCLT_JSON_DESTROY_BEG(BLADE_CONNECT_RPL, blade_connect_rpl_t)
-	SWCLT_JSON_DESTROY_UUID(sessionid)
+    SWCLT_JSON_DESTROY_BOOL(session_restored)
+    SWCLT_JSON_DESTROY_UUID(sessionid)
 	SWCLT_JSON_DESTROY_STRING(nodeid)
 	SWCLT_JSON_DESTROY_STRING(master_nodeid)
 	SWCLT_JSON_DESTROY_ITEM(authorization)
@@ -102,6 +105,7 @@ SWCLT_JSON_DESTROY_BEG(BLADE_CONNECT_RPL, blade_connect_rpl_t)
 SWCLT_JSON_DESTROY_END()
 
 SWCLT_JSON_PARSE_BEG(BLADE_CONNECT_RPL, blade_connect_rpl_t)
+    SWCLT_JSON_PARSE_BOOL(session_restored)
 	SWCLT_JSON_PARSE_UUID(sessionid)
 	SWCLT_JSON_PARSE_STRING(nodeid)
 	SWCLT_JSON_PARSE_STRING(master_nodeid)
