@@ -327,10 +327,14 @@ static ks_status_t __on_connect_reply(swclt_conn_t conn, ks_json_t *error, const
 		if (ctx->auth_failed_cb) ctx->auth_failed_cb(ctx->base.handle);
 	}
 
-	if (connect_rpl) {
-		/* Great we got the reply populate the node store */
-		if (status = swclt_store_populate(ctx->store, connect_rpl))
-			ks_log(KS_LOG_WARNING, "Failed to populate node store from connect reply (%lu)", status);
+    if (connect_rpl) {
+		if (!connect_rpl->session_restored)
+		{
+			/* Great we got the reply populate the node store */
+			swclt_store_reset(ctx->store);
+			if (status = swclt_store_populate(ctx->store, connect_rpl))
+				ks_log(KS_LOG_WARNING, "Failed to populate node store from connect reply (%lu)", status);
+		}
 	}
 
 	return status;

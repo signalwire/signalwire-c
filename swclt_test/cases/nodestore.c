@@ -118,6 +118,7 @@ blade_connect_rpl_t __connect_reply(ks_pool_t *pool)
 
 	/* Now compose it altogether in a connect result */
 	blade_connect_rpl_t reply = (blade_connect_rpl_t){
+            KS_FALSE,
 			*ks_uuid(&g_sessionid),
 			ks_uuid_str(pool, &g_route_nodeid_1),
 			ks_uuid_null_str(pool),

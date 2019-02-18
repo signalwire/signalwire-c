@@ -72,6 +72,7 @@ typedef void (*swclt_store_cb_authority_remove_t)(
 	const blade_netcast_authority_remove_param_t *params);
 
 SWCLT_DECLARE(ks_status_t) swclt_store_create(swclt_store_t *store);
+SWCLT_DECLARE(ks_status_t) swclt_store_reset(swclt_store_t store);
 SWCLT_DECLARE(ks_status_t) swclt_store_populate(swclt_store_t store, const blade_connect_rpl_t *connect_rpl);
 SWCLT_DECLARE(ks_status_t) swclt_store_update(swclt_store_t store, const blade_netcast_rqu_t *netcast_rqu);
 SWCLT_DECLARE(ks_status_t) swclt_store_get_protocols(swclt_store_t store, ks_pool_t *pool, ks_json_t **protocols);

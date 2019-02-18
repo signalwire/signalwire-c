@@ -1158,6 +1158,64 @@ static ks_status_t __context_init(swclt_store_ctx_t *ctx)
 	return status;
 }
 
+SWCLT_DECLARE(ks_status_t) swclt_store_reset(swclt_store_t store)
+{
+	ks_hash_iterator_t *itt;
+
+	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
+
+	while (itt = ks_hash_first(ctx->routes, KS_UNLOCKED)) {
+		const char *key = NULL;
+		void *value = NULL;
+
+		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
+
+		ks_hash_remove(ctx->routes, (const void *)key);
+	}
+
+	while (itt = ks_hash_first(ctx->protocols, KS_UNLOCKED)) {
+		const char *key = NULL;
+		blade_protocol_t *protocol = NULL;
+
+		ks_hash_this(itt, (const void **)&key, NULL, (void **)&protocol);
+
+		ks_hash_remove(ctx->protocols, (const void *)key);
+
+		BLADE_PROTOCOL_DESTROY(&protocol);
+	}
+
+	while (itt = ks_hash_first(ctx->subscriptions, KS_UNLOCKED)) {
+		const char *key = NULL;
+		void *value = NULL;
+
+		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
+
+		ks_hash_remove(ctx->routes, (const void *)key);
+	}
+
+
+	while (itt = ks_hash_first(ctx->authorities, KS_UNLOCKED)) {
+		const char *key = NULL;
+		void *value = NULL;
+
+		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
+
+		ks_hash_remove(ctx->authorities, (const void *)key);
+	}
+
+	while (itt = ks_hash_first(ctx->protocols_uncertified, KS_UNLOCKED)) {
+		const char *key = NULL;
+		void *value = NULL;
+
+		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
+
+		ks_hash_remove(ctx->protocols_uncertified, (const void *)key);
+	}
+
+
+	SWCLT_STORE_SCOPE_END(store, ctx, status)
+}
+
 SWCLT_DECLARE(ks_status_t) swclt_store_populate(swclt_store_t store, const blade_connect_rpl_t *connect_rpl)
 {
 	blade_connect_rpl_t *rpl = (blade_connect_rpl_t *)connect_rpl;
