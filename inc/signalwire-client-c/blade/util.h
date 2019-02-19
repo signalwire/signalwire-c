@@ -32,6 +32,8 @@ static inline uint32_t BLADE_METHOD_FLAGS(const char * const method)
 	ks_assertd(method != NULL);
 	if (!strcmp(method, BLADE_BROADCAST_METHOD))
 		return BLADE_BROADCAST_FLAGS;
+	else if (!strcmp(method, BLADE_DISCONNECT_METHOD))
+		return BLADE_DISCONNECT_FLAGS;
 	else if (!strcmp(method, BLADE_NETCAST_METHOD))
 		return BLADE_NETCAST_FLAGS;
 	else if (!strcmp(method, BLADE_PROTOCOL_METHOD))

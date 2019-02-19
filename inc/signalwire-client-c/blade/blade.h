@@ -30,6 +30,7 @@
 
 #include "signalwire-client-c/blade/type.h"
 #include "signalwire-client-c/blade/connect.h"
+#include "signalwire-client-c/blade/disconnect.h"
 #include "signalwire-client-c/blade/authenticate.h"
 #include "signalwire-client-c/blade/authority.h"
 #include "signalwire-client-c/blade/broadcast.h"
