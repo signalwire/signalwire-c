@@ -344,6 +344,7 @@ static ks_status_t __on_connect_reply(swclt_conn_t conn, ks_json_t *error, const
 	}
 
     if (connect_rpl) {
+		status = KS_STATUS_SUCCESS;
 		if (!connect_rpl->session_restored)
 		{
 			/* Great we got the reply populate the node store */
