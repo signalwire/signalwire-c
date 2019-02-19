@@ -232,6 +232,22 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t conn, swclt_cmd_t cmd, swclt_s
 
 		BLADE_BROADCAST_RQU_DESTROY(&rqu);
 		goto done;
+	} else if (!strcmp(method, BLADE_DISCONNECT_METHOD)) {
+		//blade_disconnect_rqu_t *rqu;
+
+		//status = BLADE_DISCONNECT_RQU_PARSE(cmd_pool, request, &rqu);
+
+		swclt_cmd_ctx_unlock(cmd_ctx);
+
+		//if (status) {
+		//	ks_log(KS_LOG_ERROR, "Failed to parse netcast command: %s (%lu)", ks_handle_describe_ctx(cmd_ctx), status);
+		//	goto done;
+		//}
+
+		// TODO: Handle disconnect properly, should halt sending more data until restored
+
+		//BLADE_DISCONNECT_RQU_DESTROY(&rqu);
+		goto done;
 	} else if (!strcmp(method, BLADE_NETCAST_METHOD)) {
 		blade_netcast_rqu_t *rqu;
 
