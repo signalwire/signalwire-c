@@ -936,6 +936,8 @@ static ks_status_t __update_route_remove(swclt_store_ctx_t *ctx, blade_netcast_r
 	if (status = BLADE_NETCAST_ROUTE_REMOVE_PARAM_PARSE(ctx->base.pool, netcast_rqu->params, &params))
 		return status;
 
+	__invoke_cb_route_remove(ctx, netcast_rqu, params);
+
 	/* Remove the node from the hash */
 	ks_hash_remove(ctx->routes, params->nodeid);
 
@@ -949,8 +951,6 @@ static ks_status_t __update_route_remove(swclt_store_ctx_t *ctx, blade_netcast_r
 	
 	ks_hash_remove(ctx->authorities, params->nodeid);
 	//ks_hash_remove(ctx->accesses, params->nodeid);
-
-	__invoke_cb_route_remove(ctx, netcast_rqu, params);
 
 	/* Done with the request */
 	BLADE_NETCAST_ROUTE_REMOVE_PARAM_DESTROY(&params);
