@@ -78,6 +78,51 @@ static void __invoke_cb_route_remove(swclt_store_ctx_t *ctx, const blade_netcast
 	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
 }
 
+static ks_status_t __add_cb_identity_add(swclt_store_ctx_t *ctx, swclt_store_cb_identity_add_t cb)
+{
+	ks_log(KS_LOG_DEBUG, "Adding identity add handler for method: %s", BLADE_NETCAST_CMD_IDENTITY_ADD);
+	return ks_hash_insert(ctx->callbacks, (const void *)BLADE_NETCAST_CMD_IDENTITY_ADD, (void *)cb);
+}
+
+static void __invoke_cb_identity_add(swclt_store_ctx_t *ctx, const blade_netcast_rqu_t *rqu, const blade_netcast_identity_add_param_t *params)
+{
+	swclt_store_cb_identity_add_t cb;
+
+	ks_log(KS_LOG_DEBUG, "Looking up identity add handler for method: %s", BLADE_NETCAST_CMD_IDENTITY_ADD);
+
+	ks_hash_read_lock(ctx->callbacks);
+	cb = (swclt_store_cb_identity_add_t)ks_hash_search(ctx->callbacks,
+													   (const void *)BLADE_NETCAST_CMD_IDENTITY_ADD,
+													   KS_UNLOCKED);
+	ks_hash_read_unlock(ctx->callbacks);
+
+
+	if (cb) {
+		ks_log(KS_LOG_DEBUG, "Invoking callback for node store identity add");
+		cb(__get_sess_from_store_ctx(ctx), rqu, params);
+	} else {
+		ks_log(KS_LOG_DEBUG, "No callback registered for identity add method: %s", BLADE_NETCAST_CMD_IDENTITY_ADD);
+	}
+}
+
+static ks_status_t __add_cb_identity_remove(swclt_store_ctx_t *ctx, swclt_store_cb_identity_remove_t cb)
+{
+	return ks_hash_insert(ctx->callbacks, (const void *)BLADE_NETCAST_CMD_IDENTITY_REMOVE, (void *)cb);
+}
+
+static void __invoke_cb_identity_remove(swclt_store_ctx_t *ctx, const blade_netcast_rqu_t *rqu, const blade_netcast_identity_remove_param_t *params)
+{
+	swclt_store_cb_identity_remove_t cb;
+
+	ks_hash_read_lock(ctx->callbacks);
+	cb = (swclt_store_cb_identity_remove_t)ks_hash_search(ctx->callbacks,
+														  (const void *)BLADE_NETCAST_CMD_IDENTITY_REMOVE,
+														  KS_UNLOCKED);
+	ks_hash_read_unlock(ctx->callbacks);
+
+	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+}
+
 static ks_status_t __add_cb_protocol_add(swclt_store_ctx_t *ctx, swclt_store_cb_protocol_add_t cb)
 {
 	return ks_hash_insert(ctx->callbacks, (const void *)BLADE_NETCAST_CMD_PROTOCOL_ADD, (void *)cb);
@@ -324,6 +369,70 @@ static ks_status_t __lookup_protocol_uncertified(swclt_store_ctx_t *ctx, const c
 {
 	if (ks_hash_search(ctx->protocols_uncertified, name, KS_UNLOCKED) == NULL) return KS_STATUS_NOT_FOUND;
 	return KS_STATUS_SUCCESS;
+}
+
+static void __remove_identities_by_nodeid(swclt_store_ctx_t *ctx, const char *nodeid)
+{
+	ks_hash_iterator_t *itt;
+	ks_hash_t *cleanup = NULL;
+
+	ks_hash_write_lock(ctx->identities);
+	// iterate all identities
+	for (itt = ks_hash_first(ctx->identities, KS_UNLOCKED); itt; itt = ks_hash_next(&itt)) {
+		const char *val;
+		const char *key;
+
+		ks_hash_this(itt, (const void **)&key, NULL, (void **)&val);
+
+		if (strcmp(nodeid, val)) continue;
+
+		if (!cleanup)
+			ks_hash_create(&cleanup, KS_HASH_MODE_CASE_INSENSITIVE, KS_HASH_FLAG_NOLOCK, ctx->base.pool);
+
+		ks_log(KS_LOG_INFO, "Removing identity %s from node %s", key, val);
+
+		ks_hash_insert(cleanup, key, (void *)KS_TRUE);
+	}
+
+    if (cleanup) {
+		for (itt = ks_hash_first(cleanup, KS_UNLOCKED); itt; itt = ks_hash_next(&itt)) {
+			const char *key = NULL;
+			void *val = NULL;
+
+			ks_hash_this(itt, (const void **)&key, NULL, (void **)&val);
+
+			ks_hash_remove(ctx->identities, (const void *)key);
+		}
+		ks_hash_destroy(&cleanup);
+	}
+	
+	ks_hash_write_unlock(ctx->identities);
+}
+
+static ks_status_t __get_node_identities(swclt_store_ctx_t *ctx,
+										 const char *nodeid,
+										 ks_pool_t *pool,
+										 ks_hash_t **identities)
+{
+	ks_status_t status = KS_STATUS_SUCCESS;
+    ks_hash_iterator_t *itt;
+
+	ks_hash_create(identities, KS_HASH_MODE_CASE_INSENSITIVE, KS_HASH_FLAG_FREE_KEY, pool);
+
+    ks_hash_read_lock(ctx->identities);
+    // iterate all identities
+    for (itt = ks_hash_first(ctx->identities, KS_UNLOCKED); itt; itt = ks_hash_next(&itt)) {
+		const char *val;
+		const char *key;
+
+		ks_hash_this(itt, (const void **)&key, NULL, (void **)&val);
+
+		if (strcmp(nodeid, val)) continue;
+
+		ks_hash_insert(*identities, ks_pstrdup(pool, key), (void *)KS_TRUE);
+	}
+
+    ks_hash_read_unlock(ctx->identities);
 }
 
 static void __remove_provider_from_protocols(swclt_store_ctx_t *ctx, const char *nodeid)
@@ -827,8 +936,13 @@ static ks_status_t __update_route_remove(swclt_store_ctx_t *ctx, blade_netcast_r
 	if (status = BLADE_NETCAST_ROUTE_REMOVE_PARAM_PARSE(ctx->base.pool, netcast_rqu->params, &params))
 		return status;
 
+	__invoke_cb_route_remove(ctx, netcast_rqu, params);
+
 	/* Remove the node from the hash */
 	ks_hash_remove(ctx->routes, params->nodeid);
+
+	/* Remove the identities that map to the nodeid */
+	__remove_identities_by_nodeid(ctx, params->nodeid);
 
 	/* Now we have to rummage through the protocols hash and remove any protocols hosted by this node */
 	__remove_provider_from_protocols(ctx, params->nodeid);
@@ -837,8 +951,6 @@ static ks_status_t __update_route_remove(swclt_store_ctx_t *ctx, blade_netcast_r
 	
 	ks_hash_remove(ctx->authorities, params->nodeid);
 	//ks_hash_remove(ctx->accesses, params->nodeid);
-
-	__invoke_cb_route_remove(ctx, netcast_rqu, params);
 
 	/* Done with the request */
 	BLADE_NETCAST_ROUTE_REMOVE_PARAM_DESTROY(&params);
@@ -849,13 +961,50 @@ static ks_status_t __update_route_remove(swclt_store_ctx_t *ctx, blade_netcast_r
 // Identity add/remove
 static ks_status_t __update_identity_add(swclt_store_ctx_t *ctx, blade_netcast_rqu_t *netcast_rqu)
 {
-	/* @@ TODO */
-	return KS_STATUS_SUCCESS;
+	blade_netcast_identity_add_param_t *params;
+	ks_status_t status;
+
+	if (status = BLADE_NETCAST_IDENTITY_ADD_PARAM_PARSE(ctx->base.pool, netcast_rqu->params, &params))
+		return status;
+
+    if (status = ks_hash_insert(ctx->identities, ks_pstrdup(ctx->base.pool, params->identity), ks_pstrdup(ctx->base.pool, params->nodeid))) {
+		ks_log(KS_LOG_ERROR, "Failed to insert identity: %d", status);
+		goto done;
+	}
+	
+	__invoke_cb_identity_add(ctx, netcast_rqu, params);
+
+done:
+	BLADE_NETCAST_IDENTITY_ADD_PARAM_DESTROY(&params);
+
+	return status;
 }
 
 static ks_status_t __update_identity_remove(swclt_store_ctx_t *ctx, blade_netcast_rqu_t *netcast_rqu)
 {
-	/* @@ TODO */
+	blade_netcast_identity_remove_param_t *params;
+	ks_status_t status;
+	const char *nodeid = NULL;
+
+	if (status = BLADE_NETCAST_IDENTITY_REMOVE_PARAM_PARSE(ctx->base.pool, netcast_rqu->params, &params))
+		return status;
+
+	ks_hash_write_lock(ctx->identities);
+
+	/* Make sure the identity is owned by the right nodeid */
+	nodeid = (const char *)ks_hash_search(ctx->identities, params->identity, KS_UNLOCKED);
+	if (nodeid && !strcmp(nodeid, params->nodeid))
+	{
+		/* Remove the identity from the hash */
+		__invoke_cb_identity_remove(ctx, netcast_rqu, params);
+		ks_hash_remove(ctx->identities, params->identity);
+	}
+
+	ks_hash_write_unlock(ctx->identities);
+
+	/* Done with the request */
+	BLADE_NETCAST_IDENTITY_REMOVE_PARAM_DESTROY(&params);
+
 	return KS_STATUS_SUCCESS;
 }
 
@@ -997,12 +1146,28 @@ static ks_status_t __populate_routes(swclt_store_ctx_t *ctx, blade_connect_rpl_t
 {
 	ks_json_t *entry;
 	ks_status_t status;
+	const char *nodeid;
+	ks_json_t *identities;
 
 	/* Walk the routes array and add them */
 	KS_JSON_ARRAY_FOREACH(entry, connect_rpl->routes) {
 		if (status = __add_route_obj(ctx, entry)) {
 			ks_log(KS_LOG_ERROR, "Failed to populate route: %d", status);
 			return status;
+		}
+
+		// Identities
+		nodeid = ks_json_get_object_cstr(entry, "nodeid");
+		identities = ks_json_get_object_item(entry, "identities");
+		if (nodeid && identities && ks_json_type_is_array(identities))
+		{
+			int size = ks_json_get_array_size(identities);
+			for (int index = 0; index < size; ++index)
+			{
+				const char *identity = ks_json_get_array_cstr(identities, index);
+				if (!identity) continue;
+				ks_hash_insert(ctx->identities, ks_pstrdup(ctx->base.pool, identity), ks_pstrdup(ctx->base.pool, nodeid));
+			}
 		}
 	}
 
@@ -1098,6 +1263,7 @@ static void __context_deinit(swclt_store_ctx_t *ctx)
 	ks_hash_destroy(&ctx->callbacks);
 	ks_hash_destroy(&ctx->subscriptions);
 	ks_hash_destroy(&ctx->protocols);
+	ks_hash_destroy(&ctx->identities);
 	ks_hash_destroy(&ctx->routes);
 	ks_hash_destroy(&ctx->authorities);
 	ks_hash_destroy(&ctx->protocols_uncertified);
@@ -1139,9 +1305,17 @@ static ks_status_t __context_init(swclt_store_ctx_t *ctx)
 			ctx->base.pool))
 		return status;
 
-	/* Create our roues hash, keyed by the nodeid name */
+	/* Create our routes hash, keyed by the nodeid */
 	if (status = ks_hash_create(
 			&ctx->routes,
+			KS_HASH_MODE_CASE_INSENSITIVE,
+			KS_HASH_FLAG_FREE_KEY | KS_HASH_FLAG_FREE_VALUE,
+			ctx->base.pool))
+		return status;
+
+	/* Create our identities hash, keyed by the identity */
+	if (status = ks_hash_create(
+			&ctx->identities,
 			KS_HASH_MODE_CASE_INSENSITIVE,
 			KS_HASH_FLAG_FREE_KEY | KS_HASH_FLAG_FREE_VALUE,
 			ctx->base.pool))
@@ -1173,6 +1347,15 @@ SWCLT_DECLARE(ks_status_t) swclt_store_reset(swclt_store_t store)
 		ks_hash_remove(ctx->routes, (const void *)key);
 	}
 
+	while (itt = ks_hash_first(ctx->identities, KS_UNLOCKED)) {
+		const char *key = NULL;
+		void *value = NULL;
+
+		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
+
+		ks_hash_remove(ctx->identities, (const void *)key);
+	}
+
 	while (itt = ks_hash_first(ctx->protocols, KS_UNLOCKED)) {
 		const char *key = NULL;
 		blade_protocol_t *protocol = NULL;
@@ -1190,7 +1373,7 @@ SWCLT_DECLARE(ks_status_t) swclt_store_reset(swclt_store_t store)
 
 		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
 
-		ks_hash_remove(ctx->routes, (const void *)key);
+		ks_hash_remove(ctx->subscriptions, (const void *)key);
 	}
 
 
@@ -1251,6 +1434,16 @@ SWCLT_DECLARE(ks_status_t) swclt_store_create(swclt_store_t *store)
 		__context_describe,
 		__context_deinit,
 		__context_init)
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_store_get_node_identities(swclt_store_t store,
+														   const char *nodeid,
+														   ks_pool_t *pool,
+														   ks_hash_t **identities)
+{
+	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
+	status = __get_node_identities(ctx, nodeid, pool, identities);
+	SWCLT_STORE_SCOPE_END(store, ctx, status)
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_store_get_protocols(swclt_store_t store, ks_pool_t *pool, ks_json_t **protocols)

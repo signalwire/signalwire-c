@@ -36,6 +36,9 @@ struct swclt_store_ctx {
      * class which contains their certified status. */
 	ks_hash_t *routes;
 
+	/* Hash keyed by identity mapped to nodeid */
+	ks_hash_t *identities;
+
 	/* Last index position we selected for random protocol gathering */
 	uint32_t last_random_protocol_idx;
 

@@ -71,10 +71,21 @@ typedef void (*swclt_store_cb_authority_remove_t)(
 	const blade_netcast_rqu_t* rqu,
 	const blade_netcast_authority_remove_param_t *params);
 
+typedef void (*swclt_store_cb_identity_add_t)(swclt_sess_t sess,
+	const blade_netcast_rqu_t *rqu,
+	const blade_netcast_identity_add_param_t *params);
+
+typedef void (*swclt_store_cb_identity_remove_t)(
+	swclt_sess_t sess,
+	const blade_netcast_rqu_t* rqu,
+	const blade_netcast_identity_remove_param_t *params);
+
+
 SWCLT_DECLARE(ks_status_t) swclt_store_create(swclt_store_t *store);
 SWCLT_DECLARE(ks_status_t) swclt_store_reset(swclt_store_t store);
 SWCLT_DECLARE(ks_status_t) swclt_store_populate(swclt_store_t store, const blade_connect_rpl_t *connect_rpl);
 SWCLT_DECLARE(ks_status_t) swclt_store_update(swclt_store_t store, const blade_netcast_rqu_t *netcast_rqu);
+SWCLT_DECLARE(ks_status_t) swclt_store_get_node_identities(swclt_store_t store, const char *nodeid, ks_pool_t *pool, ks_hash_t **identities);
 SWCLT_DECLARE(ks_status_t) swclt_store_get_protocols(swclt_store_t store, ks_pool_t *pool, ks_json_t **protocols);
 SWCLT_DECLARE(ks_status_t) swclt_store_check_protocol(swclt_store_t store, const char *name);
 													  
@@ -92,6 +103,8 @@ SWCLT_DECLARE(ks_status_t) swclt_store_get_protocol_providers(
 
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_route_add(swclt_store_t store, swclt_store_cb_route_add_t cb);
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_route_remove(swclt_store_t store, swclt_store_cb_route_remove_t cb);
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_identity_add(swclt_store_t store, swclt_store_cb_identity_add_t cb);
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_identity_remove(swclt_store_t store, swclt_store_cb_identity_remove_t cb);
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_add(swclt_store_t store, swclt_store_cb_protocol_add_t cb);
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_remove(swclt_store_t store, swclt_store_cb_protocol_remove_t cb);
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_provider_add(swclt_store_t store, swclt_store_cb_protocol_provider_add_t cb);
