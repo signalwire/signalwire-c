@@ -409,6 +409,32 @@ static void __remove_identities_by_nodeid(swclt_store_ctx_t *ctx, const char *no
 	ks_hash_write_unlock(ctx->identities);
 }
 
+static ks_status_t __get_node_identities(swclt_store_ctx_t *ctx,
+										 const char *nodeid,
+										 ks_pool_t *pool,
+										 ks_hash_t **identities)
+{
+	ks_status_t status = KS_STATUS_SUCCESS;
+    ks_hash_iterator_t *itt;
+
+	ks_hash_create(identities, KS_HASH_MODE_CASE_INSENSITIVE, KS_HASH_FLAG_FREE_KEY, pool);
+
+    ks_hash_read_lock(ctx->identities);
+    // iterate all identities
+    for (itt = ks_hash_first(ctx->identities, KS_UNLOCKED); itt; itt = ks_hash_next(&itt)) {
+		const char *val;
+		const char *key;
+
+		ks_hash_this(itt, (const void **)&key, NULL, (void **)&val);
+
+		if (strcmp(nodeid, val)) continue;
+
+		ks_hash_insert(*identities, ks_pstrdup(pool, key), (void *)KS_TRUE);
+	}
+
+    ks_hash_read_unlock(ctx->identities);
+}
+
 static void __remove_provider_from_protocols(swclt_store_ctx_t *ctx, const char *nodeid)
 {
 	ks_hash_iterator_t *itt;
@@ -1408,6 +1434,16 @@ SWCLT_DECLARE(ks_status_t) swclt_store_create(swclt_store_t *store)
 		__context_describe,
 		__context_deinit,
 		__context_init)
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_store_get_node_identities(swclt_store_t store,
+														   const char *nodeid,
+														   ks_pool_t *pool,
+														   ks_hash_t **identities)
+{
+	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
+	status = __get_node_identities(ctx, nodeid, pool, identities);
+	SWCLT_STORE_SCOPE_END(store, ctx, status)
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_store_get_protocols(swclt_store_t store, ks_pool_t *pool, ks_json_t **protocols)
