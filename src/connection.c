@@ -242,7 +242,7 @@ static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *paylo
 
 	ks_log(KS_LOG_DEBUG, "Handling incoming request: %s", ks_handle_describe(frame));
 
-	if (!(method = ks_json_get_object_cstr(payload, "method"))) {
+	if (!(method = ks_json_get_object_cstr_def(payload, "method", NULL))) {
 		ks_log(KS_LOG_WARNING, "Invalid response received: %s", ks_handle_describe(frame));
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
