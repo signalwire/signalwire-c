@@ -279,3 +279,46 @@ typedef blade_node_t blade_netcast_route_remove_param_t;
 #define BLADE_NETCAST_ROUTE_REMOVE_PARAM_MARSHAL BLADE_NODE_MARSHAL
 #define BLADE_NETCAST_ROUTE_REMOVE_PARAM_DESTROY BLADE_NODE_DESTROY
 #define BLADE_NETCAST_ROUTE_REMOVE_PARAM_PARSE BLADE_NODE_PARSE
+
+/* The params definition for BLADE_NETCAST_CMD_IDENTITY_ADD */
+typedef struct blade_netcast_identity_add_param_s {
+	const char *nodeid;
+	const char *identity;
+} blade_netcast_identity_add_param_t;
+
+SWCLT_JSON_MARSHAL_BEG(BLADE_NETCAST_IDENTITY_ADD_PARAM, blade_netcast_identity_add_param_t)
+	SWCLT_JSON_MARSHAL_STRING(nodeid)
+	SWCLT_JSON_MARSHAL_STRING(identity)
+SWCLT_JSON_MARSHAL_END()
+
+SWCLT_JSON_DESTROY_BEG(BLADE_NETCAST_IDENTITY_ADD_PARAM, blade_netcast_identity_add_param_t)
+	SWCLT_JSON_DESTROY_STRING(nodeid)
+	SWCLT_JSON_DESTROY_STRING(identity)
+SWCLT_JSON_DESTROY_END()
+
+SWCLT_JSON_PARSE_BEG(BLADE_NETCAST_IDENTITY_ADD_PARAM, blade_netcast_identity_add_param_t)
+	SWCLT_JSON_PARSE_STRING(nodeid)
+	SWCLT_JSON_PARSE_STRING(identity)
+SWCLT_JSON_PARSE_END()
+
+/* The params definition for BLADE_NETCAST_CMD_IDENTITY_REMOVE */
+typedef struct blade_netcast_identity_remove_param_s {
+	const char *nodeid;
+	const char *identity;
+} blade_netcast_identity_remove_param_t;
+
+SWCLT_JSON_MARSHAL_BEG(BLADE_NETCAST_IDENTITY_REMOVE_PARAM, blade_netcast_identity_remove_param_t)
+	SWCLT_JSON_MARSHAL_STRING(nodeid)
+	SWCLT_JSON_MARSHAL_STRING(identity)
+SWCLT_JSON_MARSHAL_END()
+
+SWCLT_JSON_DESTROY_BEG(BLADE_NETCAST_IDENTITY_REMOVE_PARAM, blade_netcast_identity_remove_param_t)
+	SWCLT_JSON_DESTROY_STRING(nodeid)
+	SWCLT_JSON_DESTROY_STRING(identity)
+SWCLT_JSON_DESTROY_END()
+
+SWCLT_JSON_PARSE_BEG(BLADE_NETCAST_IDENTITY_REMOVE_PARAM, blade_netcast_identity_remove_param_t)
+	SWCLT_JSON_PARSE_STRING(nodeid)
+	SWCLT_JSON_PARSE_STRING(identity)
+SWCLT_JSON_PARSE_END()
+
