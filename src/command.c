@@ -133,7 +133,7 @@ static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t fram
 
 	/* Now load the id, method, and verify it has at least a params structure in it as
 	 * well as the jsonrpc tag */
-	if (!(method = ks_json_get_object_cstr(original_json, "method"))) {
+	if (!(method = ks_json_get_object_cstr_def(original_json, "method", NULL))) {
 		ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no method field present: %s", ks_handle_describe(frame));
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
@@ -141,7 +141,7 @@ static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t fram
 		ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no params field present: %s", ks_handle_describe(frame));
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
-	if (!(jsonrpc = ks_json_get_object_cstr(original_json, "jsonrpc"))) {
+	if (!(jsonrpc = ks_json_get_object_cstr_def(original_json, "jsonrpc", NULL))) {
 		ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no jsonrpc field present: %s", ks_handle_describe(frame));
 		return KS_STATUS_INVALID_ARGUMENT;
 	}

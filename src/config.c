@@ -58,19 +58,19 @@ SWCLT_DECLARE(ks_status_t) swclt_config_load_from_json(swclt_config_t *config, k
 	ks_status_t ret = KS_STATUS_SUCCESS;
 	const char *val = NULL;
 
-	if ((val = ks_json_get_object_cstr(json, "private_key_path"))) {
+	if ((val = ks_json_get_object_cstr_def(json, "private_key_path", NULL))) {
 		swclt_config_set_private_key_path(config, val);
 	}
 
-	if ((val = ks_json_get_object_cstr(json, "client_cert_path"))) {
+	if ((val = ks_json_get_object_cstr_def(json, "client_cert_path", NULL))) {
 		swclt_config_set_client_cert_path(config, val);
 	}
 
-	if ((val = ks_json_get_object_cstr(json, "cert_chain_path"))) {
+	if ((val = ks_json_get_object_cstr_def(json, "cert_chain_path", NULL))) {
 		swclt_config_set_cert_chain_path(config, val);
 	}
 	
-	if ((val = ks_json_get_object_cstr(json, "authentication"))) {
+	if ((val = ks_json_get_object_cstr_def(json, "authentication", NULL))) {
 		swclt_config_set_authentication(config, val);
 	}
 	

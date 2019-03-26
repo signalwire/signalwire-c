@@ -1607,7 +1607,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 	}
 
 	// Get protocol from result, duplicate it so we can destroy the command
-	protocol = ks_json_get_object_cstr(result, "protocol");
+	protocol = ks_json_get_object_cstr_def(result, "protocol", NULL);
 	if (protocol) protocol = ks_pstrdup(ks_handle_pool(sess), protocol);
 
 	if (!protocol) {
