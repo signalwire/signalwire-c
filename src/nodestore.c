@@ -1505,6 +1505,20 @@ SWCLT_DECLARE(ks_status_t) swclt_store_cb_route_remove(swclt_store_t store, swcl
 	SWCLT_STORE_SCOPE_END(store, ctx, status)
 }
 
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_identity_add(swclt_store_t store, swclt_store_cb_identity_add_t cb)
+{
+	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
+	status = __add_cb_identity_add(ctx, cb);
+	SWCLT_STORE_SCOPE_END(store, ctx, status)
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_identity_remove(swclt_store_t store, swclt_store_cb_identity_remove_t cb)
+{
+	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
+	status = __add_cb_identity_remove(ctx, cb);
+	SWCLT_STORE_SCOPE_END(store, ctx, status)
+}
+
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_add(swclt_store_t store, swclt_store_cb_protocol_add_t cb)
 {
 	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
