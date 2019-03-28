@@ -79,12 +79,16 @@ struct swclt_handle_base {
 	ks_status_t status;																									\
 	context_type *context;																								\
 																														\
-	if (status = __ks_handle_alloc_ex(pool, handle_type, sizeof(context_type),											\
+	if ((status = __ks_handle_alloc_ex(pool, handle_type, sizeof(context_type),											\
 				(ks_handle_base_t **)&context, handle_ptr,																\
 				(ks_handle_describe_cb_t)describe_method,																\
 				(ks_handle_deinit_cb_t)deinit_method,																	\
-				file, line, tag))											 											\
+				file, line, tag))) {										 											\
+		if (status == KS_STATUS_HANDLE_NO_MORE_SLOTS) {																		\
+			abort();																									\
+		}																												\
 		return status;																									\
+	}																													\
 																														\
 	((swclt_handle_base_t *)context)->state = initial_hstate;															\
 	((swclt_handle_base_t *)context)->last_state = initial_hstate;														\
@@ -102,10 +106,14 @@ struct swclt_handle_base {
 	ks_status_t status;																											\
 	context_type *context;																										\
 																																\
-	if (status = __ks_handle_alloc_ex(pool, handle_type, sizeof(context_type), (ks_handle_base_t **)&context, handle_ptr,		\
+	if ((status = __ks_handle_alloc_ex(pool, handle_type, sizeof(context_type), (ks_handle_base_t **)&context, handle_ptr,		\
 				(ks_handle_describe_cb_t)describe_method, (ks_handle_deinit_cb_t)deinit_method,									\
-				file, line, tag))								 																\
+				file, line, tag))) {								 															\
+		if (status == KS_STATUS_HANDLE_NO_MORE_SLOTS) {																			\
+			abort();																											\
+		}																														\
 		return status;																											\
+	}																															\
 																																\
 	((swclt_handle_base_t *)context)->state = initial_hstate;																	\
 	((swclt_handle_base_t *)context)->last_state = initial_hstate;																\
@@ -123,11 +131,15 @@ struct swclt_handle_base {
 	ks_status_t status;																									\
 	context_type *context;																								\
 																														\
-	if (status = ks_handle_alloc_ex(pool, handle_type, sizeof(context_type),											\
+	if ((status = ks_handle_alloc_ex(pool, handle_type, sizeof(context_type),											\
 				&context, handle_ptr,																					\
 				(ks_handle_describe_cb_t)describe_method,																\
-				(ks_handle_deinit_cb_t)deinit_method))																	\
+				(ks_handle_deinit_cb_t)deinit_method))) {																\
+		if (status == KS_STATUS_HANDLE_NO_MORE_SLOTS) {																	\
+			abort();																									\
+		}																												\
 		return status;																									\
+	}																													\
 																														\
 	((swclt_handle_base_t *)context)->state = initial_hstate;															\
 	((swclt_handle_base_t *)context)->last_state = initial_hstate;														\
@@ -145,9 +157,13 @@ struct swclt_handle_base {
 	ks_status_t status;																												\
 	context_type *context;																											\
 																																	\
-	if (status = ks_handle_alloc_ex(pool, handle_type, sizeof(context_type), &context, handle_ptr,									\
-				(ks_handle_describe_cb_t)describe_method, (ks_handle_deinit_cb_t)deinit_method))									\
+	if ((status = ks_handle_alloc_ex(pool, handle_type, sizeof(context_type), &context, handle_ptr,									\
+				(ks_handle_describe_cb_t)describe_method, (ks_handle_deinit_cb_t)deinit_method))) {									\
+		if (status == KS_STATUS_HANDLE_NO_MORE_SLOTS) {																				\
+			abort();																												\
+		}																															\
 		return status;																												\
+	}																																\
 																																	\
 	((swclt_handle_base_t *)context)->state = initial_hstate;																		\
 	((swclt_handle_base_t *)context)->last_state = initial_hstate;																	\
