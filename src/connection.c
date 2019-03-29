@@ -126,6 +126,11 @@ done:
 	return status;
 }
 
+static void __deregister_cmd(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, ks_uuid_t id)
+{
+	ks_hash_remove(ctx->outstanding_requests, &id);
+}
+
 static ks_status_t __wait_outstanding_cmd_result(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, SWCLT_CMD_TYPE *type)
 {
 	ks_uuid_t id;
@@ -142,14 +147,9 @@ static ks_status_t __wait_outstanding_cmd_result(swclt_conn_ctx_t *ctx, swclt_cm
 	status = __wait_cmd_result(ctx, cmd, type);
 
 	/* Great, remove it */
-	ks_hash_remove(ctx->outstanding_requests, &id);
+	__deregister_cmd(ctx, cmd, id);
 
 	return status;
-}
-
-static void __deregister_cmd(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, ks_uuid_t id)
-{
-	ks_hash_remove(ctx->outstanding_requests, &id);
 }
 
 static ks_status_t __submit_result(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd)
@@ -282,7 +282,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 	ks_status_t status;
 	const char *method;
 	ks_uuid_t id;
-	swclt_cmd_t *outstanding_cmd;
+	swclt_cmd_t *outstanding_cmd = NULL;
 
 	ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", ks_handle_describe(frame));
 
@@ -319,6 +319,9 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
 	}
+
+	/* Remove the command from outstanding requests */
+	__deregister_cmd(ctx, *outstanding_cmd, id);
 
 	/* Right away clear this commands ttl to prevent a timeout during dispatch */
 	if (status = swclt_cmd_set_submit_time(*outstanding_cmd, 0)) {
