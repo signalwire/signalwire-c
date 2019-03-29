@@ -283,6 +283,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 	const char *method;
 	ks_uuid_t id;
 	swclt_cmd_t *outstanding_cmd = NULL;
+	ks_bool_t async = KS_FALSE;
 
 	ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", ks_handle_describe(frame));
 
@@ -337,7 +338,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 	}
 
 	/* Great, feed it the reply */
-	if (status = swclt_cmd_parse_reply_frame(*outstanding_cmd, frame)) {
+	if (status = swclt_cmd_parse_reply_frame(*outstanding_cmd, frame, &async)) {
 		ks_log(KS_LOG_ERROR, "Failed to parse command reply: %lu", status);
 		goto done;
 	}
@@ -349,6 +350,8 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 
 done:
 	ks_cond_unlock(ctx->cmd_condition);
+
+	if (async) ks_handle_destroy(outstanding_cmd);
 
 	return status;
 }

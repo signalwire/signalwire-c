@@ -115,7 +115,7 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_set_submit_time(swclt_cmd_t cmd, ks_time_
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_failure_info(swclt_cmd_t cmd, ks_status_t *failure_status, const char **failure_reason, const char *file, int line, const char *tag);
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_flags(swclt_cmd_t cmd, uint32_t *flags, const char *file, int line, const char *tag);
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_method(swclt_cmd_t cmd, const char **method, const char *file, int line, const char *tag);
-SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_frame_t frame, const char *file, int line, const char *tag);
+SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_frame_t frame, ks_bool_t *async, const char *file, int line, const char *tag);
 
 #define swclt_cmd_set_cb(cmd, cb, cb_data) __swclt_cmd_set_cb(cmd, cb, cb_data, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_cmd_cb(cmd, cb, cb_data) __swclt_cmd_cb(cmd, cb, cb_data, __FILE__, __LINE__, __PRETTY_FUNCTION__)
@@ -136,7 +136,7 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_
 #define swclt_cmd_failure_info(cmd, failure_status, failure_reason) __swclt_cmd_failure_info(cmd, failure_status, failure_reason, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_cmd_flags(cmd, flags) __swclt_cmd_flags(cmd, flags, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_cmd_method(cmd, method) __swclt_cmd_method(cmd, method, __FILE__, __LINE__, __PRETTY_FUNCTION__)
-#define swclt_cmd_parse_reply_frame(cmd, frame) __swclt_cmd_parse_reply_frame(cmd, frame, __FILE__, __LINE__, __PRETTY_FUNCTION__)
+#define swclt_cmd_parse_reply_frame(cmd, frame, async) __swclt_cmd_parse_reply_frame(cmd, frame, async, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_report_failure_fmt(const char *file, int line, const char *tag, swclt_cmd_t cmd, ks_status_t failure_status, const char *failure_fmt, ...);
 #define swclt_cmd_report_failure_fmt_s(cmd, status, error_fmt) __swclt_cmd_report_failure_fmt(__FILE__, __LINE__, __PRETTY_FUNCTION__, cmd, status, error_fmt)
