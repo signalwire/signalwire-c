@@ -760,7 +760,7 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_set_error(swclt_cmd_t cmd, ks_json_t **er
 	SWCLT_CMD_SCOPE_END_TAG(cmd, ctx, status, file, line, tag);
 }
 
-SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_frame_t frame, const char *file, int line, const char *tag)
+SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_frame_t frame, ks_bool_t *async, const char *file, int line, const char *tag)
 {
 	SWCLT_CMD_SCOPE_BEG_TAG(cmd, ctx, status, file, line, tag);
 
@@ -794,6 +794,7 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_
 
 	/* Command has completed, call the callback */
 	if (ctx->cb) {
+		*async = KS_TRUE;
 		__raise_callback(ctx);
 	}
 
