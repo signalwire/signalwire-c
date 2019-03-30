@@ -264,6 +264,8 @@ static void __context_deinit(
 	ks_handle_destroy(&ctx->rate_send);
 	ks_handle_destroy(&ctx->read_frame);
 	kws_destroy(&ctx->wss);
+
+	ks_log(KS_LOG_INFO, "Finished shutting down websocket and stopping reader");
 }
 
 static void __context_describe(swclt_wss_ctx_t *ctx, char *buffer, ks_size_t buffer_len)

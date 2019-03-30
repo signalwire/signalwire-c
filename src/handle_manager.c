@@ -93,8 +93,10 @@ static ks_bool_t __service_handle(ks_handle_t handle)
 	swclt_handle_base_t *ctx;
 	ks_bool_t serviced = KS_FALSE;
 
-	if (ks_handle_get(0, handle, &ctx))
+	if (ks_handle_get(0, handle, &ctx)) {
+		ks_log(KS_LOG_DEBUG, "Service skipped, get context failed");
 		return serviced;
+	}
 
 	/* While we're here, handle state changes for the handle */
 	ks_spinlock_acquire(&ctx->lock);
@@ -102,11 +104,13 @@ static ks_bool_t __service_handle(ks_handle_t handle)
 	ks_time_t now_time = now();
 
 	if (!ctx->next_service_time_stamp_ms) {
+		ks_log(KS_LOG_DEBUG, "Service skipped, next service == 0");
 		goto done;
 	}
 
 	if (now_time < ctx->next_service_time_stamp_ms) {
 		/* Schedule it just to be sure */
+		ks_log(KS_LOG_DEBUG, "Service skipped, next service is in %lums", ctx->next_service_time_stamp_ms - now_time);
 		__schedule_in_ms(ctx->next_service_time_stamp_ms - now_time);
 		goto done;
 	}

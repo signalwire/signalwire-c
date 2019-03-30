@@ -385,6 +385,8 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 	/* Delete the previous connection if present */
 	ks_handle_destroy(&ctx->conn);
 
+	ks_log(KS_LOG_DEBUG, "Starting new SSL setup");
+	
 	/* Re-allocate a new ssl context */
 	if (status = __setup_ssl(ctx)) {
 		ks_log(KS_LOG_CRIT, "SSL Setup failed: %lu", status);
