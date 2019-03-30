@@ -283,6 +283,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 	const char *method;
 	ks_uuid_t id;
 	swclt_cmd_t *outstanding_cmd = NULL;
+	swclt_cmd_t cmd;
 	ks_bool_t async = KS_FALSE;
 
 	ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", ks_handle_describe(frame));
@@ -321,29 +322,32 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 		goto done;
 	}
 
+	/* Copy the handle out before we remove the memory storing it in the hash */
+	cmd = *outstanding_cmd;
+	
 	/* Remove the command from outstanding requests */
 	__deregister_cmd(ctx, *outstanding_cmd, id);
 
 	/* Right away clear this commands ttl to prevent a timeout during dispatch */
-	if (status = swclt_cmd_set_submit_time(*outstanding_cmd, 0)) {
-		ks_log(KS_LOG_ERROR, "Failed to set ttl to 0 on command while processing result: %s", ks_handle_describe(*outstanding_cmd));
+	if (status = swclt_cmd_set_submit_time(cmd, 0)) {
+		ks_log(KS_LOG_ERROR, "Failed to set ttl to 0 on command while processing result: %s", ks_handle_describe(cmd));
 		goto done;
 	}
 
-	ks_log(KS_LOG_DEBUG, "Fetched cmd handle: %8.8lx", *outstanding_cmd);
+	ks_log(KS_LOG_DEBUG, "Fetched cmd handle: %8.8lx", cmd);
 
-	if (status = swclt_cmd_method(*outstanding_cmd, &method)) {
+	if (status = swclt_cmd_method(cmd, &method)) {
 		ks_log(KS_LOG_ERROR, "Failed to get command method: %lu", status);
 		goto done;
 	}
 
 	/* Great, feed it the reply */
-	if (status = swclt_cmd_parse_reply_frame(*outstanding_cmd, frame, &async)) {
+	if (status = swclt_cmd_parse_reply_frame(cmd, frame, &async)) {
 		ks_log(KS_LOG_ERROR, "Failed to parse command reply: %lu", status);
 		goto done;
 	}
 
-	ks_log(KS_LOG_DEBUG, "Successfully read command result: %s", ks_handle_describe(*outstanding_cmd));
+	ks_log(KS_LOG_DEBUG, "Successfully read command result: %s", ks_handle_describe(cmd));
 
 	/* Now raise the signal */
 	ks_cond_broadcast(ctx->cmd_condition);
@@ -352,8 +356,8 @@ done:
 	ks_cond_unlock(ctx->cmd_condition);
 
 	if (async) {
-		ks_log(KS_LOG_DEBUG, "Destroying command: %s", ks_handle_describe(*outstanding_cmd));
-		ks_handle_destroy(outstanding_cmd);
+		ks_log(KS_LOG_DEBUG, "Destroying command: %s", ks_handle_describe(cmd));
+		ks_handle_destroy(&cmd);
 	}
 
 	return status;
