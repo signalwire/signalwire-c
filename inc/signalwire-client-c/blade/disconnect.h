@@ -32,6 +32,7 @@ static const char *BLADE_DISCONNECT_METHOD = "blade.disconnect";
 
 /* Create our disconnect request template */
 typedef struct blade_disconnect_rqu_s {
+	int unused;
 } blade_disconnect_rqu_t;
 
 SWCLT_JSON_MARSHAL_BEG(BLADE_DISCONNECT_RQU, blade_disconnect_rqu_t)
