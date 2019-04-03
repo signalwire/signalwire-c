@@ -17,7 +17,7 @@ if (WIN32)
 endif()
 
 # Declare our project, libks
-project(Signalwire-Client-C VERSION 1.0.0 LANGUAGES C)
+project(Signalwire-Client-C VERSION 1.1.0 LANGUAGES C)
 message("Signalwire-Client-C ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
 
 # Set package version
