@@ -776,8 +776,11 @@ static ks_status_t __update_protocol_provider_remove(swclt_store_ctx_t *ctx, bla
 
 	ks_hash_write_lock(ctx->protocols);
 
-	if (status = __lookup_protocol(ctx, params->protocol, &protocol))
+	if (status = __lookup_protocol(ctx, params->protocol, &protocol)) {
+		ks_log(KS_LOG_WARNING, "Received protocol provider remove for protocol '%s' which does not exist", params->protocol);
+		status = KS_STATUS_SUCCESS;
 		goto done;
+	}
 
 		// iterate protocol providers
 	KS_JSON_ARRAY_FOREACH(entry, protocol->providers) {
