@@ -365,8 +365,19 @@ done:
 
 static void __context_describe(swclt_conn_ctx_t *ctx, char *buffer, ks_size_t buffer_len)
 {
-	snprintf(buffer, buffer_len, "SWCLT Connection to %s:%d (%s)",
-		ctx->info.wss.address, ctx->info.wss.port, ks_handle_describe(ctx->wss));
+	/* We have to do all this garbage because of the poor decision to nest ks_handle_describe() calls that return a common thread local buffer */
+	const char *desc = ks_handle_describe(ctx->wss);
+	ks_size_t desc_len = strlen(desc);
+	const char preamble_buf[256] = { 0 };
+	ks_size_t preamble_len = 0;
+	snprintf(preamble_buf, sizeof(preamble_buf), "SWCLT Connection to %s:%d - ", ctx->info.wss.address, ctx->info.wss.port);
+	preamble_len = strlen(preamble_buf);
+	if (desc_len + preamble_len + 1 > buffer_len) {
+		desc_len = buffer_len - preamble_len - 1;
+	}
+	memmove(buffer + preamble_len, desc, desc_len + 1);
+	memcpy(buffer, preamble_buf, preamble_len);
+	buffer[buffer_len - 1] = '\0';
 }
 
 static ks_status_t __do_logical_connect(swclt_conn_ctx_t *ctx, ks_uuid_t previous_sessionid, ks_json_t **authentication)
