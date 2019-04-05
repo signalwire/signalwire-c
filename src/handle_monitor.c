@@ -38,7 +38,17 @@ static void __raise_hstate_change(swclt_hmon_ctx_t *ctx, const swclt_hstate_chan
 
 static void __context_describe(swclt_hmon_ctx_t *ctx, char *buffer, ks_size_t buffer_len)
 {
-	snprintf(buffer, buffer_len, "SWCLT Handle Monitor for: %s", ks_handle_describe(ctx->handle_to_monitor));
+	/* We have to do all this garbage because of the poor decision to nest ks_handle_describe() calls that return a common thread local buffer */
+	const char *desc = ks_handle_describe(ctx->handle_to_monitor);
+	ks_size_t desc_len = strlen(desc);
+	const char *preamble = "SWCLT Handle Monitor for: ";
+	ks_size_t preamble_len = strlen(preamble);
+	if (desc_len + preamble_len + 1 > buffer_len) {
+		desc_len = buffer_len - preamble_len - 1;
+	}
+	memmove(buffer + preamble_len, desc, desc_len + 1);
+	memcpy(buffer, preamble, preamble_len);
+	buffer[buffer_len - 1] = '\0';
 }
 
 static ks_status_t __context_init(swclt_hmon_ctx_t *ctx, ks_handle_t handle_to_monitor, swclt_hmon_state_change_cb_t cb, void *cb_data)
