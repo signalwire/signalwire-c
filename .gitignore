@@ -21,3 +21,7 @@ swclt_test/swclt_test
 /uninstall.cmake
 build-Win32/
 build-x64/
+CPackConfig.cmake
+CPackSourceConfig.cmake
+changelog.Debian.gz
+libsignalwire_client.so.1
