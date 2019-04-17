@@ -368,7 +368,18 @@ if (NOT KS_PLAT_WIN)
 	# Set install targets
 	install(TARGETS signalwire_client COMPONENT "runtime" EXPORT SignalWireClientConfig DESTINATION lib)
 	install(DIRECTORY inc/signalwire-client-c COMPONENT "runtime" DESTINATION include PATTERN internal EXCLUDE)
-	install(FILES ${PROJECT_BINARY_DIR}/signalwire_client.pc COMPONENT "runtime" DESTINATION lib/pkgconfig)
+	
+        # Set path for pkg-config based on ARCH and distro type
+        if("${CMAKE_OS_NAME}" STREQUAL "Centos") # pkg-config --variable pc_path pkg-config
+            if(${CPACK_SYSTEM_NAME} MATCHES "x86_64")
+                install(FILES ${PROJECT_BINARY_DIR}/signalwire_client.pc COMPONENT "runtime" DESTINATION lib64/pkgconfig)
+            else()
+                install(FILES ${PROJECT_BINARY_DIR}/signalwire_client.pc COMPONENT "runtime" DESTINATION lib/pkgconfig)
+            endif()
+        else()
+            install(FILES ${PROJECT_BINARY_DIR}/signalwire_client.pc COMPONENT "runtime" DESTINATION lib/pkgconfig)
+        endif()		
+	
 	install(EXPORT SignalWireClientConfig COMPONENT "runtime" DESTINATION include/signalwire-client-c/cmake)
 	install(FILES ${PROJECT_BINARY_DIR}/copyright COMPONENT "runtime" DESTINATION share/doc/signalwire-client-c)
 
