@@ -140,7 +140,7 @@ static ks_status_t __wait_outstanding_cmd_result(swclt_conn_ctx_t *ctx, swclt_cm
 		return status;
 
 	if (!ks_hash_search(ctx->outstanding_requests, &id, KS_UNLOCKED)) {
-		ks_log(KS_LOG_WARNING, "Failed to lookup command: 16.16lx", cmd);
+		ks_log(KS_LOG_WARNING, "Failed to lookup command: %16.16lx", cmd);
 		return KS_STATUS_FAIL;
 	}
 
@@ -458,7 +458,7 @@ static void __context_service(swclt_conn_ctx_t *ctx)
 
 		/* Now check its time */
 		if (swclt_cmd_ttl(cmd, &ttl_ms) || swclt_cmd_submit_time(cmd, &cmd_submit_time) || swclt_cmd_type(cmd, &type)) {
-			ks_log(KS_LOG_WARNING, "Removing invalid cmd with id: %s from outstanding requests with handle value: 16.16lx", ks_uuid_thr_str(id_key), cmd);
+			ks_log(KS_LOG_WARNING, "Removing invalid cmd with id: %s from outstanding requests with handle value: %16.16lx", ks_uuid_thr_str(id_key), cmd);
 			remove = KS_TRUE;
 		}
 
