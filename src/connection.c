@@ -355,6 +355,8 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 done:
 	ks_cond_unlock(ctx->cmd_condition);
 
+	ks_handle_destroy(&frame);
+
 	if (async) {
 		ks_log(KS_LOG_DEBUG, "Destroying command: %s", ks_handle_describe(cmd));
 		ks_handle_destroy(&cmd);
