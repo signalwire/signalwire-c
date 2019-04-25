@@ -201,10 +201,12 @@ static ks_status_t __reader_loop(swclt_wss_ctx_t *ctx)
 				// Notify the consumer there is a new frame
 				if (status = ctx->incoming_frame_cb(ctx->base.handle, ctx->read_frame, ctx->incoming_frame_cb_data)) {
 					ks_log(KS_LOG_WARNING, "Callback from incoming frame returned: %d, exiting", status);
+					// Done with the frame, callback is responsible for freeing it
+					ctx->read_frame = 0;
 					return status;
 				}
 
-				// Done with the frame, caller is responsible for freeing it now
+				// Done with the frame, callback is responsible for freeing it
 				ctx->read_frame = 0;
 				break;
 			}
