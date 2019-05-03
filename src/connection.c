@@ -30,7 +30,7 @@ static ks_handle_t * __dupe_handle(swclt_conn_ctx_t *ctx, ks_handle_t handle)
 	ks_assertd(dup);
 	memcpy(dup, &handle, sizeof(handle));
 
-	ks_log(KS_LOG_DEBUG, "Duplicated handle: %16.16lx", handle);
+	ks_log(KS_LOG_DEBUG, "Duplicated handle: %16.16llx", handle);
 	return dup;
 }
 
@@ -48,7 +48,7 @@ static ks_status_t __register_cmd(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, ks_uui
 	/* Set this handle as a child of ours so we can free it if needed */
 	ks_handle_set_parent(cmd, ctx->base.handle);
 
-	ks_log(KS_LOG_DEBUG, "Inserting command handle: %16.16lx into hash for command key: %s", cmd, ks_uuid_thr_str(id));
+	ks_log(KS_LOG_DEBUG, "Inserting command handle: %16.16llx into hash for command key: %s", cmd, ks_uuid_thr_str(id));
 
 	return ks_hash_insert(ctx->outstanding_requests, ks_uuid_dup(ctx->base.pool, id), __dupe_handle(ctx, cmd));
 }
@@ -140,7 +140,7 @@ static ks_status_t __wait_outstanding_cmd_result(swclt_conn_ctx_t *ctx, swclt_cm
 		return status;
 
 	if (!ks_hash_search(ctx->outstanding_requests, &id, KS_UNLOCKED)) {
-		ks_log(KS_LOG_WARNING, "Failed to lookup command: %16.16lx", cmd);
+		ks_log(KS_LOG_WARNING, "Failed to lookup command: %16.16llx", cmd);
 		return KS_STATUS_FAIL;
 	}
 
@@ -334,7 +334,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 		goto done;
 	}
 
-	ks_log(KS_LOG_DEBUG, "Fetched cmd handle: %8.8lx", cmd);
+	ks_log(KS_LOG_DEBUG, "Fetched cmd handle: %8.8llx", cmd);
 
 	if (status = swclt_cmd_method(cmd, &method)) {
 		ks_log(KS_LOG_ERROR, "Failed to get command method: %lu", status);
@@ -460,7 +460,7 @@ static void __context_service(swclt_conn_ctx_t *ctx)
 
 		/* Now check its time */
 		if (swclt_cmd_ttl(cmd, &ttl_ms) || swclt_cmd_submit_time(cmd, &cmd_submit_time) || swclt_cmd_type(cmd, &type)) {
-			ks_log(KS_LOG_WARNING, "Removing invalid cmd with id: %s from outstanding requests with handle value: %16.16lx", ks_uuid_thr_str(id_key), cmd);
+			ks_log(KS_LOG_WARNING, "Removing invalid cmd with id: %s from outstanding requests with handle value: %16.16llx", ks_uuid_thr_str(id_key), cmd);
 			remove = KS_TRUE;
 		}
 
