@@ -173,7 +173,7 @@ SWCLT_DECLARE(ks_status_t) __swclt_hstate_register_listener(
 
 	/* We'll need to get to the context of the source the listener wants to watch */
 	if (__ks_handle_get(0, state_source_handle, (ks_handle_base_t **)&state_source_ctx, file, line, tag)) {
-		ks_log(KS_LOG_WARNING, "Error attempting to register a state change listener on invalid handle: %16.16lx for listener: %s",
+		ks_log(KS_LOG_WARNING, "Error attempting to register a state change listener on invalid handle: %16.16llx for listener: %s",
 			state_source_handle, ks_handle_describe(listening_ctx->handle));
 		return KS_STATUS_HANDLE_INVALID;
 	}
