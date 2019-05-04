@@ -76,11 +76,6 @@ struct swclt_cmd_ctx {
 	 * with no error) and error (when remove replies with an error */
 	SWCLT_CMD_TYPE type;
 
-	/* Since we have a context for the command, we cache the rendering to an unformatted
-	 * string */
-	SWCLT_CMD_TYPE cached_type;
-	char *cached_string;
-
 	/* This is the time to live value, when non zero, the command will fail if the
 	 * response is not received within the appropriate window. */
 	uint32_t response_ttl_ms;
