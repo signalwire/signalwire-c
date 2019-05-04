@@ -461,6 +461,8 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_write_cmd(swclt_wss_t wss, swclt_cmd_t cmd)
 	else
 		ks_throughput_report_ex(ctx->rate_send, len, KS_FALSE);
 
+	ks_pool_free(&data);
+
 	SWCLT_WSS_SCOPE_END(wss, ctx, status)
 }
 
