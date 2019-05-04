@@ -644,12 +644,12 @@ static ks_status_t __update_protocol_add(swclt_store_ctx_t *ctx, const blade_net
 
 	/* Lookup the protocol */
 	if (status = __lookup_protocol_uncertified(ctx, params->protocol)) {
-		char *key = ks_pstrdup(ks_pool_get(ctx->protocols), params->protocol);
+		char *key = ks_pstrdup(ks_pool_get(ctx->protocols_uncertified), params->protocol);
 		
 		ks_log(KS_LOG_INFO, "Protocol %s does not exist yet, adding new entry", params->protocol);
 
 		/* And add it */
-		if (status = ks_hash_insert(ctx->protocols, key, (void *)KS_TRUE)) {
+		if (status = ks_hash_insert(ctx->protocols_uncertified, key, (void *)KS_TRUE)) {
 			ks_pool_free(&key);
 			BLADE_NETCAST_PROTOCOL_ADD_PARAM_DESTROY(&params);
 			return status;
