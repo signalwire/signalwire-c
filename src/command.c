@@ -281,7 +281,7 @@ static ks_status_t __print_request(swclt_cmd_ctx_t *ctx, ks_pool_t *pool, char *
 		ks_json_delete(&jsonrpc_request);
 	}
 
-	/* And give the caller a read only copy */
+	/* And give the caller a copy */
 	*string = ks_pstrdup(pool, ctx->cached_string);
 	return KS_STATUS_SUCCESS;
 }
@@ -316,8 +316,8 @@ static ks_status_t __print_result(swclt_cmd_ctx_t *ctx, ks_pool_t *pool, char **
 		ks_json_delete(&jsonrpc_result);
 	}
 
-	/* And give the caller a read only copy */
-	*string = ctx->cached_string;
+	/* And give the caller a copy */
+	*string = ks_pstrdup(pool, ctx->cached_string);
 	return KS_STATUS_SUCCESS;
 }
 
