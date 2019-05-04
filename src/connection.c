@@ -370,7 +370,7 @@ static void __context_describe(swclt_conn_ctx_t *ctx, char *buffer, ks_size_t bu
 	/* We have to do all this garbage because of the poor decision to nest ks_handle_describe() calls that return a common thread local buffer */
 	const char *desc = ks_handle_describe(ctx->wss);
 	ks_size_t desc_len = strlen(desc);
-	const char preamble_buf[256] = { 0 };
+	char preamble_buf[256] = { 0 };
 	ks_size_t preamble_len = 0;
 	snprintf(preamble_buf, sizeof(preamble_buf), "SWCLT Connection to %s:%d - ", ctx->info.wss.address, ctx->info.wss.port);
 	preamble_len = strlen(preamble_buf);

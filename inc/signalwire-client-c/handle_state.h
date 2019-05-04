@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -98,18 +98,20 @@ struct swclt_hstate_change_request {
  * is enabled, will include the file/line where the state change was initiated from. */
 static inline const char *swclt_hstate_describe_change(const swclt_hstate_change_t *pending_state_change)
 {
+	static KS_THREAD_LOCAL char buf[1024] = { 0 };
 #if defined(KS_BUILD_DEBUG)
-	return ks_thr_sprintf("[%s=>%s] Status: %d Reason: %s\nLocation: %s:%d:%s",
+	snprintf(buf, sizeof(buf), "[%s=>%s] Status: %d Reason: %s\nLocation: %s:%d:%s",
 		swclt_hstate_str(pending_state_change->old_state),
 		swclt_hstate_str(pending_state_change->new_state),
 		pending_state_change->status, pending_state_change->reason,
 		pending_state_change->file, pending_state_change->line, pending_state_change->tag);
 #else
-	return ks_thr_sprintf("[%s=>%s] Status: %d Reason: %s",
+	snprintf(buf, sizeof(buf), "[%s=>%s] Status: %d Reason: %s",
 		swclt_hstate_str(pending_state_change->old_state),
 		swclt_hstate_str(pending_state_change->new_state),
 		pending_state_change->status, pending_state_change->reason);
 #endif
+	return buf;
 }
 
 /* Private handle state apis used internally, but still exposed for unit tests */

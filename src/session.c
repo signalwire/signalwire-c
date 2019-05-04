@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -48,20 +48,14 @@ static void __context_deinit(
 	swclt_ident_destroy(&ctx->ident);
 }
 
-static const char * __make_subscription_key(swclt_sess_ctx_t *ctx, const char * protocol, const char * channel, ks_bool_t dupe)
+static const char * __make_subscription_key(swclt_sess_ctx_t *ctx, const char * protocol, const char * channel)
 {
-	const char * key = ks_thr_sprintf("%s:%s", protocol, channel);
-	if (dupe)
-		return ks_pstrdup(ctx->base.pool, key);
-	return key;
+	return ks_psprintf(ctx->base.pool, "%s:%s", protocol, channel);
 }
 
-static const char * __make_pmethod_key(swclt_sess_ctx_t *ctx, const char *protocol, const char *method, ks_bool_t dupe)
+static const char * __make_pmethod_key(swclt_sess_ctx_t *ctx, const char *protocol, const char *method)
 {
-	const char * key = ks_thr_sprintf("%s:%s", protocol, method);
-	if (dupe)
-		return ks_pstrdup(ctx->base.pool, key);
-	return key;
+	return ks_psprintf(ctx->base.pool, "%s:%s", protocol, method);
 }
 
 static swclt_pmethod_ctx_t * __make_pmethod_value(swclt_sess_ctx_t *ctx, swclt_pmethod_cb_t pmethod, void *cb_data)
@@ -205,6 +199,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t conn, swclt_cmd_t cmd, swclt_s
 		/* Locate the protocol */
 		blade_broadcast_rqu_t *rqu;
 		swclt_sub_t *sub;
+		const char *key;
 
 		status = BLADE_BROADCAST_RQU_PARSE(cmd_pool, request, &rqu);
 		swclt_cmd_ctx_unlock(cmd_ctx);
@@ -215,10 +210,9 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t conn, swclt_cmd_t cmd, swclt_s
 			goto done;
 		}
 
-		sub = ks_hash_search(
-			ctx->subscriptions,
-			__make_subscription_key(ctx, rqu->protocol, rqu->channel, KS_FALSE),
-			KS_UNLOCKED);
+		key = __make_subscription_key(ctx, rqu->protocol, rqu->channel);
+		sub = ks_hash_search(ctx->subscriptions, key, KS_UNLOCKED);
+		ks_pool_free(&key);
 
 		if (!sub) {
 			ks_log(KS_LOG_ERROR, "Could not locate sub for protocol: %s channel: %s command: %s",
@@ -272,6 +266,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t conn, swclt_cmd_t cmd, swclt_s
 		goto done;
 	} else if (!strcmp(method, BLADE_EXECUTE_METHOD)) {
 		blade_execute_rqu_t *rqu;
+		const char *key;
 
 		status = BLADE_EXECUTE_RQU_PARSE(cmd_pool, request, &rqu);
 		swclt_cmd_ctx_unlock(cmd_ctx);
@@ -284,21 +279,11 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t conn, swclt_cmd_t cmd, swclt_s
 		}
 
 		/* Look up the pmethod, and execute it */
-		if (status = __execute_pmethod_cb(
-				ctx,
-				cmd_ctx,
-				cmd_pool,
-				ks_hash_search(
-					ctx->methods,
-				   	__make_pmethod_key(
-						ctx,
-					   	rqu->protocol,
-					   	rqu->method,
-					   	KS_FALSE),
-				  	KS_UNLOCKED
-				),
-				rqu))
+		key = __make_pmethod_key(ctx, rqu->protocol, rqu->method);
+		if (status = __execute_pmethod_cb(ctx, cmd_ctx, cmd_pool, ks_hash_search(ctx->methods, key, KS_UNLOCKED), rqu)) {
 			ks_log(KS_LOG_ERROR, "Error executing pmethod: %lu", status);
+		}
+		ks_pool_free(&key);
 
 		/* Done with the request */
 		BLADE_EXECUTE_RQU_DESTROY(&rqu);
@@ -360,8 +345,9 @@ static ks_status_t __on_connect_reply(swclt_conn_t conn, ks_json_t *error, const
 static void __on_conn_state_change(swclt_sess_ctx_t *ctx, swclt_hstate_change_t *state_change)
 {
 	/* Enqueue a state change on ourselves as well */
-	swclt_hstate_changed(&ctx->base, SWCLT_HSTATE_DEGRADED,
-		 KS_STATUS_FAIL, ks_thr_sprintf("Connection failed: %s", swclt_hstate_describe_change(state_change)));
+	char *reason = ks_psprintf(ctx->base.pool, "Connection failed: %s", swclt_hstate_describe_change(state_change));
+	swclt_hstate_changed(&ctx->base, SWCLT_HSTATE_DEGRADED, KS_STATUS_FAIL, reason);
+	ks_pool_free(&reason);
 
 	/* Now we, as a session, will want to re-connect so, enqueue a request do to so */
 	swclt_hstate_initiate_change_in(&ctx->base, SWCLT_HSTATE_ONLINE, __context_state_transition, 1000, 5000);
@@ -675,11 +661,12 @@ static ks_handle_t * __dupe_handle(swclt_sess_ctx_t *ctx, ks_handle_t handle)
 
 static ks_status_t __unregister_subscription(
 	swclt_sess_ctx_t *ctx,
-   	const char *protocol,
-   	const char *channel)
+	const char *protocol,
+	const char *channel)
 {
-	ks_handle_t *sub = (ks_handle_t *)ks_hash_remove(ctx->subscriptions,
-			   	__make_subscription_key(ctx, protocol, channel, KS_FALSE));
+	const char *key = __make_subscription_key(ctx, protocol, channel);
+	ks_handle_t *sub = (ks_handle_t *)ks_hash_remove(ctx->subscriptions, key);
+	ks_pool_free(&key);
 	if (!sub)
 		return KS_STATUS_NOT_FOUND;
 
@@ -691,9 +678,9 @@ static ks_status_t __unregister_subscription(
 
 static ks_status_t __register_subscription(
 	swclt_sess_ctx_t *ctx,
-   	const char * protocol,
-   	const char * channel,
-   	swclt_sub_t sub)
+	const char * protocol,
+	const char * channel,
+	swclt_sub_t sub)
 {
 	/* Mark this subscription as a dependent */
 	ks_handle_set_parent(sub, ctx->base.handle);
@@ -706,30 +693,23 @@ static ks_status_t __register_subscription(
 	 * answer: check out the sub, then put it in the hash */
 
 	/* And add it to the hash */
-	return ks_hash_insert(
-		ctx->subscriptions,
-	   	__make_subscription_key(
-			ctx,
-		   	protocol,
-		   	channel,
-		   	KS_TRUE),
-	  	__dupe_handle(ctx, sub));
+	return ks_hash_insert(ctx->subscriptions, __make_subscription_key(ctx, protocol, channel), __dupe_handle(ctx, sub));
 }
 
 static ks_status_t __register_pmethod(
 	swclt_sess_ctx_t *ctx,
-   	const char *protocol,
-   	const char *method,
-   	swclt_pmethod_cb_t pmethod,
+	const char *protocol,
+	const char *method,
+	swclt_pmethod_cb_t pmethod,
 	void *cb_data)
 {
 	if (!pmethod) {
-		ks_hash_remove(ctx->methods, __make_pmethod_key(ctx, protocol, method, KS_FALSE));
+		const char *key = __make_pmethod_key(ctx, protocol, method);
+		ks_hash_remove(ctx->methods, key);
+		ks_pool_free(&key);
 		return KS_STATUS_SUCCESS;
 	}
-	return ks_hash_insert(ctx->methods,
-		   	__make_pmethod_key(ctx, protocol, method, KS_TRUE),
-			__make_pmethod_value(ctx, pmethod, cb_data));
+	return ks_hash_insert(ctx->methods, __make_pmethod_key(ctx, protocol, method), __make_pmethod_value(ctx, pmethod, cb_data));
 }
 
 static ks_status_t __lookup_setup(swclt_sess_ctx_t *ctx, const char *service, ks_pool_t *pool, char **protocol)
