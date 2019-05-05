@@ -59,7 +59,7 @@ static ks_status_t __write_pong(swclt_wss_ctx_t *ctx, swclt_frame_t frame)
 
 	/* Reference the frame while we write it */
 	if (status = swclt_frame_get(frame, &frame_ctx)) {
-		ks_log(KS_LOG_WARNING, "Invalid frame handed to write: %16.16lx (%lu)", frame, status);
+		ks_log(KS_LOG_WARNING, "Invalid frame handed to write: %16.16llx (%lu)", frame, status);
 		return status;
 	}
 
