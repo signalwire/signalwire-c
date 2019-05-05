@@ -48,7 +48,7 @@ static ks_status_t __register_cmd(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, ks_uui
 	/* Set this handle as a child of ours so we can free it if needed */
 	ks_handle_set_parent(cmd, ctx->base.handle);
 
-	ks_log(KS_LOG_DEBUG, "Inserting command handle: %16.16lx into hash for command key: %s", cmd, ks_uuid_thr_str(id));
+	ks_log(KS_LOG_DEBUG, "Inserting command handle: %16.16llx into hash for command key: %s", cmd, ks_uuid_thr_str(id));
 
 	return ks_hash_insert(ctx->outstanding_requests, ks_uuid_dup(ctx->base.pool, id), __dupe_handle(ctx, cmd));
 }
@@ -334,7 +334,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 		goto done;
 	}
 
-	ks_log(KS_LOG_DEBUG, "Fetched cmd handle: %8.8lx", cmd);
+	ks_log(KS_LOG_DEBUG, "Fetched cmd handle: %8.8llx", cmd);
 
 	if (status = swclt_cmd_method(cmd, &method)) {
 		ks_log(KS_LOG_ERROR, "Failed to get command method: %lu", status);
