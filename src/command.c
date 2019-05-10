@@ -219,7 +219,6 @@ static void __context_deinit(swclt_cmd_ctx_t *ctx)
 	ks_pool_free(&ctx->method);
 	ks_pool_free(&ctx->id_str);
 	ks_json_delete((ks_json_t **)&ctx->request);
-	ks_json_free(&ctx->cached_string);
 	ks_json_delete(&ctx->reply.error);
 	ks_pool_free(&ctx->failure_summary);
 	ks_pool_free(&ctx->failure_reason);
@@ -258,101 +257,73 @@ static ks_json_t * __wrap_jsonrpc(swclt_cmd_ctx_t *ctx, const char *version,
 
 static ks_status_t __print_request(swclt_cmd_ctx_t *ctx, ks_pool_t *pool, char ** const string)
 {
-	/* Default to own pool if not set */
+	ks_json_t *jsonrpc_request;
+
 	if (!pool)
 		pool = ctx->base.pool;
 
-	if (ctx->type != ctx->cached_type) {
-		ks_json_t *jsonrpc_request;
-
-		ks_pool_free(&ctx->cached_string);
-
-		/* Wrap the request and updated the cache */
-		jsonrpc_request = __wrap_jsonrpc(ctx, "2.0", ctx->method,
+	jsonrpc_request = __wrap_jsonrpc(ctx, "2.0", ctx->method,
 			ctx->id_str, ks_json_pduplicate(ctx->base.pool, (ks_json_t *)ctx->request, KS_TRUE), NULL, NULL);
-		if (!jsonrpc_request)
-			return KS_STATUS_NO_MEM;
-		ctx->cached_string = ks_json_pprint_unformatted(ctx->base.pool, jsonrpc_request);
-		if (!ctx->cached_string) {
-			ks_json_delete(&jsonrpc_request);
-			return KS_STATUS_NO_MEM;
-		}
-		ctx->cached_type = ctx->type;
+	if (!jsonrpc_request)
+		return KS_STATUS_NO_MEM;
+	*string = ks_json_pprint_unformatted(ctx->base.pool, jsonrpc_request);
+	if (!*string) {
 		ks_json_delete(&jsonrpc_request);
+		return KS_STATUS_NO_MEM;
 	}
+	ks_json_delete(&jsonrpc_request);
 
-	/* And give the caller a read only copy */
-	*string = ks_pstrdup(pool, ctx->cached_string);
 	return KS_STATUS_SUCCESS;
 }
 
 static ks_status_t __print_result(swclt_cmd_ctx_t *ctx, ks_pool_t *pool, char **string)
 {
+	ks_json_t *jsonrpc_result;
 	if (ctx->type != SWCLT_CMD_TYPE_RESULT) {
 		ks_log(KS_LOG_WARNING, "Attempt to print incorrect result type, command type is: %s", swclt_cmd_type_str(ctx->type));
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
 
-	/* Default to own pool if not set */
 	if (!pool)
 		pool = ctx->base.pool;
 
-	if (ctx->type != ctx->cached_type) {
-		ks_json_t *jsonrpc_result;
-
-		ks_pool_free(&ctx->cached_string);
-
-		/* Wrap the result and updated the cache */
-		jsonrpc_result = __wrap_jsonrpc(ctx, "2.0", NULL,
-			ctx->id_str, NULL, ks_json_pduplicate(pool, ctx->reply.result, KS_TRUE), NULL);
-		if (!jsonrpc_result)
-			return KS_STATUS_NO_MEM;
-		ctx->cached_string = ks_json_pprint_unformatted(ctx->base.pool, jsonrpc_result);
-		if (!ctx->cached_string) {
-			ks_json_delete(&jsonrpc_result);
-			return KS_STATUS_NO_MEM;
-		}
-		ctx->cached_type = ctx->type;
+	jsonrpc_result = __wrap_jsonrpc(ctx, "2.0", NULL,
+		ctx->id_str, NULL, ks_json_pduplicate(pool, ctx->reply.result, KS_TRUE), NULL);
+	if (!jsonrpc_result)
+		return KS_STATUS_NO_MEM;
+	*string = ks_json_pprint_unformatted(ctx->base.pool, jsonrpc_result);
+	if (!*string) {
 		ks_json_delete(&jsonrpc_result);
+		return KS_STATUS_NO_MEM;
 	}
+	ks_json_delete(&jsonrpc_result);
 
-	/* And give the caller a read only copy */
-	*string = ctx->cached_string;
 	return KS_STATUS_SUCCESS;
 }
 
 static ks_status_t __print_error(swclt_cmd_ctx_t *ctx, ks_pool_t *pool, char **string)
 {
+	ks_json_t *jsonrpc_error;
+
 	if (ctx->type != SWCLT_CMD_TYPE_ERROR) {
 		ks_log(KS_LOG_WARNING, "Attempt to print incorrect error type, command type is: %s", swclt_cmd_type_str(ctx->type));
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
 
-	/* Default to own pool if not set */
 	if (!pool)
 		pool = ctx->base.pool;
 
-	if (ctx->type != ctx->cached_type) {
-		ks_json_t *jsonrpc_error;
-
-		ks_pool_free(&ctx->cached_string);
-
-		/* Wrap the error and updated the cache */
-		jsonrpc_error = __wrap_jsonrpc(ctx, "2.0", NULL,
-			ctx->id_str, NULL, NULL, ks_json_pduplicate(pool, ctx->reply.error, KS_TRUE));
-		if (!jsonrpc_error)
-			return KS_STATUS_NO_MEM;
-		ctx->cached_string = ks_json_pprint_unformatted(ctx->base.pool, jsonrpc_error);
-		if (!ctx->cached_string) {
-			ks_json_delete(&jsonrpc_error);
-			return KS_STATUS_NO_MEM;
-		}
-		ctx->cached_type = ctx->type;
+	jsonrpc_error = __wrap_jsonrpc(ctx, "2.0", NULL,
+		ctx->id_str, NULL, NULL, ks_json_pduplicate(pool, ctx->reply.error, KS_TRUE));
+	if (!jsonrpc_error)
+		return KS_STATUS_NO_MEM;
+	*string = ks_json_pprint_unformatted(ctx->base.pool, jsonrpc_error);
+	if (!*string) {
 		ks_json_delete(&jsonrpc_error);
+		return KS_STATUS_NO_MEM;
 	}
+	ks_json_delete(&jsonrpc_error);
 
-	/* And give the caller a copy */
-	*string = ks_pstrdup(pool, ctx->cached_string);
 	return KS_STATUS_SUCCESS;
 }
 

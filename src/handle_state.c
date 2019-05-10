@@ -143,7 +143,6 @@ SWCLT_DECLARE(void) __swclt_hstate_changed(
 		/* FORCE logging on from here on out */
 		//swclt_enable_log_output(KS_LOG_LEVEL_DEBUG);
 #endif
-
 		ks_log(KS_LOG_WARNING, "Handle: %s state changed: %s for handle: %s", swclt_htype_str(KS_HANDLE_TYPE_FROM_HANDLE(ctx->handle)),
 			swclt_hstate_describe_change(ctx->pending_state_change_notification), ks_handle_describe(ctx->handle));
 	} else {
