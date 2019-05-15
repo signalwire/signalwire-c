@@ -696,19 +696,24 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 	blade_netcast_protocol_provider_add_param_t *params = NULL;
 	blade_protocol_t *protocol = NULL;
 	ks_status_t status = KS_STATUS_SUCCESS;
+	ks_json_t *provider_data = NULL;
 
 	if (status = BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_PARSE(ctx->base.pool, netcast_rqu->params, &params))
 		return status;
 
 	ks_log(KS_LOG_INFO, "Request to add new provider %s for protocol %s", params->nodeid, params->protocol);
 
+	ks_hash_write_lock(ctx->protocols);
+
 	/* Lookup the protocol */
 	if (status = __lookup_protocol(ctx, params->protocol, &protocol)) {
 		ks_log(KS_LOG_INFO, "Protocol %s does not exist yet, adding new entry", params->protocol);
 
 		/* Gotta add a new one */
-		if (!(protocol = ks_pool_alloc(ctx->base.pool, sizeof(blade_protocol_t))))
+		if (!(protocol = ks_pool_alloc(ctx->base.pool, sizeof(blade_protocol_t)))) {
+			ks_hash_write_unlock(ctx->protocols);
 			return KS_STATUS_NO_MEM;
+		}
 
 		protocol->channels = ks_json_pduplicate(ctx->base.pool, params->channels, KS_TRUE);
 
@@ -718,10 +723,16 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 
 		protocol->name = ks_pstrdup(ctx->base.pool, params->protocol);
 
-		if (!(protocol->providers = ks_json_pcreate_array_inline(ctx->base.pool, 1, BLADE_PROVIDER_MARSHAL(NULL,
-																										   &(blade_provider_t){params->nodeid, NULL, params->rank, params->data})))) {
+		if (params->data) {
+			provider_data = ks_json_pduplicate(ctx->base.pool, params->data, KS_TRUE);
+		}
+		if (!(protocol->providers = ks_json_pcreate_array_inline(ctx->base.pool, 1,
+																										BLADE_PROVIDER_MARSHAL(ctx->base.pool,
+																										   &(blade_provider_t){params->nodeid, NULL, params->rank, provider_data})))) {
 			ks_pool_free(&protocol);
+			ks_pool_free(&provider_data);
 			BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_DESTROY(&params);
+			ks_hash_write_unlock(ctx->protocols);
 			return KS_STATUS_NO_MEM;
 		}
 
@@ -729,6 +740,7 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 		if (status = ks_hash_insert(ctx->protocols, protocol->name, protocol)) {
 			ks_pool_free(&protocol);
 			BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_DESTROY(&params);
+			ks_hash_write_unlock(ctx->protocols);
 			return status;
 
 		}
@@ -740,6 +752,8 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 		__invoke_cb_protocol_add(ctx, params->protocol);
 		__invoke_cb_protocol_provider_add(ctx, netcast_rqu, params);
 
+		ks_hash_write_unlock(ctx->protocols);
+
 		return status;
 
 	}
@@ -748,15 +762,23 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 				params->protocol, ks_json_get_array_size(protocol->providers));
 
 	/* Now add any provider entries to the protocol */
+	if (params->data) {
+		provider_data = ks_json_pduplicate(ctx->base.pool, params->data, KS_TRUE);
+	}
 	if (!ks_json_add_item_to_array(protocol->providers,
-								   BLADE_PROVIDER_MARSHAL(NULL, &(blade_provider_t){params->nodeid, NULL, params->rank, params->data})))
+					BLADE_PROVIDER_MARSHAL(ctx->base.pool, &(blade_provider_t){params->nodeid, NULL, params->rank, provider_data}))) {
+		ks_pool_free(&provider_data);
+		ks_hash_write_unlock(ctx->protocols);
 		return KS_STATUS_NO_MEM;
+	}
 
 	ks_log(KS_LOG_INFO, "Protocol %s add complete, provider count %lu", protocol->name, ks_json_get_array_size(protocol->providers));
 
 	__invoke_cb_protocol_provider_add(ctx, netcast_rqu, params);
 
 	BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_DESTROY(&params);
+
+	ks_hash_write_unlock(ctx->protocols);
 	
 	return status;
 }
@@ -848,15 +870,14 @@ static ks_status_t __update_protocol_provider_rank_update(swclt_store_ctx_t *ctx
 	for (int32_t index = 0; index < ks_json_get_array_size(protocol->providers); ++index) {
 		entry = ks_json_get_array_item(protocol->providers, index);
 
-		ks_assertd(!BLADE_PROVIDER_PARSE(ctx->base.pool, entry, &provider));
-
-		if (!strcmp(provider->nodeid, params->nodeid)) {
+		const char *provider_nodeid = ks_json_get_object_cstr_def(entry, "nodeid", "");
+		if (!strcmp(provider_nodeid, params->nodeid)) {
 			found = KS_TRUE;
-			provider->rank = params->rank;
+			ks_json_delete_item_from_object(entry, "rank");
+			ks_json_padd_number_to_object(ctx->base.pool, entry, "rank", params->rank);
 		}
-		BLADE_PROVIDER_DESTROY(&provider);
 	}
-		
+
 done:
 	ks_hash_write_unlock(ctx->protocols);
 
@@ -891,17 +912,14 @@ static ks_status_t __update_protocol_provider_data_update(swclt_store_ctx_t *ctx
 	// find provider
 	for (int32_t index = 0; index < ks_json_get_array_size(protocol->providers); ++index) {
 		entry = ks_json_get_array_item(protocol->providers, index);
-
-		ks_assertd(!BLADE_PROVIDER_PARSE(ctx->base.pool, entry, &provider));
-
-		if (!strcmp(provider->nodeid, params->nodeid)) {
+		const char *provider_nodeid = ks_json_get_object_cstr_def(entry, "nodeid", "");
+		if (!strcmp(provider_nodeid, params->nodeid)) {
 			found = KS_TRUE;
-			if (provider->data) ks_json_delete(&provider->data);
-			provider->data = ks_json_pduplicate(ctx->base.pool, params->data, KS_TRUE);
+			ks_json_delete_item_from_object(entry, "data");
+			ks_json_add_item_to_object(entry, "data", ks_json_pduplicate(ctx->base.pool, params->data, KS_TRUE));
 		}
-		BLADE_PROVIDER_DESTROY(&provider);
 	}
-		
+
 done:
 	ks_hash_write_unlock(ctx->protocols);
 
