@@ -139,10 +139,13 @@ static ks_status_t __wait_outstanding_cmd_result(swclt_conn_ctx_t *ctx, swclt_cm
 	if (status = swclt_cmd_id(cmd, &id))
 		return status;
 
+	ks_hash_read_lock(ctx->outstanding_requests);
 	if (!ks_hash_search(ctx->outstanding_requests, &id, KS_UNLOCKED)) {
 		ks_log(KS_LOG_WARNING, "Failed to lookup command: %16.16llx", cmd);
+		ks_hash_read_unlock(ctx->outstanding_requests);
 		return KS_STATUS_FAIL;
 	}
+    ks_hash_read_unlock(ctx->outstanding_requests);
 
 	status = __wait_cmd_result(ctx, cmd, type);
 
@@ -312,6 +315,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 		goto done;
 	}
 
+	ks_hash_read_lock(ctx->outstanding_requests);
 	if (!(outstanding_cmd = ks_hash_search(ctx->outstanding_requests, &id, KS_UNLOCKED))) {
 
 		/* Command probably timed out */
@@ -319,8 +323,10 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 
 		/* Unexpected, break in case it happens in a debugger */
 		status = KS_STATUS_INVALID_ARGUMENT;
+		ks_hash_read_unlock(ctx->outstanding_requests);
 		goto done;
 	}
+	ks_hash_read_unlock(ctx->outstanding_requests);
 
 	/* Copy the handle out before we remove the memory storing it in the hash */
 	cmd = *outstanding_cmd;
