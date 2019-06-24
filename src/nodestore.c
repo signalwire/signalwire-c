@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -543,7 +543,7 @@ static ks_status_t __select_random_protocol_provider(swclt_store_ctx_t *ctx, con
 	}
 
 	// pick random provider
-	index = (int32_t)(ks_rng_get_uint32() % ks_json_get_array_size(protocol->providers));
+	index = (int32_t)(rand() % ks_json_get_array_size(protocol->providers));
 	// parse provider
 	entry = ks_json_get_array_item(protocol->providers, index);
 	ks_assertd(!BLADE_PROVIDER_PARSE(ctx->base.pool, entry, &provider));
