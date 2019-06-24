@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -97,7 +97,6 @@ void test_ttl(ks_pool_t *pool)
 	swclt_conn_ctx_t *conn_ctx;
 	swclt_wss_ctx_t *wss_ctx;
 	swclt_cmd_ctx_t *cmd_ctx;
-	ks_time_t start_time_ms;
 	ks_json_t *channels;
 
 	REQUIRE(!swclt_conn_connect(&conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, ssl));
@@ -125,7 +124,6 @@ void test_ttl(ks_pool_t *pool)
 
 	/* And submit it */
 	REQUIRE(!swclt_conn_submit_request(conn, cmd));
-	start_time_ms = ks_time_ms(ks_time_now());
 
 	/* Give it 4 seconds */
 	ks_sleep_ms(4000);

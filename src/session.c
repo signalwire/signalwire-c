@@ -1523,7 +1523,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 	swclt_store_t store;
 	ks_pool_t *pool = NULL;
 	ks_json_t *params = NULL;
-	swclt_cmd_t cmd;
+	swclt_cmd_t cmd = KS_NULL_HANDLE;
 	SWCLT_CMD_TYPE cmd_type;
 	ks_json_t *result = NULL;
 	const char *protocol = NULL;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -452,7 +452,7 @@ static void __context_service(swclt_conn_ctx_t *ctx)
 		swclt_cmd_t cmd;
 		ks_uuid_t *id_key;
 		uint32_t ttl_ms;
-		ks_time_t cmd_submit_time;
+		ks_time_t cmd_submit_time = 0;
 		ks_bool_t remove = KS_FALSE;
 		SWCLT_CMD_TYPE type;
 		ks_time_t total_time_waited_ms = 0;
