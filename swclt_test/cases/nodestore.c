@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -83,7 +83,6 @@ blade_netcast_rqu_t __netcast_route_remove_request(ks_pool_t *pool, const char *
 
 blade_connect_rpl_t __connect_reply(ks_pool_t *pool)
 {
-	ks_json_t *result = ks_json_pcreate_object(pool);
 	ks_json_t *routes = ks_json_pcreate_array(pool);
 	ks_json_t *protocols = ks_json_pcreate_array(pool);
 	ks_json_t *subscriptions = ks_json_pcreate_array(pool);

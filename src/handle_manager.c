@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -317,8 +317,6 @@ SWCLT_DECLARE(void) swclt_hmgr_request_service_now(swclt_handle_base_t *ctx)
 SWCLT_DECLARE(void) swclt_hmgr_request_service_in(
 	swclt_handle_base_t *ctx, ks_time_t next_service_ms)
 {
-	ks_time_t now = now();
-
 	ks_log(KS_LOG_DEBUG, "Handle: %s is requesting manager service in: %lums",
 		ks_handle_describe_ctx(ctx), next_service_ms);
 

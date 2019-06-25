@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -263,10 +263,10 @@ static ks_status_t __print_request(swclt_cmd_ctx_t *ctx, ks_pool_t *pool, char *
 		pool = ctx->base.pool;
 
 	jsonrpc_request = __wrap_jsonrpc(ctx, "2.0", ctx->method,
-			ctx->id_str, ks_json_pduplicate(ctx->base.pool, (ks_json_t *)ctx->request, KS_TRUE), NULL, NULL);
+			ctx->id_str, ks_json_pduplicate(pool, (ks_json_t *)ctx->request, KS_TRUE), NULL, NULL);
 	if (!jsonrpc_request)
 		return KS_STATUS_NO_MEM;
-	*string = ks_json_pprint_unformatted(ctx->base.pool, jsonrpc_request);
+	*string = ks_json_pprint_unformatted(pool, jsonrpc_request);
 	if (!*string) {
 		ks_json_delete(&jsonrpc_request);
 		return KS_STATUS_NO_MEM;
