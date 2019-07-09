@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -71,6 +71,15 @@ typedef void (*swclt_store_cb_authority_remove_t)(
 	const blade_netcast_rqu_t* rqu,
 	const blade_netcast_authority_remove_param_t *params);
 
+typedef void (*swclt_store_cb_subscription_add_t)(swclt_sess_t sess,
+	const blade_netcast_rqu_t *rqu,
+	const blade_netcast_subscription_add_param_t *params);
+
+typedef void (*swclt_store_cb_subscription_remove_t)(
+	swclt_sess_t sess,
+	const blade_netcast_rqu_t* rqu,
+	const blade_netcast_subscription_remove_param_t *params);
+
 typedef void (*swclt_store_cb_identity_add_t)(swclt_sess_t sess,
 	const blade_netcast_rqu_t *rqu,
 	const blade_netcast_identity_add_param_t *params);
@@ -113,6 +122,8 @@ SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_provider_rank_update(swclt_st
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_protocol_provider_data_update(swclt_store_t store, swclt_store_cb_protocol_provider_data_update_t cb);
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_authority_add(swclt_store_t store, swclt_store_cb_authority_add_t cb);
 SWCLT_DECLARE(ks_status_t) swclt_store_cb_authority_remove(swclt_store_t store, swclt_store_cb_authority_remove_t cb);
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_subscription_add(swclt_store_t store, swclt_store_cb_subscription_add_t cb);
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_subscription_remove(swclt_store_t store, swclt_store_cb_subscription_remove_t cb);
 
 
 #define swclt_store_get(store, contextP)		__ks_handle_get(SWCLT_HTYPE_STORE, store, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)

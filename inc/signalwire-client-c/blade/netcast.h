@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -264,6 +264,56 @@ SWCLT_JSON_DESTROY_END()
 
 SWCLT_JSON_PARSE_BEG(BLADE_NETCAST_AUTHORITY_REMOVE_PARAM, blade_netcast_authority_remove_param_t)
 	SWCLT_JSON_PARSE_STRING(nodeid)
+SWCLT_JSON_PARSE_END()
+
+/* The params definition for BLADE_NETCAST_CMD_SUBSCRIPTION_ADD */
+typedef struct blade_netcast_subscription_add_param_s {
+	const char *protocol;
+	const char *nodeid;
+	ks_json_t *channels;
+} blade_netcast_subscription_add_param_t;
+
+SWCLT_JSON_MARSHAL_BEG(BLADE_NETCAST_SUBSCRIPTION_ADD_PARAM, blade_netcast_subscription_add_param_t)
+	SWCLT_JSON_MARSHAL_STRING(protocol)
+	SWCLT_JSON_MARSHAL_STRING(nodeid)
+	SWCLT_JSON_MARSHAL_ITEM_OPT(channels)
+SWCLT_JSON_MARSHAL_END()
+
+SWCLT_JSON_DESTROY_BEG(BLADE_NETCAST_SUBSCRIPTION_ADD_PARAM, blade_netcast_subscription_add_param_t)
+	SWCLT_JSON_DESTROY_STRING(protocol)
+	SWCLT_JSON_DESTROY_STRING(nodeid)
+	SWCLT_JSON_DESTROY_ITEM(channels)
+SWCLT_JSON_DESTROY_END()
+
+SWCLT_JSON_PARSE_BEG(BLADE_NETCAST_SUBSCRIPTION_ADD_PARAM, blade_netcast_subscription_add_param_t)
+	SWCLT_JSON_PARSE_STRING(protocol)
+	SWCLT_JSON_PARSE_STRING(nodeid)
+	SWCLT_JSON_PARSE_ITEM_OPT(channels)
+SWCLT_JSON_PARSE_END()
+
+/* The params definition for BLADE_NETCAST_CMD_SUBSCRIPTION_REMOVE */
+typedef struct blade_netcast_subscription_remove_param_s {
+	const char *protocol;
+	const char *nodeid;
+	ks_json_t *channels;
+} blade_netcast_subscription_remove_param_t;
+
+SWCLT_JSON_MARSHAL_BEG(BLADE_NETCAST_SUBSCRIPTION_REMOVE_PARAM, blade_netcast_subscription_remove_param_t)
+	SWCLT_JSON_MARSHAL_STRING(protocol)
+	SWCLT_JSON_MARSHAL_STRING(nodeid)
+	SWCLT_JSON_MARSHAL_ITEM_OPT(channels)
+SWCLT_JSON_MARSHAL_END()
+
+SWCLT_JSON_DESTROY_BEG(BLADE_NETCAST_SUBSCRIPTION_REMOVE_PARAM, blade_netcast_subscription_remove_param_t)
+	SWCLT_JSON_DESTROY_STRING(protocol)
+	SWCLT_JSON_DESTROY_STRING(nodeid)
+	SWCLT_JSON_DESTROY_ITEM(channels)
+SWCLT_JSON_DESTROY_END()
+
+SWCLT_JSON_PARSE_BEG(BLADE_NETCAST_SUBSCRIPTION_REMOVE_PARAM, blade_netcast_subscription_remove_param_t)
+	SWCLT_JSON_PARSE_STRING(protocol)
+	SWCLT_JSON_PARSE_STRING(nodeid)
+	SWCLT_JSON_PARSE_ITEM_OPT(channels)
 SWCLT_JSON_PARSE_END()
 
 /* The params definition for BLADE_NETCAST_CMD_ROUTE_ADD */
