@@ -286,8 +286,50 @@ static void __invoke_cb_authority_remove(swclt_store_ctx_t *ctx, const blade_net
 	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
 }
 
+static ks_status_t __add_cb_subscription_add(swclt_store_ctx_t *ctx, swclt_store_cb_subscription_add_t cb)
+{
+	ks_log(KS_LOG_DEBUG, "Adding authority add handler for method: %s", BLADE_NETCAST_CMD_SUBSCRIPTION_ADD);
+	return ks_hash_insert(ctx->callbacks, (const void *)BLADE_NETCAST_CMD_SUBSCRIPTION_ADD, (void *)cb);
+}
+
+static void __invoke_cb_subscription_add(swclt_store_ctx_t *ctx, const blade_netcast_rqu_t *rqu, const blade_netcast_subscription_add_param_t *params)
+{
+	swclt_store_cb_subscription_add_t cb;
+
+	ks_log(KS_LOG_DEBUG, "Looking up subscription add handler for method: %s", BLADE_NETCAST_CMD_SUBSCRIPTION_ADD);
+
+	ks_hash_read_lock(ctx->callbacks);
+	cb = (swclt_store_cb_subscription_add_t)ks_hash_search(ctx->callbacks,
+														(const void *)BLADE_NETCAST_CMD_SUBSCRIPTION_ADD,
+														KS_UNLOCKED);
+	ks_hash_read_unlock(ctx->callbacks);
 
 
+	if (cb) {
+		ks_log(KS_LOG_DEBUG, "Invoking callback for node store add");
+		cb(__get_sess_from_store_ctx(ctx), rqu, params);
+	} else {
+		ks_log(KS_LOG_DEBUG, "No callback registered for subscription add method: %s", BLADE_NETCAST_CMD_SUBSCRIPTION_ADD);
+	}
+}
+
+static ks_status_t __add_cb_subscription_remove(swclt_store_ctx_t *ctx, swclt_store_cb_subscription_remove_t cb)
+{
+	return ks_hash_insert(ctx->callbacks, (const void *)BLADE_NETCAST_CMD_SUBSCRIPTION_REMOVE, (void *)cb);
+}
+
+static void __invoke_cb_subscription_remove(swclt_store_ctx_t *ctx, const blade_netcast_rqu_t *rqu, const blade_netcast_subscription_remove_param_t *params)
+{
+	swclt_store_cb_subscription_remove_t cb;
+
+	ks_hash_read_lock(ctx->callbacks);
+	cb = (swclt_store_cb_subscription_remove_t)ks_hash_search(ctx->callbacks,
+														   (const void *)BLADE_NETCAST_CMD_SUBSCRIPTION_REMOVE,
+														   KS_UNLOCKED);
+	ks_hash_read_unlock(ctx->callbacks);
+
+	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+}
 
 static ks_status_t __add_protocol_obj(swclt_store_ctx_t *ctx, ks_json_t *obj)
 {
@@ -1045,13 +1087,36 @@ static ks_status_t __update_channel_remove(swclt_store_ctx_t *ctx, blade_netcast
 // Subscription add/remove
 static ks_status_t __update_subscription_add(swclt_store_ctx_t *ctx, blade_netcast_rqu_t *netcast_rqu)
 {
-	/* @@ TODO */
-	return KS_STATUS_SUCCESS;
+	blade_netcast_subscription_add_param_t *params;
+	ks_status_t status;
+
+	if (status = BLADE_NETCAST_SUBSCRIPTION_ADD_PARAM_PARSE(ctx->base.pool, netcast_rqu->params, &params))
+		return status;
+
+	/* @TODO add subscription to ctx->subscriptions */
+
+	__invoke_cb_subscription_add(ctx, netcast_rqu, params);
+
+	BLADE_NETCAST_SUBSCRIPTION_ADD_PARAM_DESTROY(&params);
+
+	return status;
 }
 
 static ks_status_t __update_subscription_remove(swclt_store_ctx_t *ctx, blade_netcast_rqu_t *netcast_rqu)
 {
-	/* @@ TODO */
+	blade_netcast_subscription_remove_param_t *params;
+	ks_status_t status;
+
+	if (status = BLADE_NETCAST_SUBSCRIPTION_REMOVE_PARAM_PARSE(ctx->base.pool, netcast_rqu->params, &params))
+		return status;
+
+	/* @TODO Remove the subscription from ctx->subscriptions */
+
+	__invoke_cb_subscription_remove(ctx, netcast_rqu, params);
+
+	/* Done with the request */
+	BLADE_NETCAST_SUBSCRIPTION_REMOVE_PARAM_DESTROY(&params);
+
 	return KS_STATUS_SUCCESS;
 }
 
@@ -1596,3 +1661,16 @@ SWCLT_DECLARE(ks_status_t) swclt_store_cb_authority_remove(swclt_store_t store, 
 	SWCLT_STORE_SCOPE_END(store, ctx, status)
 }
 
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_subscription_add(swclt_store_t store, swclt_store_cb_subscription_add_t cb)
+{
+	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
+	status = __add_cb_subscription_add(ctx, cb);
+	SWCLT_STORE_SCOPE_END(store, ctx, status)
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_store_cb_subscription_remove(swclt_store_t store, swclt_store_cb_subscription_remove_t cb)
+{
+	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
+	status = __add_cb_subscription_remove(ctx, cb);
+	SWCLT_STORE_SCOPE_END(store, ctx, status)
+}

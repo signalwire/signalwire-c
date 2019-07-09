@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,7 +33,7 @@ struct swclt_store_ctx {
 	ks_hash_t *callbacks;
 	
 	/* Hash of nodes keyed by their nodeid. They point to a Node
-     * class which contains their certified status. */
+	 * class which contains their certified status. */
 	ks_hash_t *routes;
 
 	/* Hash keyed by identity mapped to nodeid */
@@ -42,14 +42,14 @@ struct swclt_store_ctx {
 	/* Last index position we selected for random protocol gathering */
 	uint32_t last_random_protocol_idx;
 
-    /* Hash of protocols, keyed by the protocol name, each protocol
-     * contains channels. */
-    ks_hash_t *protocols;
+	/* Hash of protocols, keyed by the protocol name, each protocol
+	 * contains channels. */
+	ks_hash_t *protocols;
 
-    /* Hash of Subscription objects, keyed by their protocol name. */
+	/* Hash of Subscription objects, keyed by their protocol name. */
 	ks_hash_t *subscriptions;
 
-    /* Hash of authorities, keyed by their node uuid. */
+	/* Hash of authorities, keyed by their node uuid. */
 	ks_hash_t *authorities;
 
 	/* Hash of protocols available to uncertified clients only, keyed by protocol name */
