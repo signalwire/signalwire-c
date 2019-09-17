@@ -32,8 +32,6 @@ DECLARE_TEST(session);
 DECLARE_TEST(nodestore);
 DECLARE_TEST(callback);
 DECLARE_TEST(uncert_exp);
-DECLARE_TEST(messaging_exp);
-DECLARE_TEST(calling_exp);
 
 test_entry_t g_test_methods[] = {
 	TEST_ENTRY(hmanager),
@@ -47,8 +45,6 @@ test_entry_t g_test_methods[] = {
 	TEST_ENTRY(nodestore),
 	TEST_ENTRY(callback),
 	TEST_ENTRY(uncert_exp),
-	TEST_ENTRY(messaging_exp),
-	TEST_ENTRY(calling_exp),
 };
 
 static ks_spinlock_t g_log_lock;
