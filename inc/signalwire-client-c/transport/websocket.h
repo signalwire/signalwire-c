@@ -39,7 +39,7 @@ typedef struct swclt_wss_info_s {
 	SSL_CTX *ssl;					/* ssl context handed to us at first connect attempt */
 } swclt_wss_info_t;
 
-typedef ks_status_t (*swclt_wss_incoming_frame_cb_t)(swclt_wss_t wss, swclt_frame_t frame, void *cb_data);
+typedef ks_status_t (*swclt_wss_incoming_frame_cb_t)(swclt_wss_t wss, swclt_frame_t *frame, void *cb_data);
 
 SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	swclt_wss_t *wss,

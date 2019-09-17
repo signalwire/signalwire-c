@@ -84,12 +84,12 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_create_ex(swclt_cmd_t *cmd, ks_pool_t **p
 #define swclt_cmd_create_ex(cmd, pool, cb, cb_data, method, request,response_ttl_ms, flags, id)	\
 	__swclt_cmd_create_ex(cmd, pool, cb, cb_data, method, request, response_ttl_ms, flags, id, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 
-/* Create a request from af rame w/optional callback */
+/* Create a request from a frame w/optional callback */
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_create_frame(
 	swclt_cmd_t *cmd,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
-	swclt_frame_t frame,
+	swclt_frame_t *frame,
 	uint32_t response_ttl_ms,
 	uint32_t flags,
 	const char *file,
@@ -115,7 +115,7 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_set_submit_time(swclt_cmd_t cmd, ks_time_
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_failure_info(swclt_cmd_t cmd, ks_status_t *failure_status, const char **failure_reason, const char *file, int line, const char *tag);
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_flags(swclt_cmd_t cmd, uint32_t *flags, const char *file, int line, const char *tag);
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_method(swclt_cmd_t cmd, const char **method, const char *file, int line, const char *tag);
-SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_frame_t frame, ks_bool_t *async, const char *file, int line, const char *tag);
+SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_frame_t *frame, ks_bool_t *async, const char *file, int line, const char *tag);
 
 #define swclt_cmd_set_cb(cmd, cb, cb_data) __swclt_cmd_set_cb(cmd, cb, cb_data, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_cmd_cb(cmd, cb, cb_data) __swclt_cmd_cb(cmd, cb, cb_data, __FILE__, __LINE__, __PRETTY_FUNCTION__)

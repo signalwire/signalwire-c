@@ -232,7 +232,7 @@ static ks_status_t __submit_request(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd)
 	return status;
 }
 
-static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *payload, swclt_frame_t frame)
+static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *payload, swclt_frame_t *frame)
 {
 	const char *method;
 	ks_uuid_t id;
@@ -243,16 +243,16 @@ static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *paylo
 	if (status = swclt_hstate_check_ctx(&ctx->base, "Ignoring incoming request due to state:"))
 		return status;
 
-	ks_log(KS_LOG_DEBUG, "Handling incoming request: %s", ks_handle_describe(frame));
+	//ks_log(KS_LOG_DEBUG, "Handling incoming request: %s", ks_handle_describe(frame));
 
 	if (!(method = ks_json_get_object_cstr_def(payload, "method", NULL))) {
-		ks_log(KS_LOG_WARNING, "Invalid response received: %s", ks_handle_describe(frame));
+		//ks_log(KS_LOG_WARNING, "Invalid response received: %s", ks_handle_describe(frame));
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
 
 	id = ks_json_get_object_uuid(payload, "id");
 	if (ks_uuid_is_null(&id)) {
-		ks_log(KS_LOG_WARNING, "Response missing id: %s", ks_handle_describe(frame));
+		//ks_log(KS_LOG_WARNING, "Response missing id: %s", ks_handle_describe(frame));
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
 
@@ -263,7 +263,7 @@ static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *paylo
 			frame,
 			0,
 			BLADE_METHOD_FLAGS(method))) {
-		ks_log(KS_LOG_WARNING, "Failed to create command (status: %lu) from frame: %s", status, ks_handle_describe(frame));
+		//ks_log(KS_LOG_WARNING, "Failed to create command (status: %lu) from frame: %s", status, ks_handle_describe(frame));
 		return status;
 	}
 
@@ -272,14 +272,14 @@ static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *paylo
 	/* Bind this cmd to our connection in case the callback does not free it */
 	ks_handle_set_parent(cmd, ctx->base.handle);
 
-	/* And we're in charge of the frame now, we copied it, so invalidae it */
-	ks_handle_destroy(&frame);
+	/* And we're in charge of the frame now, we copied it, so free it */
+	ks_pool_free(&frame);
 
 	/* And raise the client */
 	return ctx->incoming_cmd_cb(ctx->base.handle, cmd, ctx->incoming_cmd_cb_data);
 }
 
-static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swclt_conn_ctx_t *ctx)
+static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t *frame, swclt_conn_ctx_t *ctx)
 {
 	ks_json_t *payload;
 	ks_status_t status;
@@ -289,13 +289,13 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 	swclt_cmd_t cmd;
 	ks_bool_t async = KS_FALSE;
 
-	ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", ks_handle_describe(frame));
+	//ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", ks_handle_describe(frame));
 
 	/* Lock to synchronize with the waiter thread */
 	ks_cond_lock(ctx->cmd_condition);
 
 	/* Parse the json out of the frame to figure out what it is */
-	if (status = swclt_frame_get_json(frame, &payload)) {
+	if (status = swclt_frame_to_json(frame, ctx->base.pool, &payload)) {
 		ks_log(KS_LOG_ERROR, "Failed to get frame json: %lu", status);
 		goto done;
 	}
@@ -310,7 +310,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 	/* Must be a reply, look up our outstanding request */
 	id = ks_json_get_object_uuid(payload, "id");
 	if (ks_uuid_is_null(&id)) {
-		ks_log(KS_LOG_WARNING, "Received invalid payload, missing id: %s", ks_handle_describe(frame));
+		//ks_log(KS_LOG_WARNING, "Received invalid payload, missing id: %s", ks_handle_describe(frame));
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
 	}
@@ -319,7 +319,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 	if (!(outstanding_cmd = ks_hash_search(ctx->outstanding_requests, &id, KS_UNLOCKED))) {
 
 		/* Command probably timed out */
-		ks_log(KS_LOG_DEBUG, "Could not locate cmd for frame: %s", ks_handle_describe(frame));
+		//ks_log(KS_LOG_DEBUG, "Could not locate cmd for frame: %s", ks_handle_describe(frame));
 
 		/* Unexpected, break in case it happens in a debugger */
 		status = KS_STATUS_INVALID_ARGUMENT;
@@ -361,7 +361,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t frame, swc
 done:
 	ks_cond_unlock(ctx->cmd_condition);
 
-	ks_handle_destroy(&frame);
+	ks_pool_free(&frame);
 
 	if (async) {
 		ks_log(KS_LOG_DEBUG, "Destroying command: %s", ks_handle_describe(cmd));

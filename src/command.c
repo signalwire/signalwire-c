@@ -114,7 +114,7 @@ static void __context_describe(swclt_cmd_ctx_t *ctx, char *buffer, ks_size_t buf
 	swclt_cmd_ctx_unlock(ctx);
 }
 
-static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t frame)
+static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t *frame)
 {
 	const char *method, *jsonrpc;
 	ks_json_t *original_json;
@@ -122,8 +122,8 @@ static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t fram
 
 	/* Grab the json out of the frame, but don't copy it yet, we'll slice off just
 	 * the params portion */
-	if (status = swclt_frame_get_json(frame, &original_json)) {
-		ks_log(KS_LOG_CRIT, "Received invalid frame: %s", ks_handle_describe(frame));
+	if (status = swclt_frame_to_json(frame, ctx->base.pool, &original_json)) {
+		//ks_log(KS_LOG_CRIT, "Received invalid frame: %s", ks_handle_describe(frame));
 		return status;
 	}
 
@@ -134,41 +134,54 @@ static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t fram
 	/* Now load the id, method, and verify it has at least a params structure in it as
 	 * well as the jsonrpc tag */
 	if (!(method = ks_json_get_object_cstr_def(original_json, "method", NULL))) {
-		ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no method field present: %s", ks_handle_describe(frame));
-		return KS_STATUS_INVALID_ARGUMENT;
+		//ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no method field present: %s", ks_handle_describe(frame));
+		status = KS_STATUS_INVALID_ARGUMENT;
+		goto done;
 	}
 	if (!(ctx->request = ks_json_get_object_item(original_json, "params"))) {
-		ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no params field present: %s", ks_handle_describe(frame));
-		return KS_STATUS_INVALID_ARGUMENT;
+		//ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no params field present: %s", ks_handle_describe(frame));
+		status = KS_STATUS_INVALID_ARGUMENT;
+		goto done;
 	}
 	if (!(jsonrpc = ks_json_get_object_cstr_def(original_json, "jsonrpc", NULL))) {
-		ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no jsonrpc field present: %s", ks_handle_describe(frame));
-		return KS_STATUS_INVALID_ARGUMENT;
+		//ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no jsonrpc field present: %s", ks_handle_describe(frame));
+		status = KS_STATUS_INVALID_ARGUMENT;
+		goto done;
 	}
 	ctx->id = ks_json_get_object_uuid(original_json, "id");
 	if (ks_uuid_is_null(&ctx->id)) {
-		ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no id (or null id) field: %s", ks_handle_describe(frame));
-		return KS_STATUS_INVALID_ARGUMENT;
+		//ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no id (or null id) field: %s", ks_handle_describe(frame));
+		status = KS_STATUS_INVALID_ARGUMENT;
+		goto done;
 	}
-	if (!(ctx->id_str = ks_uuid_str(ctx->base.pool, &ctx->id)))
-		return KS_STATUS_NO_MEM;
+	if (!(ctx->id_str = ks_uuid_str(ctx->base.pool, &ctx->id))) {
+		status = KS_STATUS_NO_MEM;
+		goto done;
+	}
 
 	/* Right finally its valid, copy some things */
-	if (!(ctx->method = ks_pstrdup(ctx->base.pool, method)))
-		return KS_STATUS_NO_MEM;
+	if (!(ctx->method = ks_pstrdup(ctx->base.pool, method))) {
+		status = KS_STATUS_NO_MEM;
+		goto done;
+	}
 
 	/* We just need the request portion, dupe just that, leave the rest in ownership
 	 * of the frame */
 	if (!(ctx->request = ks_json_pduplicate(ctx->base.pool, ks_json_lookup(original_json, 1, "params"), KS_TRUE))) {
-		ks_log(KS_LOG_CRIT, "Failed to allocate json request from frame: %s", ks_handle_describe(frame));
-		return KS_STATUS_INVALID_ARGUMENT;
+		//ks_log(KS_LOG_CRIT, "Failed to allocate json request from frame: %s", ks_handle_describe(frame));
+		status = KS_STATUS_INVALID_ARGUMENT;
+		goto done;
 	}
 
-	return KS_STATUS_SUCCESS;
+done:
+	if (original_json) {
+		ks_json_delete(&original_json);
+	}
+	return status;
 }
 
 static ks_status_t __context_init(swclt_cmd_ctx_t *ctx, swclt_cmd_cb_t cb, void *cb_data, const char * const method,
-		ks_json_t **request, uint32_t response_ttl_ms, uint32_t flags, ks_uuid_t uuid, swclt_frame_t frame)
+		ks_json_t **request, uint32_t response_ttl_ms, uint32_t flags, ks_uuid_t uuid, swclt_frame_t *frame)
 {
 	/* Stash their callback if they're doing async (null would imply blocking)*/
 	ctx->cb = cb;
@@ -185,7 +198,7 @@ static ks_status_t __context_init(swclt_cmd_ctx_t *ctx, swclt_cmd_cb_t cb, void 
 		if (frame) {
 			return __context_init_frame(ctx, frame);
 		}
-		ks_log(KS_LOG_CRIT, "Context init failed invalid arguments: %s", ks_handle_describe(frame));
+		//ks_log(KS_LOG_CRIT, "Context init failed invalid arguments: %s", ks_handle_describe(frame));
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
 
@@ -361,7 +374,7 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_create_frame(
 	swclt_cmd_t *cmd,
    	swclt_cmd_cb_t cb,
    	void *cb_data,
-	swclt_frame_t frame,
+	swclt_frame_t *frame,
    	uint32_t response_ttl_ms,
    	uint32_t flags,
    	const char *file,
@@ -731,7 +744,7 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_set_error(swclt_cmd_t cmd, ks_json_t **er
 	SWCLT_CMD_SCOPE_END_TAG(cmd, ctx, status, file, line, tag);
 }
 
-SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_frame_t frame, ks_bool_t *async, const char *file, int line, const char *tag)
+SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_frame_t *frame, ks_bool_t *async, const char *file, int line, const char *tag)
 {
 	SWCLT_CMD_SCOPE_BEG_TAG(cmd, ctx, status, file, line, tag);
 

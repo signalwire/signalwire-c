@@ -28,7 +28,6 @@ SWCLT_DECLARE(ks_status_t) swclt_hmgr_init();
 SWCLT_DECLARE(void) swclt_hmgr_shutdown();
 
 SWCLT_DECLARE(void) swclt_hmgr_request_service_in(swclt_handle_base_t *ctx, ks_time_t time_to_service);
-SWCLT_DECLARE(void) swclt_hmgr_request_service_now(swclt_handle_base_t *ctx);
 
 KS_END_EXTERN_C
 

@@ -47,7 +47,6 @@ static inline void name##_put(swclt_##name##_ctx_t **ctx)					\
 SWCLT_TEST_HANDLE_GET_DEF(sess)
 SWCLT_TEST_HANDLE_GET_DEF(conn)
 SWCLT_TEST_HANDLE_GET_DEF(cmd)
-SWCLT_TEST_HANDLE_GET_DEF(frame)
 SWCLT_TEST_HANDLE_GET_DEF(wss)
 SWCLT_TEST_HANDLE_GET_DEF(sub)
 

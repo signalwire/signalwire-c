@@ -111,7 +111,7 @@ static ks_bool_t __service_handle(ks_handle_t handle)
 		goto done;
 	}
 
-	ks_log(KS_LOG_DEBUG, "Service begin: %s", ks_handle_describe_ctx(ctx));
+	//ks_log(KS_LOG_DEBUG, "Service begin: %s", ks_handle_describe_ctx(ctx));
 
 	serviced = KS_TRUE;
 
@@ -195,7 +195,7 @@ static ks_bool_t __service_handle(ks_handle_t handle)
 
 	}
 
-	ks_log(KS_LOG_DEBUG, "Service end: %s", ks_handle_describe(handle));
+	//ks_log(KS_LOG_DEBUG, "Service end: %s", ks_handle_describe(handle));
 
 done:
 	ks_spinlock_release(&ctx->lock);
@@ -206,9 +206,6 @@ done:
 static void __service_handle_type(swclt_htype_t type)
 {
 	ks_handle_t next = KS_NULL_HANDLE;
-	uint32_t total = 0;
-
-	ks_log(KS_LOG_DEBUG, "Service manager enumerating handles of type: %s", swclt_htype_str(type));
 
 	while (!ks_handle_enum_type(type, &next)) {
 		if (ks_thread_stop_requested(g_mgr_thread)) {
@@ -216,12 +213,8 @@ static void __service_handle_type(swclt_htype_t type)
 			break;
 		}
 
-		if (__service_handle(next))
-			total++;
+		__service_handle(next);
 	}
-
-	if (total)
-		ks_log(KS_LOG_DEBUG, "Service manager serviced: %lu handles of type: %s", total, swclt_htype_str(type));
 }
 
 static void __service_handles()
@@ -229,7 +222,6 @@ static void __service_handles()
 	/* Now loop through all handles and service them */
 	__service_handle_type(SWCLT_HTYPE_CONN);
     __service_handle_type(SWCLT_HTYPE_CMD);
-    __service_handle_type(SWCLT_HTYPE_FRAME);
     __service_handle_type(SWCLT_HTYPE_WSS);
     __service_handle_type(SWCLT_HTYPE_SESS);
     __service_handle_type(SWCLT_HTYPE_SUB);
@@ -307,11 +299,6 @@ SWCLT_DECLARE(void) swclt_hmgr_shutdown()
 
 	ks_thread_destroy(&g_mgr_thread);
 	ks_cond_destroy(&g_mgr_condition);
-}
-
-SWCLT_DECLARE(void) swclt_hmgr_request_service_now(swclt_handle_base_t *ctx)
-{
-	swclt_hmgr_request_service_in(ctx, 1);
 }
 
 SWCLT_DECLARE(void) swclt_hmgr_request_service_in(

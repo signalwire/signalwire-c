@@ -52,27 +52,16 @@ static ks_status_t __write_ping(swclt_wss_ctx_t *ctx)
 	return __write_raw(ctx, WSOC_PING, &data, sizeof(data));
 }
 
-static ks_status_t __write_pong(swclt_wss_ctx_t *ctx, swclt_frame_t frame)
+static ks_status_t __write_pong(swclt_wss_ctx_t *ctx, swclt_frame_t *frame)
 {
-	swclt_frame_ctx_t *frame_ctx;
 	ks_status_t status = KS_STATUS_SUCCESS;
 
-	/* Reference the frame while we write it */
-	if (status = swclt_frame_get(frame, &frame_ctx)) {
-		ks_log(KS_LOG_WARNING, "Invalid frame handed to write: %16.16llx (%lu)", frame, status);
-		return status;
-	}
-
 	ks_mutex_lock(ctx->write_mutex);
-	if (kws_write_frame(ctx->wss, WSOC_PONG, frame_ctx->data, frame_ctx->len) != frame_ctx->len) {
-		ks_log(KS_LOG_WARNING, "Failed to write frame: %s", ks_handle_describe(frame));
+	if (kws_write_frame(ctx->wss, WSOC_PONG, frame->data, frame->len) != frame->len) {
+		ks_log(KS_LOG_WARNING, "Failed to write frame");
 		status = KS_STATUS_FAIL;
 	}
 	ks_mutex_unlock(ctx->write_mutex);
-
-	/* Done with the reference */
-	swclt_frame_put(&frame_ctx);
-
 	return status;
 }
 
@@ -89,9 +78,9 @@ static ks_status_t __poll_read(swclt_wss_ctx_t *ctx, uint32_t *poll_flagsP)
 }
 
 // Read thread
-static ks_status_t __read_frame(swclt_wss_ctx_t *ctx, swclt_frame_t *frameP, kws_opcode_t *opcodeP)
+static ks_status_t __read_frame(swclt_wss_ctx_t *ctx, swclt_frame_t **frameP, kws_opcode_t *opcodeP)
 {
-	swclt_frame_t frame = KS_NULL_HANDLE;
+	swclt_frame_t *frame = NULL;
 	kws_opcode_t opcode = WSOC_INVALID;
 	uint8_t *data;
 	ks_ssize_t len;
@@ -99,16 +88,14 @@ static ks_status_t __read_frame(swclt_wss_ctx_t *ctx, swclt_frame_t *frameP, kws
 
 	/* Allocate a new frame if needed */
 	if (!*frameP) {
-		if (status = swclt_frame_alloc(&frame))
+		if (status = swclt_frame_alloc(&frame, ctx->base.pool)) {
 			return status;
-
-		/* Associate the frame with our handle */
-		ks_handle_set_parent(frame, ctx->base.handle);
+		}
 	} else {
 		frame = *frameP;
 
 		/* Mark it null for now if we error its getting freed */
-		*frameP = KS_NULL_HANDLE;
+		*frameP = NULL;
 	}
 
 	ks_mutex_lock(ctx->write_mutex);
@@ -129,14 +116,15 @@ static ks_status_t __read_frame(swclt_wss_ctx_t *ctx, swclt_frame_t *frameP, kws
 	ks_log(KS_LOG_DEBUG, "Copying frame of length: %lu of opcode: %lu", (size_t)len, opcode);
 
 	/* Stash it in the frame */
-	if (status = swclt_frame_copy_data(frame, data, (size_t)len, opcode))
+	if (status = swclt_frame_copy_data(frame, ctx->base.pool, data, (size_t)len, opcode)) {
 		goto done;
+	}
 
 done:
 	ks_mutex_unlock(ctx->write_mutex);
 
 	if (status) {
-		ks_handle_destroy(&frame);
+		ks_pool_free(&frame);
 	} else {
 		*frameP = frame;
 		*opcodeP = opcode;
@@ -180,7 +168,11 @@ static ks_status_t __reader_loop(swclt_wss_ctx_t *ctx)
 				return status;
 			}
 
-			ks_log(KS_LOG_DEBUG, "Read frame: %s", ks_handle_describe(ctx->read_frame));
+			if (ctx->read_frame->len > 0) {
+				ks_log(KS_LOG_DEBUG, "Read frame: opcode %u, length %zu, data: %s", ctx->read_frame->opcode, ctx->read_frame->len, ctx->read_frame->data);
+			} else {
+				ks_log(KS_LOG_DEBUG, "Read frame: opcode %u, length %zu, data: (null)", ctx->read_frame->opcode, ctx->read_frame->len);
+			}
 
 			// Deal with pings
 			switch(frame_opcode) {
@@ -202,12 +194,12 @@ static ks_status_t __reader_loop(swclt_wss_ctx_t *ctx)
 				if (status = ctx->incoming_frame_cb(ctx->base.handle, ctx->read_frame, ctx->incoming_frame_cb_data)) {
 					ks_log(KS_LOG_WARNING, "Callback from incoming frame returned: %d, exiting", status);
 					// Done with the frame, callback is responsible for freeing it
-					ctx->read_frame = 0;
+					ctx->read_frame = NULL;
 					return status;
 				}
 
 				// Done with the frame, callback is responsible for freeing it
-				ctx->read_frame = 0;
+				ctx->read_frame = NULL;
 				break;
 			}
 		} else {
@@ -264,7 +256,7 @@ static void __context_deinit(
 	ks_mutex_destroy(&ctx->read_mutex);
 	ks_handle_destroy(&ctx->rate_recv);
 	ks_handle_destroy(&ctx->rate_send);
-	ks_handle_destroy(&ctx->read_frame);
+	ks_pool_free(&ctx->read_frame);
 	kws_destroy(&ctx->wss);
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -47,7 +47,7 @@ struct swclt_wss_ctx {
 	ks_time_t ping_next_time_sec;
 
 	/* We keep a read frame around and re-use its data buffer */
-	swclt_frame_t read_frame;
+	swclt_frame_t *read_frame;
 
 	/* Our final status for our read thread, and its thread context
 	 * for thread control (e.g. stop requests) */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,35 +24,16 @@
 KS_BEGIN_EXTERN_C
 
 /* The internal context wrapped by the frame handle */
-struct swclt_frame_ctx {
-	swclt_handle_base_t base;
-
+struct swclt_frame {
 	/* Raw data read from the socket */
 	ks_size_t len;
 	uint8_t *data;
-
-	/* The frame may be manipulated by multiple threads from time to time, so 
-	 * a lightweight lock is a good idea */
-	ks_spinlock_t lock;
-
-	/* Cached description */
-	const char *cached_description;
-
-	/* Parsed data cached */
-	ks_json_t *json;
 
 	/* The operation code for the socket */
 	kws_opcode_t opcode;
 };
 
 KS_END_EXTERN_C
-
-/* Define helper macros to eliminate boiler code in handle wrapped apis */
-#define SWCLT_FRAME_SCOPE_BEG(frame, ctx, status) \
-	KS_HANDLE_SCOPE_BEG(SWCLT_HTYPE_FRAME, frame, swclt_frame_ctx_t, ctx, status);
-
-#define SWCLT_FRAME_SCOPE_END(frame, ctx, status) \
-	KS_HANDLE_SCOPE_END(SWCLT_HTYPE_FRAME, frame, swclt_frame_ctx_t, ctx, status);
 
 /* For Emacs:
  * Local Variables:
