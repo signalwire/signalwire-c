@@ -73,7 +73,7 @@ static void __notify_monitor_children(swclt_handle_base_t *ctx)
 {
 	ks_handle_t next = KS_NULL_HANDLE;
 
-	while (!ks_handle_enum_type(SWCLT_HTYPE_HMON, &next)) {
+	while (KS_STATUS_SUCCESS == ks_handle_enum_type(SWCLT_HTYPE_HMON, &next)) {
 		ks_handle_t parent;
 
 		if (ks_handle_parent(next, &parent))
@@ -210,7 +210,7 @@ static void __service_handle_type(swclt_htype_t type)
 
 	ks_log(KS_LOG_DEBUG, "Service manager enumerating handles of type: %s", swclt_htype_str(type));
 
-	while (!ks_handle_enum_type(type, &next)) {
+	while (KS_STATUS_SUCCESS == ks_handle_enum_type(type, &next)) {
 		if (ks_thread_stop_requested(g_mgr_thread)) {
 			ks_log(KS_LOG_DEBUG, "Service manager stopping early due to stop request");
 			break;

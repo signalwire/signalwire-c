@@ -70,7 +70,7 @@ void test_messaging_exp(ks_pool_t *pool)
 		ks_handle_t next = 0;
 		uint32_t count = 0;
 
-		while (!ks_handle_enum_type(SWCLT_HTYPE_HMON, &next))
+		while (KS_STATUS_SUCCESS == ks_handle_enum_type(SWCLT_HTYPE_HMON, &next))
 			count++;
 
 		REQUIRE(count == 1);
