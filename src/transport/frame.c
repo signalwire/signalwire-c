@@ -21,7 +21,7 @@
  */
 
 #include "signalwire-client-c/client.h"
-#include "signalwire-client-c/transport/internal/frame.h"
+
 
 static ks_status_t __to_json(swclt_frame_t *frame, ks_pool_t *pool, ks_json_t **json)
 {

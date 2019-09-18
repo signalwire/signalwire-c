@@ -27,7 +27,6 @@
 #include "signalwire-client-c/internal/connection.h"
 #include "signalwire-client-c/internal/session.h"
 #include "signalwire-client-c/internal/subscription.h"
-#include "signalwire-client-c/transport/internal/frame.h"
 #include "signalwire-client-c/transport/internal/websocket.h"
 
 /* Create uber handle shortcuts for testing */

@@ -22,7 +22,6 @@
 
 #include "signalwire-client-c/client.h"
 #include "signalwire-client-c/transport/internal/websocket.h"
-#include "signalwire-client-c/transport/internal/frame.h"
 
 // Write apis
 

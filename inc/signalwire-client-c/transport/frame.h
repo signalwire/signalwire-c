@@ -22,7 +22,14 @@
 
 #pragma once
 
-typedef struct swclt_frame swclt_frame_t;
+typedef struct swclt_frame {
+	/* Raw data read from the socket */
+	ks_size_t len;
+	uint8_t *data;
+
+	/* The operation code for the socket */
+	kws_opcode_t opcode;
+} swclt_frame_t;
 
 KS_BEGIN_EXTERN_C
 
