@@ -382,7 +382,7 @@ static ks_status_t __add_protocol_uncertified_obj(swclt_store_ctx_t *ctx, ks_jso
 static void __destroy_node(void *node)
 {
 	blade_node_t *n = (blade_node_t *)node;
-	BLADE_NODE_DESTROY(&node);
+	BLADE_NODE_DESTROY(&n);
 }
 
 static ks_status_t __add_route_obj(swclt_store_ctx_t *ctx, ks_json_t *obj)
@@ -563,8 +563,6 @@ static void __remove_provider_from_protocols(swclt_store_ctx_t *ctx, const char 
 
 			ks_hash_remove(ctx->protocols, (const void *)key);
 			__invoke_cb_protocol_remove(ctx, protocol->name);
-
-			BLADE_PROTOCOL_DESTROY(&protocol);
 		}
 		ks_hash_destroy(&cleanup);
 	}
@@ -884,8 +882,6 @@ static ks_status_t __update_protocol_provider_remove(swclt_store_ctx_t *ctx, bla
 		// cleanup protocol if no providers left
 		ks_hash_remove(ctx->protocols, (const void *)protocol->name);
 		__invoke_cb_protocol_remove(ctx, protocol->name);
-
-		BLADE_PROTOCOL_DESTROY(&protocol);
 	}
 
 done:
@@ -1468,8 +1464,6 @@ SWCLT_DECLARE(ks_status_t) swclt_store_reset(swclt_store_t store)
 		ks_hash_this(itt, (const void **)&key, NULL, (void **)&protocol);
 
 		ks_hash_remove(ctx->protocols, (const void *)key);
-
-		BLADE_PROTOCOL_DESTROY(&protocol);
 	}
 
 	while (itt = ks_hash_first(ctx->subscriptions, KS_UNLOCKED)) {
