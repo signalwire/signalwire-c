@@ -331,6 +331,12 @@ static void __invoke_cb_subscription_remove(swclt_store_ctx_t *ctx, const blade_
 	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
 }
 
+static void __destroy_protocol(void *protocol)
+{
+	blade_protocol_t *proto = (blade_protocol_t *)protocol;
+	BLADE_PROTOCOL_DESTROY(&proto);
+}
+
 static ks_status_t __add_protocol_obj(swclt_store_ctx_t *ctx, ks_json_t *obj)
 {
 	blade_protocol_t *protocol;
@@ -373,6 +379,11 @@ static ks_status_t __add_protocol_uncertified_obj(swclt_store_ctx_t *ctx, ks_jso
 	return KS_STATUS_SUCCESS;
 }
 
+static void __destroy_node(void *node)
+{
+	blade_node_t *n = (blade_node_t *)node;
+	BLADE_NODE_DESTROY(&n);
+}
 
 static ks_status_t __add_route_obj(swclt_store_ctx_t *ctx, ks_json_t *obj)
 {
@@ -552,8 +563,6 @@ static void __remove_provider_from_protocols(swclt_store_ctx_t *ctx, const char 
 
 			ks_hash_remove(ctx->protocols, (const void *)key);
 			__invoke_cb_protocol_remove(ctx, protocol->name);
-
-			BLADE_PROTOCOL_DESTROY(&protocol);
 		}
 		ks_hash_destroy(&cleanup);
 	}
@@ -873,8 +882,6 @@ static ks_status_t __update_protocol_provider_remove(swclt_store_ctx_t *ctx, bla
 		// cleanup protocol if no providers left
 		ks_hash_remove(ctx->protocols, (const void *)protocol->name);
 		__invoke_cb_protocol_remove(ctx, protocol->name);
-
-		BLADE_PROTOCOL_DESTROY(&protocol);
 	}
 
 done:
@@ -1276,6 +1283,12 @@ static ks_status_t __populate_protocols(swclt_store_ctx_t *ctx, blade_connect_rp
 	return KS_STATUS_SUCCESS;
 }
 
+static void __destroy_subscription(void *subscription)
+{
+	blade_subscription_t *sub = (blade_subscription_t *)subscription;
+	BLADE_SUBSCRIPTION_DESTROY(&sub);
+}
+
 static ks_status_t __populate_subscriptions(swclt_store_ctx_t *ctx, blade_connect_rpl_t *connect_rpl)
 {
 	ks_json_t *entry;
@@ -1292,7 +1305,7 @@ static ks_status_t __populate_subscriptions(swclt_store_ctx_t *ctx, blade_connec
 
 		/* Subscriptions get keyed by a combo key with the channel/protocol */
 		if (status = ks_hash_insert(ctx->subscriptions, ks_psprintf(ctx->base.pool, "%s:%s", subscription->protocol, subscription->channel), subscription)) {
-			ks_log(KS_LOG_ERROR, "Failed to inser subscription: %d", status);
+			ks_log(KS_LOG_ERROR, "Failed to insert subscription: %d", status);
 			BLADE_SUBSCRIPTION_DESTROY(&subscription);
 			return status;
 		}
@@ -1370,7 +1383,7 @@ static ks_status_t __context_init(swclt_store_ctx_t *ctx)
 	if (status = ks_hash_create(
 			&ctx->authorities,
 			KS_HASH_MODE_CASE_INSENSITIVE,
-			KS_HASH_FLAG_FREE_KEY,
+			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_KEY,
 			ctx->base.pool))
 		return status;
 
@@ -1378,32 +1391,34 @@ static ks_status_t __context_init(swclt_store_ctx_t *ctx)
 	if (status = ks_hash_create(
 			&ctx->subscriptions,
 			KS_HASH_MODE_CASE_INSENSITIVE,
-			KS_HASH_FLAG_FREE_KEY | KS_HASH_FLAG_FREE_VALUE,
+			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_KEY,
 			ctx->base.pool))
 		return status;
+	ks_hash_set_destructor(ctx->subscriptions, __destroy_subscription);
 
 	/* Create our protocols hash, keyed by the protocol name */
 	if (status = ks_hash_create(
 			&ctx->protocols,
 			KS_HASH_MODE_CASE_INSENSITIVE,
-			0,				/* The key is the value so don't free either
-							 * we'll free it ourselves when it gets removed */
+			KS_HASH_FLAG_DUP_CHECK,  /* the key is inside the value struct - only need to destroy value */
 			ctx->base.pool))
 		return status;
+	ks_hash_set_destructor(ctx->protocols, __destroy_protocol);
 
 	/* Create our routes hash, keyed by the nodeid */
 	if (status = ks_hash_create(
 			&ctx->routes,
 			KS_HASH_MODE_CASE_INSENSITIVE,
-			KS_HASH_FLAG_FREE_KEY | KS_HASH_FLAG_FREE_VALUE,
+			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_KEY,
 			ctx->base.pool))
 		return status;
+	ks_hash_set_destructor(ctx->routes, __destroy_node);
 
 	/* Create our identities hash, keyed by the identity */
 	if (status = ks_hash_create(
 			&ctx->identities,
 			KS_HASH_MODE_CASE_INSENSITIVE,
-			KS_HASH_FLAG_FREE_KEY | KS_HASH_FLAG_FREE_VALUE,
+			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_KEY | KS_HASH_FLAG_FREE_VALUE,
 			ctx->base.pool))
 		return status;
 
@@ -1449,8 +1464,6 @@ SWCLT_DECLARE(ks_status_t) swclt_store_reset(swclt_store_t store)
 		ks_hash_this(itt, (const void **)&key, NULL, (void **)&protocol);
 
 		ks_hash_remove(ctx->protocols, (const void *)key);
-
-		BLADE_PROTOCOL_DESTROY(&protocol);
 	}
 
 	while (itt = ks_hash_first(ctx->subscriptions, KS_UNLOCKED)) {
