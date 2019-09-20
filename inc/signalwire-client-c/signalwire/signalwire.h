@@ -22,8 +22,6 @@
 
 #pragma once
 
-#include "signalwire-client-c/signalwire/messaging.h"
-#include "signalwire-client-c/signalwire/calling.h"
 #include "signalwire-client-c/signalwire/provisioning.h"
 
 /* For Emacs:
