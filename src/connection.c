@@ -22,21 +22,6 @@
 #include "signalwire-client-c/client.h"
 #include "signalwire-client-c/internal/connection.h"
 
-#include <sys/types.h>
-#include <unistd.h>
-
-static void log_mem_usage(void)
-{
-	pid_t pid = getpid();
-	char buf[1024] = { 0 };
-	snprintf(buf, sizeof(buf) - 1, "/proc/%d/statm", (int)pid);
-	FILE *f = fopen(buf, "r");
-	fread(buf, sizeof(char), sizeof(buf) - 1, f);
-	fclose(f);
-	ks_log(KS_LOG_INFO, "mem: %s", buf);
-}
-
-
 #define ks_time_now_ms() ks_time_ms(ks_time_now())
 
 static ks_handle_t * __dupe_handle(swclt_conn_t *ctx, ks_handle_t handle)
@@ -168,7 +153,7 @@ static ks_status_t __submit_result(swclt_conn_t *ctx, swclt_cmd_t cmd)
 	SWCLT_CMD_TYPE type;
 	ks_status_t status;
 
-	if (ctx->wss->failed) {
+	if (!ctx->wss || ctx->wss->failed) {
 		return KS_STATUS_FAIL;
 	}
 
@@ -190,7 +175,7 @@ static ks_status_t __submit_request(swclt_conn_t *ctx, swclt_cmd_t cmd)
 	ks_status_t status;
 
 	/* Check state */
-	if (ctx->wss->failed) {
+	if (!ctx->wss || ctx->wss->failed) {
 		return KS_STATUS_FAIL;
 	}
 
@@ -248,7 +233,7 @@ static ks_status_t __on_incoming_request(swclt_conn_t *ctx, ks_json_t *payload, 
 	ks_status_t status;
 
 	/* Check state */
-	if (ctx->wss->failed) {
+	if (!ctx->wss || ctx->wss->failed) {
 		return KS_STATUS_FAIL;
 	}
 
@@ -288,7 +273,7 @@ static ks_status_t __on_incoming_request(swclt_conn_t *ctx, ks_json_t *payload, 
 static ks_status_t __on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, swclt_conn_t *ctx)
 {
 	ks_json_t *payload = NULL;
-	ks_status_t status;
+	ks_status_t status = KS_STATUS_SUCCESS;
 	const char *method;
 	ks_uuid_t id;
 	swclt_cmd_t *outstanding_cmd = NULL;
@@ -384,7 +369,10 @@ done:
 
 SWCLT_DECLARE(char *) swclt_conn_describe(swclt_conn_t *ctx)
 {
-	return ks_psprintf(ctx->pool, "SWCLT Connection to %s:%d - ", ctx->info.wss.address, ctx->info.wss.port);
+	if (ctx) {
+		return ks_psprintf(ctx->pool, "SWCLT Connection to %s:%d - ", ctx->info.wss.address, ctx->info.wss.port);
+	}
+	return NULL;
 }
 
 static ks_status_t __do_logical_connect(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, ks_json_t **authentication)
@@ -516,6 +504,14 @@ static void __context_service(swclt_conn_t *ctx)
 	ks_hash_write_unlock(ctx->outstanding_requests);
 }
 
+static void __on_wss_failed(swclt_wss_t *wss, void *data)
+{
+	swclt_conn_t *conn = (swclt_conn_t *)data;
+	if (conn->failed_cb) {
+		conn->failed_cb(conn, conn->failed_cb_data);
+	}
+}
+
 static ks_status_t __connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, ks_json_t **authentication)
 {
 	ks_status_t status;
@@ -540,8 +536,10 @@ static ks_status_t __connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid
 	ks_log(KS_LOG_INFO, "Connecting to %s:%d/%s", ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path);
 
 	/* Create our websocket transport */
-	if (status = swclt_wss_connect(ctx->pool, &ctx->wss, (swclt_wss_incoming_frame_cb_t)__on_incoming_frame,
-								   ctx, ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path, ctx->info.wss.connect_timeout_ms, ctx->info.wss.ssl))
+	if (status = swclt_wss_connect(ctx->pool, &ctx->wss,
+			(swclt_wss_incoming_frame_cb_t)__on_incoming_frame, ctx,
+			(swclt_wss_failed_cb_t)__on_wss_failed, ctx,
+			ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path, ctx->info.wss.connect_timeout_ms, ctx->info.wss.ssl))
 		return status;
 
 	/* Now perform a logical connect to blade with the connect request */
@@ -567,6 +565,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	void *incoming_cmd_cb_data,
 	swclt_conn_connect_cb_t connect_cb,
 	void *connect_cb_data,
+	swclt_conn_failed_cb_t failed_cb,
+	void *failed_cb_data,
 	swclt_ident_t *ident,
 	ks_uuid_t previous_sessionid,
 	ks_json_t **authentication,
@@ -583,6 +583,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	new_conn->incoming_cmd_cb_data = incoming_cmd_cb_data;
 	new_conn->connect_cb = connect_cb;
 	new_conn->connect_cb_data = connect_cb_data;
+	new_conn->failed_cb = failed_cb;
+	new_conn->failed_cb_data = failed_cb_data;
 
 	/* Fill in the info on behalf of wss so we can re-use the same connect api
 	 * either during a reconnect or an initial connect */
@@ -630,6 +632,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 		incoming_cmd_cb_data,
 		NULL,
 		NULL,
+		NULL,
+		NULL,
 		ident,
 		ks_uuid_null(),
 		authentication,
@@ -638,12 +642,18 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cmd_t cmd)
 {
-	return __submit_result(conn, cmd);
+	if (conn) {
+		return __submit_result(conn, cmd);
+	}
+	return KS_STATUS_FAIL;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t cmd)
 {
-	return __submit_request(conn, cmd);
+	if (conn) {
+		return __submit_request(conn, cmd);
+	}
+	return KS_STATUS_FAIL;
 }
 
 /* Private due to un-implemented caller ownership semantics, internal use only */

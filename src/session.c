@@ -26,20 +26,6 @@
 #include "signalwire-client-c/internal/command.h"
 #include "signalwire-client-c/internal/subscription.h"
 
-#include <sys/types.h>
-#include <unistd.h>
-
-static void log_mem_usage(void)
-{
-	pid_t pid = getpid();
-	char buf[1024] = { 0 };
-	snprintf(buf, sizeof(buf) - 1, "/proc/%d/statm", (int)pid);
-	FILE *f = fopen(buf, "r");
-	fread(buf, sizeof(char), sizeof(buf) - 1, f);
-	fclose(f);
-	ks_log(KS_LOG_INFO, "mem: %s", buf);
-}
-
 typedef struct swclt_metric_reg_s {
 	int interval;
 	ks_time_t timeout;
@@ -60,7 +46,6 @@ static void __context_deinit(
 	ks_hash_destroy(&ctx->metrics);
 	swclt_ssl_destroy_context(&ctx->ssl);
 	swclt_ident_destroy(&ctx->ident);
-	log_mem_usage();
 }
 
 static const char * __make_subscription_key(swclt_sess_ctx_t *ctx, const char * protocol, const char * channel)
@@ -183,7 +168,7 @@ static ks_status_t __execute_pmethod_cb(
 	return KS_STATUS_SUCCESS;
 }
 
-static ks_status_t __on_incoming_cmd(swclt_conn_t conn, swclt_cmd_t cmd, swclt_sess_ctx_t *ctx)
+static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_sess_ctx_t *ctx)
 {
 	const char * method;
 	ks_status_t status;
@@ -332,11 +317,10 @@ done:
 static ks_status_t __do_disconnect(swclt_sess_ctx_t *ctx)
 {
 	swclt_conn_destroy(&ctx->conn);
-	log_mem_usage();
 	return KS_STATUS_SUCCESS;
 }
 
-static ks_status_t __on_connect_reply(swclt_conn_t conn, ks_json_t *error, const blade_connect_rpl_t *connect_rpl, swclt_sess_ctx_t *ctx)
+static ks_status_t __on_connect_reply(swclt_conn_t *conn, ks_json_t *error, const blade_connect_rpl_t *connect_rpl, swclt_sess_ctx_t *ctx)
 {
 	ks_status_t status = KS_STATUS_FAIL;
 
@@ -363,17 +347,10 @@ static ks_status_t __on_connect_reply(swclt_conn_t conn, ks_json_t *error, const
 	return status;
 }
 
-static void __on_conn_state_change(swclt_sess_ctx_t *ctx, swclt_hstate_change_t *state_change)
+static void __on_conn_failed(swclt_conn_t *conn, void *data)
 {
-	/* Enqueue a state change on ourselves as well */
-	char *reason = ks_psprintf(ctx->base.pool, "Connection failed: %s", swclt_hstate_describe_change(state_change));
-	swclt_hstate_changed(&ctx->base, SWCLT_HSTATE_DEGRADED, KS_STATUS_FAIL, reason);
-	ks_pool_free(&reason);
-
-	log_mem_usage();
-
-	/* Now we, as a session, will want to re-connect so, enqueue a request do to so */
-	swclt_hstate_initiate_change_in(&ctx->base, SWCLT_HSTATE_ONLINE, __context_state_transition, 1000, 5000);
+	swclt_sess_ctx_t *ctx = (swclt_sess_ctx_t *)data;
+	ctx->failed = 1;
 }
 
 static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
@@ -389,15 +366,11 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 		}
 	}
 
-	log_mem_usage();
-
 	ks_log(KS_LOG_INFO, "Session is performing connect");
 
 	/* Delete the previous connection if present */
 	swclt_conn_destroy(&ctx->conn);
 	ctx->conn = 0;
-
-	log_mem_usage();
 
 	/* Re-allocate a new ssl context */
 	if (status = __setup_ssl(ctx)) {
@@ -406,8 +379,6 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 	}
 
 	ks_log(KS_LOG_INFO, "Successfully setup ssl, initiating connection");
-
-	log_mem_usage();
 
 	if (ctx->config->authentication) {
 		authentication = ks_json_parse(ctx->config->authentication);
@@ -421,12 +392,13 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 			ctx,
 			(swclt_conn_connect_cb_t)__on_connect_reply,
 			ctx,
+			(swclt_conn_failed_cb_t)__on_conn_failed,
+			ctx,
 			&ctx->ident,
 			ctx->info.sessionid,			/* Pass in our session id, if it was previous valid we'll try to re-use it */
 			&authentication,
 			ctx->ssl)) {
 		if (authentication) ks_json_delete(&authentication);
-		log_mem_usage();
 		return status;
 	}
 
@@ -450,15 +422,9 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 	ctx->info.nodeid = ks_pstrdup(ctx->base.pool, ctx->info.conn.nodeid);
 	ctx->info.master_nodeid = ks_pstrdup(ctx->base.pool, ctx->info.conn.master_nodeid);
 
-	/* Monitor for state changed on the connection */
-	//swclt_hstate_register_listener(&ctx->base, __on_conn_state_change, ctx->conn);
-	// TODO need to get conn state changes
-
 	ks_log(KS_LOG_INFO, "Successfully established sessionid: %s", ks_uuid_thr_str(&ctx->info.sessionid));
 	ks_log(KS_LOG_INFO, "   nodeid: %s", ctx->info.nodeid);
 	ks_log(KS_LOG_INFO, "   master_nodeid: %s", ctx->info.master_nodeid);
-
-	log_mem_usage();
 
 	return status;
 }
@@ -593,6 +559,18 @@ static void __context_service(swclt_sess_ctx_t *ctx)
 	}
 	ks_hash_read_unlock(ctx->metrics);
 
+	if (ctx->failed) {
+		ctx->failed = 0;
+
+		/* Enqueue a state change on ourselves as well */
+		char *reason = ks_pstrdup(ctx->base.pool, "Connection failed");
+		swclt_hstate_changed(&ctx->base, SWCLT_HSTATE_DEGRADED, KS_STATUS_FAIL, reason);
+		ks_pool_free(&reason);
+
+		/* Now we, as a session, will want to re-connect so, enqueue a request do to so */
+		swclt_hstate_initiate_change_in(&ctx->base, SWCLT_HSTATE_ONLINE, __context_state_transition, 1000, 5000);
+	}
+
 	/* Now ask to be serviced again in 1 second */
 	swclt_hmgr_request_service_in(&ctx->base, 1000);
 }
@@ -667,8 +645,6 @@ static ks_status_t __context_init(
 done:
 	if (status)
 		__context_deinit(ctx);
-
-	log_mem_usage();
 
 	return status;
 }

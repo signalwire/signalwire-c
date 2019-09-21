@@ -27,6 +27,7 @@ KS_BEGIN_EXTERN_C
 typedef struct swclt_wss swclt_wss_t;
 
 typedef ks_status_t (*swclt_wss_incoming_frame_cb_t)(swclt_wss_t *wss, swclt_frame_t **frame, void *cb_data);
+typedef ks_status_t (*swclt_wss_failed_cb_t)(swclt_wss_t *wss, void *cb_data);
 
 /* Define our info structure */
 typedef struct swclt_wss_info_s {
@@ -47,6 +48,10 @@ struct swclt_wss {
 	/* Callback for when the reader reads a new frame */
 	swclt_wss_incoming_frame_cb_t incoming_frame_cb;
 	void *incoming_frame_cb_data;
+
+	/* Callback for when the websocket fails */
+	swclt_wss_failed_cb_t failed_cb;
+	void *failed_cb_data;
 
 	/* Information concerning our connection */
 	swclt_wss_info_t info;
@@ -83,6 +88,8 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	swclt_wss_t **wss,
 	swclt_wss_incoming_frame_cb_t incoming_frame_cb,
 	void *incoming_frame_cb_data,
+	swclt_wss_failed_cb_t failed_cb,
+	void *failed_cb_data,
 	const char *address,
 	short port,
 	const char *path,

@@ -225,6 +225,9 @@ static void *__reader(ks_thread_t *thread, void *data)
 	if (ctx->reader_status && ctx->reader_status != KS_STATUS_THREAD_STOP_REQUESTED) {
 		/* Report a failed state */
 		ctx->failed = 1;
+		if (ctx->failed_cb) {
+			ctx->failed_cb(ctx, ctx->failed_cb_data);
+		}
 	}
 
 	return NULL;
@@ -314,6 +317,8 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	swclt_wss_t **wss,
 	swclt_wss_incoming_frame_cb_t incoming_frame_cb,
 	void *incoming_frame_cb_data,
+	swclt_wss_failed_cb_t failed_cb,
+	void *failed_cb_data,
 	const char *address,
 	short port,
 	const char *path,
@@ -324,11 +329,12 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	swclt_wss_t *new_wss = ks_pool_alloc(pool, sizeof(swclt_wss_t));
 	new_wss->pool = pool;
 
-
 	ks_log(KS_LOG_INFO, "Web socket initiating connection to: %s on port %u to /%s", address, (unsigned int)port, path);
 
 	new_wss->incoming_frame_cb = incoming_frame_cb;
 	new_wss->incoming_frame_cb_data = incoming_frame_cb_data;
+	new_wss->failed_cb = failed_cb;
+	new_wss->failed_cb_data = failed_cb_data;
 	new_wss->info.ssl = (SSL_CTX *)ssl;
 	new_wss->info.connect_timeout_ms = timeout_ms;
 	strncpy(new_wss->info.address, address, sizeof(new_wss->info.address) - 1);

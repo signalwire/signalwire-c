@@ -28,6 +28,7 @@ typedef struct swclt_conn swclt_conn_t;
 
 typedef ks_status_t (*swclt_conn_incoming_cmd_cb_t)(swclt_conn_t *conn, swclt_cmd_t cmd, void *cb_data);
 typedef ks_status_t (*swclt_conn_connect_cb_t)(swclt_conn_t *conn, ks_json_t *error, blade_connect_rpl_t *connect_rpl, void *cb_data);
+typedef ks_status_t (*swclt_conn_failed_cb_t)(swclt_conn_t *conn, void *cb_data);
 
 /* Information about this connection */
 typedef struct swclt_conn_info_s {
@@ -52,6 +53,10 @@ struct swclt_conn {
 	/* Optional callbacks for getting the initial connect result payload */
 	swclt_conn_connect_cb_t connect_cb;
 	void *connect_cb_data;
+
+	/* Optional callbacks for getting notified of connection failure */
+	swclt_conn_failed_cb_t failed_cb;
+	void *failed_cb_data;
 
 	/* Our websocket transport, basically our connection to blade */
 	swclt_wss_t *wss;
@@ -94,6 +99,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	void *incoming_command_cb_data,
 	swclt_conn_connect_cb_t connect_callback,
 	void *connect_cb_data,
+	swclt_conn_failed_cb_t failed_callback,
+	void *failed_cb_data,
 	swclt_ident_t *ident,
 	ks_uuid_t previous_sessionid,
 	ks_json_t **authentication,
