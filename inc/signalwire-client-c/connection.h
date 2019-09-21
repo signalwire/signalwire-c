@@ -29,12 +29,6 @@ typedef struct swclt_conn swclt_conn_t;
 typedef ks_status_t (*swclt_conn_incoming_cmd_cb_t)(swclt_conn_t *conn, swclt_cmd_t cmd, void *cb_data);
 typedef ks_status_t (*swclt_conn_connect_cb_t)(swclt_conn_t *conn, ks_json_t *error, blade_connect_rpl_t *connect_rpl, void *cb_data);
 
-typedef enum swclt_conn_state {
-	CONN_STATE_OFFLINE,
-	CONN_STATE_DEGRADED,
-	CONN_STATE_ONLINE
-} swclt_conn_state_t;
-
 /* Information about this connection */
 typedef struct swclt_conn_info_s {
 	/* We also store a copy of the wss's info structure */
@@ -50,8 +44,6 @@ typedef struct swclt_conn_info_s {
 struct swclt_conn {
 
 	ks_pool_t *pool;
-
-	swclt_conn_state_t state;
 
 	/* When we receive an incoming request we call this callback with the prepared command */
 	swclt_conn_incoming_cmd_cb_t incoming_cmd_cb;

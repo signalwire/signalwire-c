@@ -26,17 +26,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-static void log_mem_usage(void)
-{
-	pid_t pid = getpid();
-	char buf[1024] = { 0 };
-	snprintf(buf, sizeof(buf) - 1, "/proc/%d/statm", (int)pid);
-	FILE *f = fopen(buf, "r");
-	fread(buf, sizeof(char), sizeof(buf) - 1, f);
-	fclose(f);
-	ks_log(KS_LOG_INFO, "mem: %s", buf);
-}
-
 
 // Write apis
 
@@ -152,7 +141,7 @@ static ks_status_t __reader_loop(swclt_wss_t *ctx)
 		uint32_t poll_flags;
 		kws_opcode_t frame_opcode;
 
-		if (ctx->state != WSS_STATE_ONLINE) {
+		if (ctx->failed) {
 			return KS_STATUS_FAIL;
 		}
 
@@ -234,8 +223,8 @@ static void *__reader(ks_thread_t *thread, void *data)
 	ctx->reader_status = __reader_loop(ctx);
 
 	if (ctx->reader_status && ctx->reader_status != KS_STATUS_THREAD_STOP_REQUESTED) {
-		/* Report a state change to degraded */
-		ctx->state = WSS_STATE_DEGRADED;
+		/* Report a failed state */
+		ctx->failed = 1;
 	}
 
 	return NULL;
@@ -246,54 +235,25 @@ static ks_status_t __start_reader(swclt_wss_t *ctx)
 	return ks_thread_create_tag(&ctx->reader_thread, __reader, ctx, ctx->pool, "SWClient WSS Reader");
 }
 
-// Context
 
-static void __context_deinit(
-	swclt_wss_t **ctx)
-{
-	ks_log(KS_LOG_INFO, "Shutting down websocket");
-	log_mem_usage();
-	ks_log(KS_LOG_INFO, "stopping reader");
-	ks_thread_destroy(&(*ctx)->reader_thread);
-	log_mem_usage();
-	ks_log(KS_LOG_INFO, "destroy reader_thread again??");
-	ks_thread_destroy(&(*ctx)->reader_thread);
-	log_mem_usage();
-	ks_log(KS_LOG_INFO, "destroy mutexes");
-	ks_mutex_destroy(&(*ctx)->write_mutex);
-	ks_mutex_destroy(&(*ctx)->read_mutex);
-	log_mem_usage();
-	ks_log(KS_LOG_INFO, "destroy read_frame again");
-	ks_pool_free(&(*ctx)->read_frame);
-	log_mem_usage();
-	ks_log(KS_LOG_INFO, "destroy kws");
-	kws_destroy(&(*ctx)->wss);
-	log_mem_usage();
-	ks_pool_free(ctx);
-}
-
-static void __context_describe(swclt_wss_t *ctx, char *buffer, ks_size_t buffer_len)
+KS_DECLARE(char *) swclt_wss_describe(swclt_wss_t *ctx)
 {
 	if (ctx->info.ssl) {
-		snprintf(
-			buffer,
-			buffer_len,
+		return ks_psprintf(ctx->pool,
 			"SWCLT Websocket connection to: %s:%d/%s (Cipher: %s)",
 			ctx->info.address,
 			ctx->info.port,
 			ctx->info.path,
 			ctx->info.cipher
 		);
-	} else {
-		snprintf(
-			buffer,
-			buffer_len,
-			"SWCLT Websocket connection to: %s:%d/%s (No ssl)",
-			ctx->info.address,
-			ctx->info.port,
-			ctx->info.path
-		);
 	}
+	return ks_psprintf(
+		ctx->pool,
+		"SWCLT Websocket connection to: %s:%d/%s (No ssl)",
+		ctx->info.address,
+		ctx->info.port,
+		ctx->info.path
+	);
 }
 
 static ks_status_t __connect_socket(swclt_wss_t *ctx)
@@ -335,61 +295,18 @@ done:
 	return status;
 }
 
-static ks_status_t __context_init(
-	swclt_wss_t *ctx,
-	swclt_wss_incoming_frame_cb_t incoming_frame_cb,
-	void *incoming_frame_cb_data,
-	const char *address,
-	short port,
-	const char *path,
-	uint32_t timeout_ms,
-	const SSL_CTX *ssl)
+SWCLT_DECLARE(void) swclt_wss_destroy(swclt_wss_t **wss)
 {
-	ks_status_t status;
-
-	ks_log(KS_LOG_INFO, "Web socket initiating connection to: %s on port %u to /%s", address, (unsigned int)port, path);
-
-	ctx->incoming_frame_cb = incoming_frame_cb;
-	ctx->incoming_frame_cb_data = incoming_frame_cb_data;
-	ctx->info.ssl = (SSL_CTX *)ssl;
-	ctx->info.connect_timeout_ms = timeout_ms;
-	strncpy(ctx->info.address, address, sizeof(ctx->info.address) - 1);
-	strncpy(ctx->info.path, path, sizeof(ctx->info.path) - 1);
-	ctx->info.port = port;
-
-	ks_log(KS_LOG_DEBUG, "Resolving address: %s", address);
-
-	if (status = ks_addr_getbyname(address, port, AF_INET, &ctx->addr)) {
-		ks_log(KS_LOG_WARNING, "Failed to resolve: %s", address);
-		goto done;
+	if (wss && *wss) {
+		ks_log(KS_LOG_INFO, "Shutting down websocket");
+		ks_thread_destroy(&(*wss)->reader_thread);
+		ks_thread_destroy(&(*wss)->reader_thread);
+		ks_mutex_destroy(&(*wss)->write_mutex);
+		ks_mutex_destroy(&(*wss)->read_mutex);
+		ks_pool_free(&(*wss)->read_frame);
+		kws_destroy(&(*wss)->wss);
+		ks_pool_free(wss);
 	}
-
-	ks_log(KS_LOG_DEBUG, "Successfully resolved address");
-
-	if (status = ks_mutex_create(&ctx->write_mutex, KS_MUTEX_FLAG_DEFAULT, ctx->pool))
-		goto done;
-
-	if (status = ks_mutex_create(&ctx->read_mutex, KS_MUTEX_FLAG_DEFAULT, ctx->pool))
-		goto done;
-
-	for (uint32_t tryCount = 0; tryCount < 2; tryCount++) {
-		ks_log(KS_LOG_INFO, "Performing connect try: %lu to: %s:%d/%s", tryCount, ctx->info.address, ctx->info.port, ctx->info.path);
-
-		if (status = __connect_socket(ctx)) {
-			ks_sleep_ms(1000);
-			continue;
-		}
-		break;
-	}
-
-done:
-
-	return status;
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_wss_destroy(swclt_wss_t **wss)
-{
-	__context_deinit(wss);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
@@ -403,12 +320,51 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	uint32_t timeout_ms,
 	const SSL_CTX *ssl)
 {
-	*wss = ks_pool_alloc(pool, sizeof(swclt_wss_t));
-	(*wss)->pool = pool;
-	ks_status_t status = __context_init(*wss, incoming_frame_cb, incoming_frame_cb_data, address, port, path, timeout_ms, ssl);
-	if (status != KS_STATUS_SUCCESS) {
-		__context_deinit(wss);
+	ks_status_t status = KS_STATUS_SUCCESS;
+	swclt_wss_t *new_wss = ks_pool_alloc(pool, sizeof(swclt_wss_t));
+	new_wss->pool = pool;
+
+
+	ks_log(KS_LOG_INFO, "Web socket initiating connection to: %s on port %u to /%s", address, (unsigned int)port, path);
+
+	new_wss->incoming_frame_cb = incoming_frame_cb;
+	new_wss->incoming_frame_cb_data = incoming_frame_cb_data;
+	new_wss->info.ssl = (SSL_CTX *)ssl;
+	new_wss->info.connect_timeout_ms = timeout_ms;
+	strncpy(new_wss->info.address, address, sizeof(new_wss->info.address) - 1);
+	strncpy(new_wss->info.path, path, sizeof(new_wss->info.path) - 1);
+	new_wss->info.port = port;
+
+	ks_log(KS_LOG_DEBUG, "Resolving address: %s", address);
+
+	if (status = ks_addr_getbyname(address, port, AF_INET, &new_wss->addr)) {
+		ks_log(KS_LOG_WARNING, "Failed to resolve: %s", address);
+		goto done;
 	}
+
+	ks_log(KS_LOG_DEBUG, "Successfully resolved address");
+
+	if (status = ks_mutex_create(&new_wss->write_mutex, KS_MUTEX_FLAG_DEFAULT, new_wss->pool))
+		goto done;
+
+	if (status = ks_mutex_create(&new_wss->read_mutex, KS_MUTEX_FLAG_DEFAULT, new_wss->pool))
+		goto done;
+
+	for (uint32_t tryCount = 0; tryCount < 2; tryCount++) {
+		ks_log(KS_LOG_INFO, "Performing connect try: %lu to: %s:%d/%s", tryCount, new_wss->info.address, new_wss->info.port, new_wss->info.path);
+
+		if (status = __connect_socket(new_wss)) {
+			ks_sleep_ms(1000);
+			continue;
+		}
+		break;
+	}
+
+done:
+	if (status != KS_STATUS_SUCCESS) {
+		swclt_wss_destroy(&new_wss);
+	}
+	*wss = new_wss;
 	return status;
 }
 
@@ -424,7 +380,7 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_write_cmd(swclt_wss_t *wss, swclt_cmd_t cmd
 	ks_status_t status;
 
 	/* Ensure we have valid state */
-	if (wss->state != WSS_STATE_ONLINE) {
+	if (wss->failed) {
 		return KS_STATUS_FAIL;
 	}
 

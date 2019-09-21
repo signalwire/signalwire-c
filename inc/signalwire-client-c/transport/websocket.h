@@ -28,12 +28,6 @@ typedef struct swclt_wss swclt_wss_t;
 
 typedef ks_status_t (*swclt_wss_incoming_frame_cb_t)(swclt_wss_t *wss, swclt_frame_t **frame, void *cb_data);
 
-typedef enum swclt_wss_state {
-	WSS_STATE_OFFLINE,
-	WSS_STATE_DEGRADED,
-	WSS_STATE_ONLINE
-} swclt_wss_state_t;
-
 /* Define our info structure */
 typedef struct swclt_wss_info_s {
 	char address[128];				/* tcp address string (no port) */
@@ -48,7 +42,7 @@ struct swclt_wss {
 
 	ks_pool_t *pool;
 
-	swclt_wss_state_t state;
+	int failed;
 
 	/* Callback for when the reader reads a new frame */
 	swclt_wss_incoming_frame_cb_t incoming_frame_cb;
@@ -95,7 +89,7 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	uint32_t timeout_ms,
 	const SSL_CTX *ssl);
 
-SWCLT_DECLARE(ks_status_t) swclt_wss_destroy(swclt_wss_t **wss);
+SWCLT_DECLARE(void) swclt_wss_destroy(swclt_wss_t **wss);
 
 SWCLT_DECLARE(ks_status_t) swclt_wss_write_cmd(swclt_wss_t *wss, swclt_cmd_t cmd);
 SWCLT_DECLARE(ks_status_t) swclt_wss_get_info(swclt_wss_t *wss, swclt_wss_info_t *info);
