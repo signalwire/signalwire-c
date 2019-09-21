@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,7 @@
  */
 
 #include "signalwire-client-c/client.h"
-#include "signalwire-client-c/transport/internal/websocket.h"
+#include "signalwire-client-c/transport/websocket.h"
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -40,7 +40,7 @@ static void log_mem_usage(void)
 
 // Write apis
 
-static ks_status_t __write_raw(swclt_wss_ctx_t *ctx, kws_opcode_t opcode, const void *data, ks_size_t len)
+static ks_status_t __write_raw(swclt_wss_t *ctx, kws_opcode_t opcode, const void *data, ks_size_t len)
 {
 	ks_size_t wrote;
 
@@ -58,13 +58,13 @@ static ks_status_t __write_raw(swclt_wss_ctx_t *ctx, kws_opcode_t opcode, const 
 	return KS_STATUS_SUCCESS;
 }
 
-static ks_status_t __write_ping(swclt_wss_ctx_t *ctx)
+static ks_status_t __write_ping(swclt_wss_t *ctx)
 {
 	static uint64_t data = 0;
 	return __write_raw(ctx, WSOC_PING, &data, sizeof(data));
 }
 
-static ks_status_t __write_pong(swclt_wss_ctx_t *ctx, swclt_frame_t *frame)
+static ks_status_t __write_pong(swclt_wss_t *ctx, swclt_frame_t *frame)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
 
@@ -79,7 +79,7 @@ static ks_status_t __write_pong(swclt_wss_ctx_t *ctx, swclt_frame_t *frame)
 
 // Read apis
 
-static ks_status_t __poll_read(swclt_wss_ctx_t *ctx, uint32_t *poll_flagsP)
+static ks_status_t __poll_read(swclt_wss_t *ctx, uint32_t *poll_flagsP)
 {
 	*poll_flagsP = ks_wait_sock(ctx->socket, 1000, KS_POLL_READ);
 	if (*poll_flagsP & KS_POLL_ERROR) {
@@ -90,7 +90,7 @@ static ks_status_t __poll_read(swclt_wss_ctx_t *ctx, uint32_t *poll_flagsP)
 }
 
 // Read thread
-static ks_status_t __read_frame(swclt_wss_ctx_t *ctx, swclt_frame_t **frameP, kws_opcode_t *opcodeP)
+static ks_status_t __read_frame(swclt_wss_t *ctx, swclt_frame_t **frameP, kws_opcode_t *opcodeP)
 {
 	swclt_frame_t *frame = NULL;
 	kws_opcode_t opcode = WSOC_INVALID;
@@ -100,7 +100,7 @@ static ks_status_t __read_frame(swclt_wss_ctx_t *ctx, swclt_frame_t **frameP, kw
 
 	/* Allocate a new frame if needed */
 	if (!*frameP) {
-		if (status = swclt_frame_alloc(&frame, ctx->base.pool)) {
+		if (status = swclt_frame_alloc(&frame, ctx->pool)) {
 			return status;
 		}
 	} else {
@@ -125,7 +125,7 @@ static ks_status_t __read_frame(swclt_wss_ctx_t *ctx, swclt_frame_t **frameP, kw
 	ks_log(KS_LOG_DEBUG, "Copying frame of length: %lu of opcode: %lu", (size_t)len, opcode);
 
 	/* Stash it in the frame */
-	if (status = swclt_frame_copy_data(frame, ctx->base.pool, data, (size_t)len, opcode)) {
+	if (status = swclt_frame_copy_data(frame, ctx->pool, data, (size_t)len, opcode)) {
 		goto done;
 	}
 
@@ -141,7 +141,7 @@ done:
 
 	return status;
 }
-static ks_status_t __reader_loop(swclt_wss_ctx_t *ctx)
+static ks_status_t __reader_loop(swclt_wss_t *ctx)
 {
 	ks_status_t status;
 
@@ -152,8 +152,9 @@ static ks_status_t __reader_loop(swclt_wss_ctx_t *ctx)
 		uint32_t poll_flags;
 		kws_opcode_t frame_opcode;
 
-		if (status = swclt_hstate_check_ctx(&ctx->base, "Reader stopping due to state change:"))
-			return status;
+		if (ctx->state != WSS_STATE_ONLINE) {
+			return KS_STATUS_FAIL;
+		}
 
 		ks_log(KS_LOG_DEBUG, "Waiting on read poll");
 
@@ -195,7 +196,7 @@ static ks_status_t __reader_loop(swclt_wss_ctx_t *ctx)
 			case WSOC_TEXT:
 				ks_log(KS_LOG_DEBUG, "Reading text ");
 				// Notify the consumer there is a new frame
-				if (status = ctx->incoming_frame_cb(ctx->base.handle, &ctx->read_frame, ctx->incoming_frame_cb_data)) {
+				if (status = ctx->incoming_frame_cb(ctx, &ctx->read_frame, ctx->incoming_frame_cb_data)) {
 					ks_log(KS_LOG_WARNING, "Callback from incoming frame returned: %d, exiting", status);
 					// Done with the frame, callback is responsible for freeing it
 					ctx->read_frame = NULL;
@@ -229,48 +230,49 @@ static ks_status_t __reader_loop(swclt_wss_ctx_t *ctx)
 
 static void *__reader(ks_thread_t *thread, void *data)
 {
-	swclt_wss_ctx_t *ctx = (swclt_wss_ctx_t *)data;
+	swclt_wss_t *ctx = (swclt_wss_t *)data;
 	ctx->reader_status = __reader_loop(ctx);
 
 	if (ctx->reader_status && ctx->reader_status != KS_STATUS_THREAD_STOP_REQUESTED) {
 		/* Report a state change to degraded */
-		swclt_hstate_changed(&ctx->base, SWCLT_HSTATE_DEGRADED, ctx->reader_status, "Reader failed");
+		ctx->state = WSS_STATE_DEGRADED;
 	}
 
 	return NULL;
 }
 
-static ks_status_t __start_reader(swclt_wss_ctx_t *ctx)
+static ks_status_t __start_reader(swclt_wss_t *ctx)
 {
-	return ks_thread_create_tag(&ctx->reader_thread, __reader, ctx, ctx->base.pool, "SWClient WSS Reader");
+	return ks_thread_create_tag(&ctx->reader_thread, __reader, ctx, ctx->pool, "SWClient WSS Reader");
 }
 
 // Context
 
 static void __context_deinit(
-	swclt_wss_ctx_t *ctx)
+	swclt_wss_t **ctx)
 {
 	ks_log(KS_LOG_INFO, "Shutting down websocket");
 	log_mem_usage();
 	ks_log(KS_LOG_INFO, "stopping reader");
-	ks_thread_destroy(&ctx->reader_thread);
+	ks_thread_destroy(&(*ctx)->reader_thread);
 	log_mem_usage();
 	ks_log(KS_LOG_INFO, "destroy reader_thread again??");
-	ks_thread_destroy(&ctx->reader_thread);
+	ks_thread_destroy(&(*ctx)->reader_thread);
 	log_mem_usage();
 	ks_log(KS_LOG_INFO, "destroy mutexes");
-	ks_mutex_destroy(&ctx->write_mutex);
-	ks_mutex_destroy(&ctx->read_mutex);
+	ks_mutex_destroy(&(*ctx)->write_mutex);
+	ks_mutex_destroy(&(*ctx)->read_mutex);
 	log_mem_usage();
 	ks_log(KS_LOG_INFO, "destroy read_frame again");
-	ks_pool_free(&ctx->read_frame);
+	ks_pool_free(&(*ctx)->read_frame);
 	log_mem_usage();
 	ks_log(KS_LOG_INFO, "destroy kws");
-	kws_destroy(&ctx->wss);
+	kws_destroy(&(*ctx)->wss);
 	log_mem_usage();
+	ks_pool_free(ctx);
 }
 
-static void __context_describe(swclt_wss_ctx_t *ctx, char *buffer, ks_size_t buffer_len)
+static void __context_describe(swclt_wss_t *ctx, char *buffer, ks_size_t buffer_len)
 {
 	if (ctx->info.ssl) {
 		snprintf(
@@ -294,7 +296,7 @@ static void __context_describe(swclt_wss_ctx_t *ctx, char *buffer, ks_size_t buf
 	}
 }
 
-static ks_status_t __connect_socket(swclt_wss_ctx_t *ctx)
+static ks_status_t __connect_socket(swclt_wss_t *ctx)
 {
 	ks_status_t status;
 	char buf[256];
@@ -310,7 +312,7 @@ static ks_status_t __connect_socket(swclt_wss_ctx_t *ctx)
 	snprintf(buf, sizeof(buf), "/%s:%s:swclt", ctx->info.path, ctx->info.address);
 	
 	if (status = kws_init(&ctx->wss, ctx->socket,
-			ctx->info.ssl, buf, KWS_BLOCK | KWS_CLOSE_SOCK, ctx->base.pool))
+			ctx->info.ssl, buf, KWS_BLOCK | KWS_CLOSE_SOCK, ctx->pool))
 		goto done;
 
 	/* Load our negotiated cipher while we're here */
@@ -334,7 +336,7 @@ done:
 }
 
 static ks_status_t __context_init(
-	swclt_wss_ctx_t *ctx,
+	swclt_wss_t *ctx,
 	swclt_wss_incoming_frame_cb_t incoming_frame_cb,
 	void *incoming_frame_cb_data,
 	const char *address,
@@ -364,10 +366,10 @@ static ks_status_t __context_init(
 
 	ks_log(KS_LOG_DEBUG, "Successfully resolved address");
 
-	if (status = ks_mutex_create(&ctx->write_mutex, KS_MUTEX_FLAG_DEFAULT, ctx->base.pool))
+	if (status = ks_mutex_create(&ctx->write_mutex, KS_MUTEX_FLAG_DEFAULT, ctx->pool))
 		goto done;
 
-	if (status = ks_mutex_create(&ctx->read_mutex, KS_MUTEX_FLAG_DEFAULT, ctx->base.pool))
+	if (status = ks_mutex_create(&ctx->read_mutex, KS_MUTEX_FLAG_DEFAULT, ctx->pool))
 		goto done;
 
 	for (uint32_t tryCount = 0; tryCount < 2; tryCount++) {
@@ -381,14 +383,18 @@ static ks_status_t __context_init(
 	}
 
 done:
-	if (status)
-		__context_deinit(ctx);
 
 	return status;
 }
 
+SWCLT_DECLARE(ks_status_t) swclt_wss_destroy(swclt_wss_t **wss)
+{
+	__context_deinit(wss);
+}
+
 SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
-	swclt_wss_t *wss,
+	ks_pool_t *pool,
+	swclt_wss_t **wss,
 	swclt_wss_incoming_frame_cb_t incoming_frame_cb,
 	void *incoming_frame_cb_data,
 	const char *address,
@@ -397,60 +403,51 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	uint32_t timeout_ms,
 	const SSL_CTX *ssl)
 {
-	SWCLT_HANDLE_ALLOC_TEMPLATE_M(
-		NULL,
-		SWCLT_HTYPE_WSS,
-		wss,
-		swclt_wss_ctx_t,
-		SWCLT_HSTATE_NORMAL,
-		__context_describe,
-		__context_deinit,
-		__context_init,
-		incoming_frame_cb,
-		incoming_frame_cb_data,
-		address,
-		port,
-		path,
-		timeout_ms,
-		ssl);
+	*wss = ks_pool_alloc(pool, sizeof(swclt_wss_t));
+	(*wss)->pool = pool;
+	ks_status_t status = __context_init(*wss, incoming_frame_cb, incoming_frame_cb_data, address, port, path, timeout_ms, ssl);
+	if (status != KS_STATUS_SUCCESS) {
+		__context_deinit(wss);
+	}
+	return status;
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_wss_get_info(swclt_wss_t wss, swclt_wss_info_t *info)
+SWCLT_DECLARE(ks_status_t) swclt_wss_get_info(swclt_wss_t *wss, swclt_wss_info_t *info)
 {
-	SWCLT_WSS_SCOPE_BEG(wss, ctx, status)
-	memcpy(info, &ctx->info, sizeof(ctx->info));
-	SWCLT_WSS_SCOPE_END(wss, ctx, status)
+	memcpy(info, &wss->info, sizeof(wss->info));
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_wss_write_cmd(swclt_wss_t wss, swclt_cmd_t cmd)
+SWCLT_DECLARE(ks_status_t) swclt_wss_write_cmd(swclt_wss_t *wss, swclt_cmd_t cmd)
 {
-	SWCLT_WSS_SCOPE_BEG(wss, ctx, status)
-	char *data;
+	char *data = NULL;
 	ks_size_t len, wrote;
+	ks_status_t status;
 
 	/* Ensure we have valid state */
-	if (status = swclt_hstate_check_ctx(&ctx->base, "Write denied, invalid state:"))
-		goto ks_handle_scope_end;
+	if (wss->state != WSS_STATE_ONLINE) {
+		return KS_STATUS_FAIL;
+	}
 
-	if (status = swclt_cmd_print(cmd, ctx->base.pool, &data)) {
-		ks_log(KS_LOG_CRIT, "Invalid command, faild to render payload string: %lu", status);
-		goto ks_handle_scope_end;
+	if (status = swclt_cmd_print(cmd, wss->pool, &data)) {
+		ks_log(KS_LOG_CRIT, "Invalid command, failed to render payload string: %lu", status);
+		return KS_STATUS_FAIL;
 	}
 
 	len = strlen(data);
 
-	ks_mutex_lock(ctx->write_mutex);
-	wrote = kws_write_frame(ctx->wss, WSOC_TEXT, data, len);
-	ks_mutex_unlock(ctx->write_mutex);
+	ks_mutex_lock(wss->write_mutex);
+	wrote = kws_write_frame(wss->wss, WSOC_TEXT, data, len);
+	ks_mutex_unlock(wss->write_mutex);
 
 	ks_log(KS_LOG_DEBUG, "Wrote frame: %s", ks_handle_describe(cmd));
 
-	if (len != wrote)
+	if (len != wrote) {
 		status = KS_STATUS_FAIL;
+	}
 
 	ks_pool_free(&data);
 
-	SWCLT_WSS_SCOPE_END(wss, ctx, status)
+	return status;
 }
 
 /* For Emacs:

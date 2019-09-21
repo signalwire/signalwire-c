@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,17 +24,74 @@
 
 KS_BEGIN_EXTERN_C
 
-/* All connections are handles, opaque numbers that manage ref counts */
-typedef ks_handle_t swclt_conn_t;
+typedef struct swclt_conn swclt_conn_t;
 
-/* Obfuscate our connection internals */
-typedef struct swclt_conn_ctx swclt_conn_ctx_t;
+typedef ks_status_t (*swclt_conn_incoming_cmd_cb_t)(swclt_conn_t *conn, swclt_cmd_t cmd, void *cb_data);
+typedef ks_status_t (*swclt_conn_connect_cb_t)(swclt_conn_t *conn, ks_json_t *error, blade_connect_rpl_t *connect_rpl, void *cb_data);
 
-typedef ks_status_t (*swclt_conn_incoming_cmd_cb_t)(swclt_conn_t conn, swclt_cmd_t cmd, void *cb_data);
-typedef ks_status_t (*swclt_conn_connect_cb_t)(swclt_conn_t conn, ks_json_t *error, blade_connect_rpl_t *connect_rpl, void *cb_data);
+typedef enum swclt_conn_state {
+	CONN_STATE_OFFLINE,
+	CONN_STATE_DEGRADED,
+	CONN_STATE_ONLINE
+} swclt_conn_state_t;
+
+/* Information about this connection */
+typedef struct swclt_conn_info_s {
+	/* We also store a copy of the wss's info structure */
+	swclt_wss_info_t wss;
+	
+	/* Pulled from the blade connect result */
+	ks_uuid_t sessionid;
+	const char *nodeid;
+	const char *master_nodeid;
+} swclt_conn_info_t;
+
+/* Ths client connection context represents a connections state */
+struct swclt_conn {
+
+	ks_pool_t *pool;
+
+	swclt_conn_state_t state;
+
+	/* When we receive an incoming request we call this callback with the prepared command */
+	swclt_conn_incoming_cmd_cb_t incoming_cmd_cb;
+	void *incoming_cmd_cb_data;
+
+	/* Optional callbacks for getting the initial connect result payload */
+	swclt_conn_connect_cb_t connect_cb;
+	void *connect_cb_data;
+
+	/* Our websocket transport, basically our connection to blade */
+	swclt_wss_t *wss;
+
+	/* Basic connection info that the caller can examine, contains
+	 * our sessionid, nodeid, and master_nodeid variables returned from
+	 * a connect result from blade, including our connected address and
+	 * ssl context ptr (from websocket info) */
+	swclt_conn_info_t info;
+
+	/* The result of our last connect, kept around for reference */
+	blade_connect_rpl_t *blade_connect_rpl;
+
+	/* A hash of oustanding commands, keyed by their request ids.
+	 * This is the outgoing queue for requests born from the client or
+	 * requests which have been sent from blade. Since the uuids are
+	 * globally unique we can just use one hash for both */
+	ks_hash_t *outstanding_requests;
+
+	/* The outstanding condition is signalled anytime a command in the outstanding
+	 * requests hash parses a result. Client readers wait on this condition until
+	 * signalled */
+	ks_cond_t *cmd_condition;
+};
+
+ks_status_t swclt_conn_info(swclt_conn_t *conn, swclt_conn_info_t *info);
+
+SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn);
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
-	swclt_conn_t *conn,
+	ks_pool_t *pool,
+	swclt_conn_t **conn,
 	swclt_conn_incoming_cmd_cb_t incoming_command_callback,
 	void *incoming_command_cb_data,
 	swclt_ident_t *ident,
@@ -42,7 +99,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 	const SSL_CTX *ssl);
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
-	swclt_conn_t *conn,
+	ks_pool_t *pool,
+	swclt_conn_t **conn,
 	swclt_conn_incoming_cmd_cb_t incoming_command_callback,
 	void *incoming_command_cb_data,
 	swclt_conn_connect_cb_t connect_callback,
@@ -52,11 +110,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	ks_json_t **authentication,
 	const SSL_CTX *ssl);
 
-SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t conn, swclt_cmd_t cmd);
-SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t conn, swclt_cmd_t cmd);
-
-#define swclt_conn_get(conn, contextP)		__ks_handle_get(SWCLT_HTYPE_CONN, conn, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)
-#define swclt_conn_put(contextP)			__ks_handle_put(SWCLT_HTYPE_CONN, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)
+SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t cmd);
+SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cmd_t cmd);
 
 KS_END_EXTERN_C
 

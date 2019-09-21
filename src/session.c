@@ -53,7 +53,7 @@ static ks_status_t __context_state_transition(swclt_sess_ctx_t *ctx, SWCLT_HSTAT
 static void __context_deinit(
 	swclt_sess_ctx_t *ctx)
 {
-	ks_handle_destroy(&ctx->conn);
+	swclt_conn_destroy(&ctx->conn);
 	ks_hash_destroy(&ctx->subscriptions);
 	ks_hash_destroy(&ctx->methods);
 	ks_hash_destroy(&ctx->setups);
@@ -331,7 +331,7 @@ done:
 
 static ks_status_t __do_disconnect(swclt_sess_ctx_t *ctx)
 {
-	ks_handle_destroy(&ctx->conn);
+	swclt_conn_destroy(&ctx->conn);
 	log_mem_usage();
 	return KS_STATUS_SUCCESS;
 }
@@ -394,10 +394,10 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 	ks_log(KS_LOG_INFO, "Session is performing connect");
 
 	/* Delete the previous connection if present */
-	//ks_handle_destroy(&ctx->conn);
+	swclt_conn_destroy(&ctx->conn);
 	ctx->conn = 0;
 
-	//log_mem_usage();
+	log_mem_usage();
 
 	/* Re-allocate a new ssl context */
 	if (status = __setup_ssl(ctx)) {
@@ -415,6 +415,7 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 
 	/* Create a connection and have it call us back anytime a new read is detected */
 	if (status = swclt_conn_connect_ex(
+			ctx->base.pool,
 			&ctx->conn,
 			(swclt_conn_incoming_cmd_cb_t)__on_incoming_cmd,
 			ctx,
@@ -431,7 +432,7 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 
 	if (status = swclt_conn_info(ctx->conn, &ctx->info.conn)) {
 		ks_debug_break();	/* unexpected */
-		ks_handle_destroy(&ctx->conn);
+		swclt_conn_destroy(&ctx->conn);
 		return status;
 	}
 
@@ -450,7 +451,8 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 	ctx->info.master_nodeid = ks_pstrdup(ctx->base.pool, ctx->info.conn.master_nodeid);
 
 	/* Monitor for state changed on the connection */
-	swclt_hstate_register_listener(&ctx->base, __on_conn_state_change, ctx->conn);
+	//swclt_hstate_register_listener(&ctx->base, __on_conn_state_change, ctx->conn);
+	// TODO need to get conn state changes
 
 	ks_log(KS_LOG_INFO, "Successfully established sessionid: %s", ks_uuid_thr_str(&ctx->info.sessionid));
 	ks_log(KS_LOG_INFO, "   nodeid: %s", ctx->info.nodeid);
@@ -464,6 +466,8 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 static void __context_describe(swclt_sess_ctx_t *ctx, char *buffer, ks_size_t buffer_len)
 {
 	const char *desc = NULL;
+// TODO
+#if 0
 	if (ctx->conn && (desc = ks_handle_describe(ctx->conn))) {
 		/* We have to do all this garbage because of the poor decision to nest ks_handle_describe() calls that return a common thread local buffer */
 		ks_size_t desc_len = strlen(desc);
@@ -478,6 +482,7 @@ static void __context_describe(swclt_sess_ctx_t *ctx, char *buffer, ks_size_t bu
 	} else {
 		snprintf(buffer, buffer_len, "SWCLT Session (not connected)");
 	}
+#endif
 }
 
 static ks_status_t __context_state_transition(swclt_sess_ctx_t *ctx, SWCLT_HSTATE new_state)
@@ -1129,7 +1134,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 		if (cmdP) *cmdP = cmd;
 
 		/* Parent it to connection for safe guard */
-		ks_handle_set_parent(cmd, ctx->conn);
+		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1197,7 +1202,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 		if (cmdP) *cmdP = cmd;
 
 		/* Parent it to connection for safe guard */
-		ks_handle_set_parent(cmd, ctx->conn);
+		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1286,7 +1291,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 		if (cmdP) *cmdP = cmd;
 
 		/* Parent it to connection for safe guard */
-		ks_handle_set_parent(cmd, ctx->conn);
+		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1345,7 +1350,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
 		if (cmdP) *cmdP = cmd;
 
 		/* Parent it to connection for safe guard */
-		ks_handle_set_parent(cmd, ctx->conn);
+		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1405,7 +1410,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
 		if (cmdP) *cmdP = cmd;
 
 		/* Parent it to connection for safe guard */
-		ks_handle_set_parent(cmd, ctx->conn);
+		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1463,7 +1468,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-		ks_handle_set_parent(cmd, ctx->conn);
+		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1529,7 +1534,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-		ks_handle_set_parent(cmd, ctx->conn);
+		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:

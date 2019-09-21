@@ -39,9 +39,9 @@ static void log_mem_usage(void)
 
 #define ks_time_now_ms() ks_time_ms(ks_time_now())
 
-static ks_handle_t * __dupe_handle(swclt_conn_ctx_t *ctx, ks_handle_t handle)
+static ks_handle_t * __dupe_handle(swclt_conn_t *ctx, ks_handle_t handle)
 {
-	ks_handle_t *dup = ks_pool_alloc(ctx->base.pool, sizeof(handle));
+	ks_handle_t *dup = ks_pool_alloc(ctx->pool, sizeof(handle));
 	ks_assertd(dup);
 	memcpy(dup, &handle, sizeof(handle));
 
@@ -49,7 +49,7 @@ static ks_handle_t * __dupe_handle(swclt_conn_ctx_t *ctx, ks_handle_t handle)
 	return dup;
 }
 
-static ks_status_t __register_cmd(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, ks_uuid_t *id, uint32_t *flags, uint32_t *ttl_ms)
+static ks_status_t __register_cmd(swclt_conn_t *ctx, swclt_cmd_t cmd, ks_uuid_t *id, uint32_t *flags, uint32_t *ttl_ms)
 {
 	ks_status_t status;
 
@@ -61,27 +61,28 @@ static ks_status_t __register_cmd(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, ks_uui
 		return status;
 
 	/* Set this handle as a child of ours so we can free it if needed */
-	ks_handle_set_parent(cmd, ctx->base.handle);
+	//ks_handle_set_parent(cmd, ctx->base.handle);
 
 	ks_log(KS_LOG_DEBUG, "Inserting command handle: %16.16llx into hash for command key: %s", cmd, ks_uuid_thr_str(id));
 
-	return ks_hash_insert(ctx->outstanding_requests, ks_uuid_dup(ctx->base.pool, id), __dupe_handle(ctx, cmd));
+	return ks_hash_insert(ctx->outstanding_requests, ks_uuid_dup(ctx->pool, id), __dupe_handle(ctx, cmd));
 }
 
 static void __context_deinit(
-	swclt_conn_ctx_t *ctx)
+	swclt_conn_t **ctx)
 {
 	ks_log(KS_LOG_INFO, "Destroying connection");
 	log_mem_usage();
 	ks_log(KS_LOG_INFO, "Destroying websocket");
-	ks_handle_destroy(&ctx->wss);
+	swclt_wss_destroy(&(*ctx)->wss);
 	log_mem_usage();
 	ks_log(KS_LOG_INFO, "Destroying outstanding requests");
-	ks_hash_destroy(&ctx->outstanding_requests);
+	ks_hash_destroy(&(*ctx)->outstanding_requests);
 	log_mem_usage();
+	ks_pool_free(ctx);
 }
 
-static ks_status_t __wait_cmd_result(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, SWCLT_CMD_TYPE *type)
+static ks_status_t __wait_cmd_result(swclt_conn_t *ctx, swclt_cmd_t cmd, SWCLT_CMD_TYPE *type)
 {
 	uint32_t ttl_ms, ttl_remaining_ms, duration_total_ms;
 	ks_time_t start_sec;
@@ -147,12 +148,12 @@ done:
 	return status;
 }
 
-static void __deregister_cmd(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, ks_uuid_t id)
+static void __deregister_cmd(swclt_conn_t *ctx, swclt_cmd_t cmd, ks_uuid_t id)
 {
 	ks_hash_remove(ctx->outstanding_requests, &id);
 }
 
-static ks_status_t __wait_outstanding_cmd_result(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, SWCLT_CMD_TYPE *type)
+static ks_status_t __wait_outstanding_cmd_result(swclt_conn_t *ctx, swclt_cmd_t cmd, SWCLT_CMD_TYPE *type)
 {
 	ks_uuid_t id;
 	ks_status_t status;
@@ -176,23 +177,25 @@ static ks_status_t __wait_outstanding_cmd_result(swclt_conn_ctx_t *ctx, swclt_cm
 	return status;
 }
 
-static ks_status_t __submit_result(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd)
+static ks_status_t __submit_result(swclt_conn_t *ctx, swclt_cmd_t cmd)
 {
 	SWCLT_CMD_TYPE type;
 	ks_status_t status;
 
-	if (status = swclt_hstate_check_ctx(&ctx->base, "Submit result denied due to state"))
+	if (ctx->state != CONN_STATE_ONLINE) {
 		return status;
+	}
 
-	if (status = swclt_cmd_type(cmd, &type))
+	if (status = swclt_cmd_type(cmd, &type)) {
 		return status;
+	}
 
 	ks_assert(type == SWCLT_CMD_TYPE_RESULT || type == SWCLT_CMD_TYPE_ERROR);
 
 	return swclt_wss_write_cmd(ctx->wss, cmd);
 }
 
-static ks_status_t __submit_request(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd)
+static ks_status_t __submit_request(swclt_conn_t *ctx, swclt_cmd_t cmd)
 {
 	uint32_t flags;
 	ks_uuid_t id;
@@ -201,8 +204,9 @@ static ks_status_t __submit_request(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd)
 	ks_status_t status;
 
 	/* Check state */
-	if (status = swclt_hstate_check_ctx(&ctx->base, "Submit request denied due to state"))
+	if (ctx->state != CONN_STATE_ONLINE) {
 		return status;
+	}
 
 	ks_log(KS_LOG_DEBUG, "Submitting request: %s", ks_handle_describe(cmd));
 
@@ -228,7 +232,8 @@ static ks_status_t __submit_request(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd)
 	ks_log(KS_LOG_DEBUG, "Requesting service for command ttl of: %lums", ttl_ms);
 
 	/* Now ask to be serviced by its ttl time */
-	swclt_hmgr_request_service_in(&ctx->base, ttl_ms);
+	//swclt_hmgr_request_service_in(&ctx->base, ttl_ms);
+	// TODO figure out TTL
 
 	/* If the command has a reply, wait for it (it will get
 	 * de-registered by __wait_outstanding_cmd_result) */
@@ -253,7 +258,7 @@ static ks_status_t __submit_request(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd)
 	return status;
 }
 
-static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *payload, swclt_frame_t **frame)
+static ks_status_t __on_incoming_request(swclt_conn_t *ctx, ks_json_t *payload, swclt_frame_t **frame)
 {
 	const char *method;
 	ks_uuid_t id;
@@ -261,8 +266,9 @@ static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *paylo
 	ks_status_t status;
 
 	/* Check state */
-	if (status = swclt_hstate_check_ctx(&ctx->base, "Ignoring incoming request due to state:"))
-		return status;
+	if (ctx->state != CONN_STATE_ONLINE) {
+		return KS_STATUS_FAIL;
+	}
 
 	ks_log(KS_LOG_DEBUG, "Handling incoming request: %s", (*frame)->data);
 
@@ -291,16 +297,16 @@ static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *paylo
 	ks_log(KS_LOG_DEBUG, "Dispatching incoming request method: %s id: %s", method, ks_uuid_thr_str(&id));
 
 	/* Bind this cmd to our connection in case the callback does not free it */
-	ks_handle_set_parent(cmd, ctx->base.handle);
+	//ks_handle_set_parent(cmd, ctx->base.handle);
 
 	/* And we're in charge of the frame now, we copied it, so free it */
 	ks_pool_free(frame);
 
 	/* And raise the client */
-	return ctx->incoming_cmd_cb(ctx->base.handle, cmd, ctx->incoming_cmd_cb_data);
+	return ctx->incoming_cmd_cb(ctx, cmd, ctx->incoming_cmd_cb_data);
 }
 
-static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t **frame, swclt_conn_ctx_t *ctx)
+static ks_status_t __on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, swclt_conn_t *ctx)
 {
 	ks_json_t *payload = NULL;
 	ks_status_t status;
@@ -316,7 +322,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t **frame, s
 	ks_cond_lock(ctx->cmd_condition);
 
 	/* Parse the json out of the frame to figure out what it is */
-	if (status = swclt_frame_to_json(*frame, ctx->base.pool, &payload)) {
+	if (status = swclt_frame_to_json(*frame, ctx->pool, &payload)) {
 		ks_log(KS_LOG_ERROR, "Failed to get frame json: %lu", status);
 		goto done;
 	}
@@ -397,24 +403,17 @@ done:
 	return status;
 }
 
-static void __context_describe(swclt_conn_ctx_t *ctx, char *buffer, ks_size_t buffer_len)
+static void __context_describe(swclt_conn_t *ctx, char *buffer, ks_size_t buffer_len)
 {
-	/* We have to do all this garbage because of the poor decision to nest ks_handle_describe() calls that return a common thread local buffer */
-	const char *desc = ks_handle_describe(ctx->wss);
-	ks_size_t desc_len = strlen(desc);
-	char preamble_buf[256] = { 0 };
-	ks_size_t preamble_len = 0;
-	snprintf(preamble_buf, sizeof(preamble_buf), "SWCLT Connection to %s:%d - ", ctx->info.wss.address, ctx->info.wss.port);
-	preamble_len = strlen(preamble_buf);
-	if (desc_len + preamble_len + 1 > buffer_len) {
-		desc_len = buffer_len - preamble_len - 1;
-	}
-	memmove(buffer + preamble_len, desc, desc_len + 1);
-	memcpy(buffer, preamble_buf, preamble_len);
+	//const char *desc = ks_handle_describe(ctx->wss);
+	//ks_size_t desc_len = strlen(desc);
+	//char preamble_buf[256] = { 0 };
+	//ks_size_t preamble_len = 0;
+	snprintf(buffer, buffer_len, "SWCLT Connection to %s:%d - ", ctx->info.wss.address, ctx->info.wss.port);
 	buffer[buffer_len - 1] = '\0';
 }
 
-static ks_status_t __do_logical_connect(swclt_conn_ctx_t *ctx, ks_uuid_t previous_sessionid, ks_json_t **authentication)
+static ks_status_t __do_logical_connect(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, ks_json_t **authentication)
 {
 	swclt_cmd_t cmd = CREATE_BLADE_CONNECT_CMD(previous_sessionid, authentication);
 	SWCLT_CMD_TYPE cmd_type;
@@ -440,7 +439,7 @@ static ks_status_t __do_logical_connect(swclt_conn_ctx_t *ctx, ks_uuid_t previou
 		goto done;
 	}
 	
-	if (status = swclt_cmd_lookup_parse_s(cmd, ctx->base.pool,
+	if (status = swclt_cmd_lookup_parse_s(cmd, ctx->pool,
 										  (swclt_cmd_parse_cb_t)BLADE_CONNECT_RPL_PARSE, (void **)&ctx->blade_connect_rpl)) {
 		ks_log(KS_LOG_ERROR, "Unable to parse connect reply");
 		goto done;
@@ -448,13 +447,13 @@ static ks_status_t __do_logical_connect(swclt_conn_ctx_t *ctx, ks_uuid_t previou
 
 	/* Great snapshot our info types */
 	ctx->info.sessionid = ctx->blade_connect_rpl->sessionid;
-	ctx->info.nodeid = ks_pstrdup(ctx->base.pool, ctx->blade_connect_rpl->nodeid);
+	ctx->info.nodeid = ks_pstrdup(ctx->pool, ctx->blade_connect_rpl->nodeid);
 	ctx->info.master_nodeid = ctx->blade_connect_rpl->master_nodeid;
 
 done:
 	/* If the caller wants a call back for connect do that too */
 	if (ctx->connect_cb) {
-		if (status = ctx->connect_cb(ctx->base.handle, error, ctx->blade_connect_rpl, ctx->connect_cb_data)) {
+		if (status = ctx->connect_cb(ctx, error, ctx->blade_connect_rpl, ctx->connect_cb_data)) {
 			ks_log(KS_LOG_WARNING, "Connect callback returned error: %lu", status);
 		}
 	}
@@ -464,7 +463,7 @@ done:
 	return status;
 }
 
-static void __context_service(swclt_conn_ctx_t *ctx)
+static void __context_service(swclt_conn_t *ctx)
 {
 	/* Iterate our outstanding commands, and time out any that haven't received
 	 * a response by their ttl amount */
@@ -522,7 +521,8 @@ static void __context_service(swclt_conn_ctx_t *ctx)
 				ks_log(KS_LOG_DEBUG, "Not removing cmd: %s, ttl has not crossed wait time of: %lums (current wait time is: %lums)", ks_handle_describe(cmd), ttl_ms, total_time_waited_ms);
 
 				/* Enqueue a manager service for the remaining amount */
-				swclt_hmgr_request_service_in(&ctx->base, ttl_ms - total_time_waited_ms);
+				//swclt_hmgr_request_service_in(&ctx->base, ttl_ms - total_time_waited_ms);
+				// TODO more TTL
 			}
 		}
 
@@ -542,14 +542,16 @@ static void __context_service(swclt_conn_ctx_t *ctx)
 	ks_hash_write_unlock(ctx->outstanding_requests);
 }
 
-static void __on_wss_state_change(swclt_conn_ctx_t *ctx, swclt_hstate_change_t *state_change)
+// TODO need callback from wss
+static void __on_wss_state_change(swclt_conn_t *ctx, swclt_hstate_change_t *state_change)
 {
 	/* When websocket dies, all commands get marked as failed and removed from the outstanding commands hash */
 	if (state_change->new_state == SWCLT_HSTATE_DEGRADED) {
 
 		/* Enqueue a state change on ourselves as well */
-		swclt_hstate_changed(&ctx->base, SWCLT_HSTATE_DEGRADED,
-			 KS_STATUS_FAIL, "Websocket failed");
+		//swclt_hstate_changed(&ctx->base, SWCLT_HSTATE_DEGRADED,
+		//	 KS_STATUS_FAIL, "Websocket failed");
+		ctx->state = CONN_STATE_DEGRADED;
 
 		ks_log(KS_LOG_WARNING, "Websocket got disconnected and has initiated a state change: %s", swclt_hstate_describe_change(state_change));
 		ks_log(KS_LOG_WARNING, "Expiring all outstanding commands");
@@ -579,7 +581,7 @@ static void __on_wss_state_change(swclt_conn_ctx_t *ctx, swclt_hstate_change_t *
 	}
 }
 
-static ks_status_t __connect_wss(swclt_conn_ctx_t *ctx, ks_uuid_t previous_sessionid, ks_json_t **authentication)
+static ks_status_t __connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, ks_json_t **authentication)
 {
 	ks_status_t status;
 
@@ -592,7 +594,7 @@ static ks_status_t __connect_wss(swclt_conn_ctx_t *ctx, ks_uuid_t previous_sessi
 		else
 			ks_log(KS_LOG_DEBUG, "Destroying previous web socket handle, re-connecting with new sessionid");
 
-		ks_handle_destroy(&ctx->wss);
+		swclt_wss_destroy(&ctx->wss);
 	}
 
 	if (!ctx->info.wss.port) {
@@ -603,13 +605,14 @@ static ks_status_t __connect_wss(swclt_conn_ctx_t *ctx, ks_uuid_t previous_sessi
 	ks_log(KS_LOG_INFO, "Connecting to %s:%d/%s", ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path);
 
 	/* Create our websocket transport */
-	if (status = swclt_wss_connect(&ctx->wss, (swclt_wss_incoming_frame_cb_t)__on_incoming_frame,
+	if (status = swclt_wss_connect(ctx->pool, &ctx->wss, (swclt_wss_incoming_frame_cb_t)__on_incoming_frame,
 								   ctx, ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path, ctx->info.wss.connect_timeout_ms, ctx->info.wss.ssl))
 		return status;
 
 	/* Listen for state changes on the websocket */
-	if (status = swclt_hstate_register_listener(&ctx->base, __on_wss_state_change, ctx->wss))
-		return status;
+	//if (status = swclt_hstate_register_listener(&ctx->base, __on_wss_state_change, ctx->wss))
+//		return status;
+	// TODO ask wss for state changes
 
 	/* Now perform a logical connect to blade with the connect request */
 	if (status = __do_logical_connect(ctx, previous_sessionid, authentication))
@@ -619,7 +622,7 @@ static ks_status_t __connect_wss(swclt_conn_ctx_t *ctx, ks_uuid_t previous_sessi
 }
 
 static ks_status_t __context_init(
-	swclt_conn_ctx_t *ctx,
+	swclt_conn_t *ctx,
 	swclt_conn_incoming_cmd_cb_t incoming_cmd_cb,
 	void *incoming_cmd_cb_data,
 	swclt_conn_connect_cb_t connect_cb,
@@ -646,16 +649,17 @@ static ks_status_t __context_init(
 	if (ident->path) strncpy(ctx->info.wss.path, ident->path, sizeof(ctx->info.wss.path));
 	ctx->info.wss.connect_timeout_ms = 10000;
 
-	if (status = ks_cond_create(&ctx->cmd_condition, ctx->base.pool))
+	if (status = ks_cond_create(&ctx->cmd_condition, ctx->pool))
 		goto done;
 
 	/* Create our request hash */
 	if (status = ks_hash_create(&ctx->outstanding_requests, KS_HASH_MODE_UUID,
-			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_VALUE | KS_HASH_FLAG_FREE_KEY, ctx->base.pool))
+			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_VALUE | KS_HASH_FLAG_FREE_KEY, ctx->pool))
 		goto done;
 
 	/* Enable servicing */
-	swclt_hstate_register_service(&ctx->base, __context_service);
+	//swclt_hstate_register_service(&ctx->base, __context_service);
+	// TODO maybe replace with something else?  TTL thread?
 
 	/* Connect our websocket */
 	if (status = __connect_wss(ctx, previous_sessionid, authentication))
@@ -665,8 +669,14 @@ done:
 	return status;
 }
 
+SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn)
+{
+	__context_deinit(conn);
+}
+
 SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
-	swclt_conn_t *conn,
+	ks_pool_t *pool,
+	swclt_conn_t **conn,
 	swclt_conn_incoming_cmd_cb_t incoming_cmd_cb,
 	void *incoming_cmd_cb_data,
 	swclt_conn_connect_cb_t connect_cb,
@@ -676,27 +686,13 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	ks_json_t **authentication,
 	const SSL_CTX *ssl)
 {
-	SWCLT_HANDLE_ALLOC_TEMPLATE_M(
-		NULL,
-		SWCLT_HTYPE_CONN,
-		conn,
-		swclt_conn_ctx_t,
-		SWCLT_HSTATE_NORMAL,
-		__context_describe,
-		__context_deinit,
-		__context_init,
-		incoming_cmd_cb,
-		incoming_cmd_cb_data,
-		connect_cb,
-		connect_cb_data,
-		ident,
-		previous_sessionid,
-		authentication,
-		ssl);
+	// TODO
+	return KS_STATUS_SUCCESS;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
-	swclt_conn_t *conn,
+	ks_pool_t *pool,
+	swclt_conn_t **conn,
 	swclt_conn_incoming_cmd_cb_t incoming_cmd_cb,
 	void *incoming_cmd_cb_data,
 	swclt_ident_t *ident,
@@ -704,6 +700,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 	const SSL_CTX *ssl)
 {
 	return swclt_conn_connect_ex(
+		pool,
 		conn,
 		incoming_cmd_cb,
 		incoming_cmd_cb_data,
@@ -715,30 +712,21 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 		ssl);
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t conn, swclt_cmd_t cmd)
+SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cmd_t cmd)
 {
-	SWCLT_CONN_SCOPE_BEG(conn, ctx, status);
-
-	status = __submit_result(ctx, cmd);
-
-	SWCLT_CONN_SCOPE_END(conn, ctx, status);
+	return __submit_result(conn, cmd);
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t conn, swclt_cmd_t cmd)
+SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t cmd)
 {
-	SWCLT_CONN_SCOPE_BEG(conn, ctx, status);
-
-	status = __submit_request(ctx, cmd);
-
-	SWCLT_CONN_SCOPE_END(conn, ctx, status);
+	return __submit_request(conn, cmd);
 }
 
 /* Private due to un-implemented caller ownership semantics, internal use only */
-ks_status_t swclt_conn_info(swclt_conn_t conn, swclt_conn_info_t *info)
+ks_status_t swclt_conn_info(swclt_conn_t *conn, swclt_conn_info_t *info)
 {
-	SWCLT_CONN_SCOPE_BEG(conn, ctx, status);
-	memcpy(info, &ctx->info, sizeof(ctx->info));
-	SWCLT_CONN_SCOPE_END(conn, ctx, status);
+	memcpy(info, &conn->info, sizeof(conn->info));
+	return KS_STATUS_SUCCESS;
 }
 
 /* For Emacs:

@@ -24,7 +24,7 @@
 
 static uint32_t g_protocol_response_cb_called;
 
-static ks_status_t __on_incoming_cmd(swclt_conn_t conn, swclt_cmd_t cmd, void *cb_data)
+static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, void *cb_data)
 {
 	return KS_STATUS_SUCCESS;
 }
@@ -37,13 +37,13 @@ static void __on_protocol_response(swclt_cmd_t cmd, void *cb_data)
 void test_async(ks_pool_t *pool)
 {
 	SSL_CTX *ssl = create_ssl_context();
-	swclt_conn_t conn;
+	swclt_conn_t *conn;
 	swclt_cmd_t cmd;
 	SWCLT_CMD_TYPE cmd_type;
 	const ks_json_t *result;
 	ks_json_t *channels;
 
-	REQUIRE(!swclt_conn_connect(&conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, ssl));
+	REQUIRE(!swclt_conn_connect(pool, &conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, ssl));
 
 	channels = ks_json_create_array_inline(1, BLADE_CHANNEL_MARSHAL(pool, &(blade_channel_t){"a_channel", 0, 0}));
 
@@ -81,7 +81,7 @@ void test_async(ks_pool_t *pool)
 
 	REQUIRE(ks_handle_valid(cmd));
 
-	ks_handle_destroy(&conn);
+	swclt_conn_destroy(&conn);
 
 	/* Command should become invalid once we destroy the connection */
 	REQUIRE(!ks_handle_valid(cmd));
@@ -91,15 +91,13 @@ void test_async(ks_pool_t *pool)
 void test_ttl(ks_pool_t *pool)
 {
 	SSL_CTX *ssl = create_ssl_context();
-	swclt_conn_t conn;
+	swclt_conn_t *conn;
 	swclt_cmd_t cmd;
 	SWCLT_CMD_TYPE cmd_type;
-	swclt_conn_ctx_t *conn_ctx;
-	swclt_wss_ctx_t *wss_ctx;
 	swclt_cmd_ctx_t *cmd_ctx;
 	ks_json_t *channels;
 
-	REQUIRE(!swclt_conn_connect(&conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, ssl));
+	REQUIRE(!swclt_conn_connect(pool, &conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, ssl));
 
 	channels = ks_json_create_array_inline(1, BLADE_CHANNEL_MARSHAL(pool, &(blade_channel_t){"a_channel", 0, 0}));
 	REQUIRE(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
@@ -115,12 +113,10 @@ void test_ttl(ks_pool_t *pool)
 			NULL));
 
 	/* Lock the reader so we never get a response, forcing a timeout */
-	conn_ctx = conn_get(conn);
-	wss_ctx = wss_get(conn_ctx->wss);
 	cmd_ctx = cmd_get(cmd);
 	REQUIRE(cmd_ctx->response_ttl_ms == BLADE_PROTOCOL_TTL_MS);
 	REQUIRE(cmd_ctx->flags == BLADE_PROTOCOL_FLAGS);
-	REQUIRE(!ks_mutex_lock(wss_ctx->write_mutex));
+	REQUIRE(!ks_mutex_lock(conn->wss->write_mutex));
 
 	/* And submit it */
 	REQUIRE(!swclt_conn_submit_request(conn, cmd));
@@ -146,15 +142,13 @@ void test_ttl(ks_pool_t *pool)
 	}
 
 	/* Don't forget to unlock the poor websocket reader */
-	REQUIRE(!ks_mutex_unlock(wss_ctx->write_mutex));
+	REQUIRE(!ks_mutex_unlock(conn->wss->write_mutex));
 
 	cmd_put(&cmd_ctx);
-	conn_put(&conn_ctx);
-	wss_put(&wss_ctx);
 
 	REQUIRE(ks_handle_valid(cmd));
 
-	ks_handle_destroy(&conn);
+	swclt_conn_destroy(&conn);
 
 	/* Command should become invalid once we destroy the connection */
 	REQUIRE(!ks_handle_valid(cmd));

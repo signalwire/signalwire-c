@@ -51,7 +51,7 @@ struct swclt_sess_ctx {
 	swclt_store_t store;
 
 	/* Our connection */
-	swclt_conn_t conn;
+	swclt_conn_t *conn;
 
 	/* The extracted identity info */
 	swclt_ident_t ident;
