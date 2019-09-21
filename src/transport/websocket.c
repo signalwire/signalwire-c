@@ -21,11 +21,6 @@
  */
 
 #include "signalwire-client-c/client.h"
-#include "signalwire-client-c/transport/websocket.h"
-
-#include <sys/types.h>
-#include <unistd.h>
-
 
 // Write apis
 

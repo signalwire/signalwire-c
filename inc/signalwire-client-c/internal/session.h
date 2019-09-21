@@ -22,8 +22,6 @@
 
 #pragma once
 
-#include "signalwire-client-c/internal/connection.h"
-
 KS_BEGIN_EXTERN_C
 
 /* Create a structure containing some handy peices of info */

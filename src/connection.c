@@ -20,7 +20,6 @@
  * SOFTWARE.
  */
 #include "signalwire-client-c/client.h"
-#include "signalwire-client-c/internal/connection.h"
 
 #define ks_time_now_ms() ks_time_ms(ks_time_now())
 
