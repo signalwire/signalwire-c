@@ -22,6 +22,21 @@
 #include "signalwire-client-c/client.h"
 #include "signalwire-client-c/internal/connection.h"
 
+#include <sys/types.h>
+#include <unistd.h>
+
+static void log_mem_usage(void)
+{
+	pid_t pid = getpid();
+	char buf[1024] = { 0 };
+	snprintf(buf, sizeof(buf) - 1, "/proc/%d/statm", (int)pid);
+	FILE *f = fopen(buf, "r");
+	fread(buf, sizeof(char), sizeof(buf) - 1, f);
+	fclose(f);
+	ks_log(KS_LOG_INFO, "mem: %s", buf);
+}
+
+
 #define ks_time_now_ms() ks_time_ms(ks_time_now())
 
 static ks_handle_t * __dupe_handle(swclt_conn_ctx_t *ctx, ks_handle_t handle)
@@ -56,8 +71,14 @@ static ks_status_t __register_cmd(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, ks_uui
 static void __context_deinit(
 	swclt_conn_ctx_t *ctx)
 {
+	ks_log(KS_LOG_INFO, "Destroying connection");
+	log_mem_usage();
+	ks_log(KS_LOG_INFO, "Destroying websocket");
 	ks_handle_destroy(&ctx->wss);
+	log_mem_usage();
+	ks_log(KS_LOG_INFO, "Destroying outstanding requests");
 	ks_hash_destroy(&ctx->outstanding_requests);
+	log_mem_usage();
 }
 
 static ks_status_t __wait_cmd_result(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd, SWCLT_CMD_TYPE *type)
@@ -232,7 +253,7 @@ static ks_status_t __submit_request(swclt_conn_ctx_t *ctx, swclt_cmd_t cmd)
 	return status;
 }
 
-static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *payload, swclt_frame_t *frame)
+static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *payload, swclt_frame_t **frame)
 {
 	const char *method;
 	ks_uuid_t id;
@@ -243,16 +264,16 @@ static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *paylo
 	if (status = swclt_hstate_check_ctx(&ctx->base, "Ignoring incoming request due to state:"))
 		return status;
 
-	ks_log(KS_LOG_DEBUG, "Handling incoming request: %s", frame->data);
+	ks_log(KS_LOG_DEBUG, "Handling incoming request: %s", (*frame)->data);
 
 	if (!(method = ks_json_get_object_cstr_def(payload, "method", NULL))) {
-		ks_log(KS_LOG_WARNING, "Invalid response received: %s", frame->data);
+		ks_log(KS_LOG_WARNING, "Invalid response received: %s", (*frame)->data);
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
 
 	id = ks_json_get_object_uuid(payload, "id");
 	if (ks_uuid_is_null(&id)) {
-		ks_log(KS_LOG_WARNING, "Response missing id: %s", frame->data);
+		ks_log(KS_LOG_WARNING, "Response missing id: %s", (*frame)->data);
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
 
@@ -260,10 +281,10 @@ static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *paylo
 			&cmd,
 			NULL,
 			NULL,
-			frame,
+			*frame,
 			0,
 			BLADE_METHOD_FLAGS(method))) {
-		ks_log(KS_LOG_WARNING, "Failed to create command (status: %lu) from frame: %s", status, frame->data);
+		ks_log(KS_LOG_WARNING, "Failed to create command (status: %lu) from frame: %s", status, (*frame)->data);
 		return status;
 	}
 
@@ -273,13 +294,13 @@ static ks_status_t __on_incoming_request(swclt_conn_ctx_t *ctx, ks_json_t *paylo
 	ks_handle_set_parent(cmd, ctx->base.handle);
 
 	/* And we're in charge of the frame now, we copied it, so free it */
-	ks_pool_free(&frame);
+	ks_pool_free(frame);
 
 	/* And raise the client */
 	return ctx->incoming_cmd_cb(ctx->base.handle, cmd, ctx->incoming_cmd_cb_data);
 }
 
-static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t *frame, swclt_conn_ctx_t *ctx)
+static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t **frame, swclt_conn_ctx_t *ctx)
 {
 	ks_json_t *payload = NULL;
 	ks_status_t status;
@@ -289,13 +310,13 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t *frame, sw
 	swclt_cmd_t cmd;
 	ks_bool_t async = KS_FALSE;
 
-	ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", frame->data);
+	ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", (*frame)->data);
 
 	/* Lock to synchronize with the waiter thread */
 	ks_cond_lock(ctx->cmd_condition);
 
 	/* Parse the json out of the frame to figure out what it is */
-	if (status = swclt_frame_to_json(frame, ctx->base.pool, &payload)) {
+	if (status = swclt_frame_to_json(*frame, ctx->base.pool, &payload)) {
 		ks_log(KS_LOG_ERROR, "Failed to get frame json: %lu", status);
 		goto done;
 	}
@@ -311,7 +332,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t *frame, sw
 	/* Must be a reply, look up our outstanding request */
 	id = ks_json_get_object_uuid(payload, "id");
 	if (ks_uuid_is_null(&id)) {
-		ks_log(KS_LOG_WARNING, "Received invalid payload, missing id: %s", frame->data);
+		ks_log(KS_LOG_WARNING, "Received invalid payload, missing id: %s", (*frame)->data);
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
 	}
@@ -320,7 +341,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t *frame, sw
 	if (!(outstanding_cmd = ks_hash_search(ctx->outstanding_requests, &id, KS_UNLOCKED))) {
 
 		/* Command probably timed out */
-		ks_log(KS_LOG_DEBUG, "Could not locate cmd for frame: %s", frame->data);
+		ks_log(KS_LOG_DEBUG, "Could not locate cmd for frame: %s", (*frame)->data);
 
 		/* Unexpected, break in case it happens in a debugger */
 		status = KS_STATUS_INVALID_ARGUMENT;
@@ -349,7 +370,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t *frame, sw
 	}
 
 	/* Great, feed it the reply */
-	if (status = swclt_cmd_parse_reply_frame(cmd, frame, &async)) {
+	if (status = swclt_cmd_parse_reply_frame(cmd, *frame, &async)) {
 		ks_log(KS_LOG_ERROR, "Failed to parse command reply: %lu", status);
 		goto done;
 	}
@@ -362,7 +383,7 @@ static ks_status_t __on_incoming_frame(swclt_wss_t wss, swclt_frame_t *frame, sw
 done:
 	ks_cond_unlock(ctx->cmd_condition);
 
-	ks_pool_free(&frame);
+	ks_pool_free(frame);
 
 	if (payload) {
 		ks_json_free(&payload);
@@ -717,13 +738,6 @@ ks_status_t swclt_conn_info(swclt_conn_t conn, swclt_conn_info_t *info)
 {
 	SWCLT_CONN_SCOPE_BEG(conn, ctx, status);
 	memcpy(info, &ctx->info, sizeof(ctx->info));
-	SWCLT_CONN_SCOPE_END(conn, ctx, status);
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_conn_get_rates(swclt_conn_t conn, ks_throughput_t *recv, ks_throughput_t *send)
-{
-	SWCLT_CONN_SCOPE_BEG(conn, ctx, status);
-	status = swclt_wss_get_rates(ctx->wss, recv, send);
 	SWCLT_CONN_SCOPE_END(conn, ctx, status);
 }
 

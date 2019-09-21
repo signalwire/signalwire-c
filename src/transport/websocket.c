@@ -23,6 +23,21 @@
 #include "signalwire-client-c/client.h"
 #include "signalwire-client-c/transport/internal/websocket.h"
 
+#include <sys/types.h>
+#include <unistd.h>
+
+static void log_mem_usage(void)
+{
+	pid_t pid = getpid();
+	char buf[1024] = { 0 };
+	snprintf(buf, sizeof(buf) - 1, "/proc/%d/statm", (int)pid);
+	FILE *f = fopen(buf, "r");
+	fread(buf, sizeof(char), sizeof(buf) - 1, f);
+	fclose(f);
+	ks_log(KS_LOG_INFO, "mem: %s", buf);
+}
+
+
 // Write apis
 
 static ks_status_t __write_raw(swclt_wss_ctx_t *ctx, kws_opcode_t opcode, const void *data, ks_size_t len)
@@ -38,8 +53,6 @@ static ks_status_t __write_raw(swclt_wss_ctx_t *ctx, kws_opcode_t opcode, const 
 	if (wrote != len) {
 		ks_log(KS_LOG_WARNING, "Failed to write frame\n");
 		return KS_STATUS_FAIL;
-	} else {
-		ks_throughput_report_ex(ctx->rate_send, len, KS_FALSE);
 	}
 
 	return KS_STATUS_SUCCESS;
@@ -109,9 +122,6 @@ static ks_status_t __read_frame(swclt_wss_ctx_t *ctx, swclt_frame_t **frameP, kw
 		goto done;
 	}
 
-	/* Update rates */
-	ks_throughput_report_ex(ctx->rate_recv, (size_t)len, KS_FALSE);
-
 	ks_log(KS_LOG_DEBUG, "Copying frame of length: %lu of opcode: %lu", (size_t)len, opcode);
 
 	/* Stash it in the frame */
@@ -134,11 +144,6 @@ done:
 static ks_status_t __reader_loop(swclt_wss_ctx_t *ctx)
 {
 	ks_status_t status;
-
-	/* Righto first things first, notify the throughputs that
-	 * their clocks can officially start. */
-	ks_throughput_start(ctx->rate_recv);
-	ks_throughput_start(ctx->rate_send);
 
 	ks_log(KS_LOG_DEBUG, "Websocket reader starting");
 
@@ -190,7 +195,7 @@ static ks_status_t __reader_loop(swclt_wss_ctx_t *ctx)
 			case WSOC_TEXT:
 				ks_log(KS_LOG_DEBUG, "Reading text ");
 				// Notify the consumer there is a new frame
-				if (status = ctx->incoming_frame_cb(ctx->base.handle, ctx->read_frame, ctx->incoming_frame_cb_data)) {
+				if (status = ctx->incoming_frame_cb(ctx->base.handle, &ctx->read_frame, ctx->incoming_frame_cb_data)) {
 					ks_log(KS_LOG_WARNING, "Callback from incoming frame returned: %d, exiting", status);
 					// Done with the frame, callback is responsible for freeing it
 					ctx->read_frame = NULL;
@@ -245,18 +250,24 @@ static ks_status_t __start_reader(swclt_wss_ctx_t *ctx)
 static void __context_deinit(
 	swclt_wss_ctx_t *ctx)
 {
-	ks_log(KS_LOG_INFO, "Shutting down websocket and stopping reader");
-
+	ks_log(KS_LOG_INFO, "Shutting down websocket");
+	log_mem_usage();
+	ks_log(KS_LOG_INFO, "stopping reader");
 	ks_thread_destroy(&ctx->reader_thread);
-	ks_handle_destroy(&ctx->rate_send);
-	ks_handle_destroy(&ctx->rate_recv);
+	log_mem_usage();
+	ks_log(KS_LOG_INFO, "destroy reader_thread again??");
 	ks_thread_destroy(&ctx->reader_thread);
+	log_mem_usage();
+	ks_log(KS_LOG_INFO, "destroy mutexes");
 	ks_mutex_destroy(&ctx->write_mutex);
 	ks_mutex_destroy(&ctx->read_mutex);
-	ks_handle_destroy(&ctx->rate_recv);
-	ks_handle_destroy(&ctx->rate_send);
+	log_mem_usage();
+	ks_log(KS_LOG_INFO, "destroy read_frame again");
 	ks_pool_free(&ctx->read_frame);
+	log_mem_usage();
+	ks_log(KS_LOG_INFO, "destroy kws");
 	kws_destroy(&ctx->wss);
+	log_mem_usage();
 }
 
 static void __context_describe(swclt_wss_ctx_t *ctx, char *buffer, ks_size_t buffer_len)
@@ -344,11 +355,6 @@ static ks_status_t __context_init(
 	strncpy(ctx->info.path, path, sizeof(ctx->info.path) - 1);
 	ctx->info.port = port;
 
-	if (status = ks_throughput_create(&ctx->rate_send))
-		goto done;
-	if (status = ks_throughput_create(&ctx->rate_recv))
-		goto done;
-
 	ks_log(KS_LOG_DEBUG, "Resolving address: %s", address);
 
 	if (status = ks_addr_getbyname(address, port, AF_INET, &ctx->addr)) {
@@ -416,14 +422,6 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_get_info(swclt_wss_t wss, swclt_wss_info_t 
 	SWCLT_WSS_SCOPE_END(wss, ctx, status)
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_wss_get_rates(swclt_wss_t wss, ks_throughput_t *send, ks_throughput_t *recv)
-{
-	SWCLT_WSS_SCOPE_BEG(wss, ctx, status)
-	*send = ctx->rate_send;
-	*recv = ctx->rate_recv;
-	SWCLT_WSS_SCOPE_END(wss, ctx, status)
-}
-
 SWCLT_DECLARE(ks_status_t) swclt_wss_write_cmd(swclt_wss_t wss, swclt_cmd_t cmd)
 {
 	SWCLT_WSS_SCOPE_BEG(wss, ctx, status)
@@ -449,8 +447,6 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_write_cmd(swclt_wss_t wss, swclt_cmd_t cmd)
 
 	if (len != wrote)
 		status = KS_STATUS_FAIL;
-	else
-		ks_throughput_report_ex(ctx->rate_send, len, KS_FALSE);
 
 	ks_pool_free(&data);
 

@@ -54,7 +54,6 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t conn, swclt_cmd_t cmd);
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t conn, swclt_cmd_t cmd);
-SWCLT_DECLARE(ks_status_t) swclt_conn_get_rates(swclt_conn_t conn, ks_throughput_t *recv, ks_throughput_t *send);
 
 #define swclt_conn_get(conn, contextP)		__ks_handle_get(SWCLT_HTYPE_CONN, conn, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_conn_put(contextP)			__ks_handle_put(SWCLT_HTYPE_CONN, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)

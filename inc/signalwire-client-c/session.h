@@ -193,7 +193,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 	swclt_cmd_t *cmdP);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_nodestore(swclt_sess_t sess, swclt_store_t *store);
-SWCLT_DECLARE(ks_status_t) swclt_sess_get_rates(swclt_sess_t sess, ks_throughput_t *recv, ks_throughput_t *send);
 
 #define swclt_sess_get(sess, contextP)		__ks_handle_get(SWCLT_HTYPE_SESS, sess, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_sess_put(contextP)			__ks_handle_put(SWCLT_HTYPE_SESS, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)

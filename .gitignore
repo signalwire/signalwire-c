@@ -12,7 +12,6 @@ testclient
 /build
 Testing/
 core
-swclt_bench/swclt_bench
 swclt_test/cotire/
 swclt_test/swclt_test
 /install_manifest.txt

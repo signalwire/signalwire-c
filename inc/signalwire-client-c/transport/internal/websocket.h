@@ -54,9 +54,6 @@ struct swclt_wss_ctx {
 	ks_status_t reader_status;
 	ks_thread_t *reader_thread;
 
-	/* Build in rate calculators track throughput for send/recv all the time */
-	ks_throughput_t rate_send, rate_recv;
-
 	/* To maintain state, we lock with mutexes. We have two here
 	 * the read_mutex is locked anytime someone is reading from
 	 * the websocket, and the write_mutex is locked anytime

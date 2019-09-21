@@ -413,7 +413,5 @@ endif()
 
 cotire(signalwire_client)
 
-add_subdirectory(swclt_bench)
-
 enable_testing()
 add_subdirectory(swclt_test)
