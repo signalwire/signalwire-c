@@ -77,10 +77,7 @@ struct swclt_conn {
 	ks_cond_t *cmd_condition;
 };
 
-ks_status_t swclt_conn_info(swclt_conn_t *conn, swclt_conn_info_t *info);
-
 SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn);
-
 SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 	ks_pool_t *pool,
 	swclt_conn_t **conn,
@@ -104,6 +101,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t cmd);
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cmd_t cmd);
+SWCLT_DECLARE(ks_status_t) swclt_conn_info(swclt_conn_t *conn, swclt_conn_info_t *info);
+SWCLT_DECLARE(char *) swclt_conn_describe(swclt_conn_t *conn);
 
 KS_END_EXTERN_C
 

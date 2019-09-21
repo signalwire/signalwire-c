@@ -465,24 +465,13 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 
 static void __context_describe(swclt_sess_ctx_t *ctx, char *buffer, ks_size_t buffer_len)
 {
-	const char *desc = NULL;
-// TODO
-#if 0
-	if (ctx->conn && (desc = ks_handle_describe(ctx->conn))) {
-		/* We have to do all this garbage because of the poor decision to nest ks_handle_describe() calls that return a common thread local buffer */
-		ks_size_t desc_len = strlen(desc);
-		const char *preamble = "SWCLT Session - ";
-		ks_size_t preamble_len = strlen(preamble);
-		if (desc_len + preamble_len + 1 > buffer_len) {
-			desc_len = buffer_len - preamble_len - 1;
-		}
-		memmove(buffer + preamble_len, desc, desc_len + 1);
-		memcpy(buffer, preamble, preamble_len);
-		buffer[buffer_len - 1] = '\0';
+	char *desc = NULL;
+	if (ctx->conn && (desc = swclt_conn_describe(ctx->conn))) {
+		snprintf(buffer, buffer_len, "SWCLT Session - %s", desc);
+		ks_pool_free(&desc);
 	} else {
 		snprintf(buffer, buffer_len, "SWCLT Session (not connected)");
 	}
-#endif
 }
 
 static ks_status_t __context_state_transition(swclt_sess_ctx_t *ctx, SWCLT_HSTATE new_state)

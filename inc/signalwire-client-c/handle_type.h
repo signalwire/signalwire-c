@@ -32,23 +32,13 @@
 #define KS_HANDLE_GROUP_SWCLT_SYS (KS_HANDLE_USER_GROUP_START + 1)
 
 typedef enum {
-	/* CONN - Connection which contains a transport
-	 * to blade (e.g. websocket) handles reads and writes
-	 * and knows how to do high level things like connect
-	 * to blade with a connect request */
-    SWCLT_HTYPE_CONN =  KS_HANDLE_MAKE_TYPE(SWCLT_SYS, 1),
 
 	/* CMD - Commands are request/reply wrappers for json rpc */
-    SWCLT_HTYPE_CMD =  KS_HANDLE_MAKE_TYPE(SWCLT_SYS, 2),
-
-	/* WSS - Web socket transport which abstracts the reading
-	 * and writing semantics of a web socket, including ssl
-	 * negotiation, and ping/pong handling */
-    SWCLT_HTYPE_WSS =  KS_HANDLE_MAKE_TYPE(SWCLT_SYS, 3),
+    SWCLT_HTYPE_CMD =  KS_HANDLE_MAKE_TYPE(SWCLT_SYS, 1),
 
 	/* SESS	- A session is the highest level construct, and is the
 	 * primary means in which a client ineracts with this sdk. */
-    SWCLT_HTYPE_SESS =  KS_HANDLE_MAKE_TYPE(SWCLT_SYS, 4),
+    SWCLT_HTYPE_SESS =  KS_HANDLE_MAKE_TYPE(SWCLT_SYS, 2),
 
 	/* SUB - A subscription holds the callback state for a subscription
 	 * and is a child of a session. */
@@ -76,12 +66,8 @@ static inline ks_bool_t swclt_htype_valid(swclt_htype_t type)
 static inline const char *const swclt_htype_str(swclt_htype_t type)
 {
 	switch(type) {
-	case SWCLT_HTYPE_CONN:
-		return "Connection";
 	case SWCLT_HTYPE_CMD:
 		return "Command";
-	case SWCLT_HTYPE_WSS:
-		return "Websocket";
 	case SWCLT_HTYPE_SESS:
 		return "Session";
 	case SWCLT_HTYPE_SUB:
@@ -90,8 +76,6 @@ static inline const char *const swclt_htype_str(swclt_htype_t type)
 		return "NodeStore";
 	case SWCLT_HTYPE_HMON:
 		return "HandleMonitor";
-	case SWCLT_HTYPE_TEST:
-		return "Test";
 	default:
 		ks_abort_fmt("Invalid handle type: %lu", type);
 	}

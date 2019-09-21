@@ -236,7 +236,7 @@ static ks_status_t __start_reader(swclt_wss_t *ctx)
 }
 
 
-KS_DECLARE(char *) swclt_wss_describe(swclt_wss_t *ctx)
+SWCLT_DECLARE(char *) swclt_wss_describe(swclt_wss_t *ctx)
 {
 	if (ctx->info.ssl) {
 		return ks_psprintf(ctx->pool,
