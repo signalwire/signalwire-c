@@ -46,8 +46,6 @@ struct swclt_sess_ctx {
 	/* The pool that manages all the allocations */
 	ks_pool_t *pool;
 
-	int failed;
-
 	/* The node store, an api to keep the cache in sync with blade, contains
 	 * a lotta info about stuff. */
 	swclt_store_t store;

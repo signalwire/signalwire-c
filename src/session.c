@@ -350,7 +350,13 @@ static ks_status_t __on_connect_reply(swclt_conn_t *conn, ks_json_t *error, cons
 static void __on_conn_failed(swclt_conn_t *conn, void *data)
 {
 	swclt_sess_ctx_t *ctx = (swclt_sess_ctx_t *)data;
-	ctx->failed = 1;
+	/* Enqueue a state change on ourselves as well */
+	char *reason = ks_pstrdup(ctx->base.pool, "Connection failed");
+	swclt_hstate_changed(&ctx->base, SWCLT_HSTATE_DEGRADED, KS_STATUS_FAIL, reason);
+	ks_pool_free(&reason);
+
+	/* Now we, as a session, will want to re-connect so, enqueue a request do to so */
+	swclt_hstate_initiate_change_in(&ctx->base, SWCLT_HSTATE_ONLINE, __context_state_transition, 1000, 5000);
 }
 
 static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
@@ -558,18 +564,6 @@ static void __context_service(swclt_sess_ctx_t *ctx)
 		}
 	}
 	ks_hash_read_unlock(ctx->metrics);
-
-	if (ctx->failed) {
-		ctx->failed = 0;
-
-		/* Enqueue a state change on ourselves as well */
-		char *reason = ks_pstrdup(ctx->base.pool, "Connection failed");
-		swclt_hstate_changed(&ctx->base, SWCLT_HSTATE_DEGRADED, KS_STATUS_FAIL, reason);
-		ks_pool_free(&reason);
-
-		/* Now we, as a session, will want to re-connect so, enqueue a request do to so */
-		swclt_hstate_initiate_change_in(&ctx->base, SWCLT_HSTATE_ONLINE, __context_state_transition, 1000, 5000);
-	}
 
 	/* Now ask to be serviced again in 1 second */
 	swclt_hmgr_request_service_in(&ctx->base, 1000);
