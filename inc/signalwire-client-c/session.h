@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -198,80 +198,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_nodestore(swclt_sess_t sess, swclt_store_t
 #define swclt_sess_put(contextP)			__ks_handle_put(SWCLT_HTYPE_SESS, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const char *service, swclt_sub_cb_t cb, void *cb_data);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_messaging_setup(swclt_sess_t sess, swclt_sub_cb_t cb, void *cb_data);
-													  
-SWCLT_DECLARE(ks_status_t) swclt_sess_messaging_send(swclt_sess_t sess,
-													 const char *from,
-													 const char *to,
-													 const char *body,
-													 const char **media,
-													 swclt_cmd_t *cmdP);
-SWCLT_DECLARE(ks_status_t) swclt_sess_messaging_send_async(swclt_sess_t sess,
-														   const char *from,
-														   const char *to,
-														   const char *body,
-														   const char **media,
-														   swclt_cmd_cb_t response_callback,
-														   void *response_callback_data,
-														   swclt_cmd_t *cmdP);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_messaging_status(swclt_sess_t sess,
-													   const char *id,
-													   swclt_cmd_t *cmdP);
-SWCLT_DECLARE(ks_status_t) swclt_sess_messaging_status_async(swclt_sess_t sess,
-															 const char *id,
-															 swclt_cmd_cb_t response_callback,
-															 void *response_callback_data,
-															 swclt_cmd_t *cmdP);
-
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_calling_setup(swclt_sess_t sess, swclt_sub_cb_t cb, void *cb_data);
-													  
-SWCLT_DECLARE(ks_status_t) swclt_sess_calling_call(swclt_sess_t sess,
-												   const char *from,
-												   const char *to,
-												   uint8_t retries,
-												   uint32_t sleep_between_retries,
-												   swclt_cmd_t *cmdP);
-SWCLT_DECLARE(ks_status_t) swclt_sess_calling_call_async(swclt_sess_t sess,
-														 const char *from,
-														 const char *to,
-														 uint8_t retries,
-														 uint32_t sleep_between_retries,
-														 swclt_cmd_cb_t response_callback,
-														 void *response_callback_data,
-														 swclt_cmd_t *cmdP);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_calling_disconnect(swclt_sess_t sess,
-														 const char *channel,
-														 swclt_cmd_t *cmdP);
-SWCLT_DECLARE(ks_status_t) swclt_sess_calling_disconnect_async(swclt_sess_t sess,
-															   const char *channel,
-															   swclt_cmd_cb_t response_callback,
-															   void *response_callback_data,
-															   swclt_cmd_t *cmdP);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_calling_play(swclt_sess_t sess,
-												   const char *channel,
-												   const char *url,
-												   swclt_cmd_t *cmdP);
-SWCLT_DECLARE(ks_status_t) swclt_sess_calling_play_async(swclt_sess_t sess,
-														 const char *channel,
-														 const char *url,
-														 swclt_cmd_cb_t response_callback,
-														 void *response_callback_data,
-														 swclt_cmd_t *cmdP);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_calling_stop_playback(swclt_sess_t sess,
-															const char *channel,
-															swclt_cmd_t *cmdP);
-SWCLT_DECLARE(ks_status_t) swclt_sess_calling_stop_playback_async(swclt_sess_t sess,
-																  const char *channel,
-																  swclt_cmd_cb_t response_callback,
-																  void *response_callback_data,
-																  swclt_cmd_t *cmdP);
-
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_setup(swclt_sess_t sess, swclt_sub_cb_t cb, void *cb_data);
 													  
