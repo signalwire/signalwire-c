@@ -79,6 +79,11 @@ static void __raise_callback(swclt_cmd_ctx_t *ctx)
 
 static void __report_failure(const char *file, int line, const char *tag, swclt_cmd_ctx_t *ctx, ks_status_t failure_status, const char *failure_fmt, va_list *ap)
 {
+	if (ctx->type != SWCLT_CMD_TYPE_REQUEST) {
+		ks_log(KS_LOG_INFO, "Discarding failure report - command %s has already been finalized", ks_uuid_thr_str(&ctx->id));
+		return;
+	}
+
 	/* Reset previous allocation if set */
 	ks_pool_free(&ctx->failure_reason);
 	ks_pool_free(&ctx->failure_summary);
@@ -736,6 +741,12 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_
 
 	/* Convert the frame to json */
 	ks_json_t *reply, *result, *error;
+
+	if (ctx->type != SWCLT_CMD_TYPE_REQUEST) {
+		ks_log(KS_LOG_INFO, "Discarding reply - command %s has already been finalized", ks_uuid_thr_str(&ctx->id));
+		status = KS_STATUS_SUCCESS; // it is OK to continue
+		goto done;
+	}
 
 	/* Get the json out of the frame */
 	if (status = swclt_frame_to_json(frame, ctx->base.pool, &reply)) {

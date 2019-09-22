@@ -23,12 +23,14 @@
 
 #define ks_time_now_ms() ks_time_ms(ks_time_now())
 
+static void deregister_cmd(swclt_conn_t *ctx, ks_uuid_t id);
+
 /* 1638 commands per second over 5 second average TTL */
 #define TTL_HEAP_MAX_SIZE 8192
 
 typedef struct swclt_ttl_node {
 	ks_time_t expiry;
-	swclt_cmd_t cmd;
+	ks_uuid_t id;
 } swclt_ttl_node_t;
 
 struct swclt_ttl_tracker {
@@ -36,6 +38,7 @@ struct swclt_ttl_tracker {
 	int count;
 	ks_cond_t *cond;
 	ks_thread_t *thread;
+	swclt_conn_t *conn;
 };
 
 #define TTL_HEAP_ROOT 0
@@ -55,8 +58,7 @@ static ks_status_t ttl_heap_remove(swclt_ttl_tracker_t *ttl)
 	if (ttl->count <= 0) {
 		return KS_STATUS_FAIL;
 	}
-	ttl->heap[TTL_HEAP_ROOT].expiry = 0;
-	ttl->heap[TTL_HEAP_ROOT].cmd = KS_NULL_HANDLE;
+	memset(&ttl->heap[TTL_HEAP_ROOT], 0, sizeof(ttl->heap[TTL_HEAP_ROOT]));
 	int pos = ttl->count;
 	ttl->count--;
 	ttl_heap_swap(ttl, pos, TTL_HEAP_ROOT);
@@ -77,9 +79,10 @@ static ks_status_t ttl_heap_remove(swclt_ttl_tracker_t *ttl)
 			break;
 		}
 	}
+	return KS_STATUS_SUCCESS;
 }
 
-static ks_status_t ttl_heap_insert(swclt_ttl_tracker_t *ttl, ks_time_t expiry, swclt_cmd_t cmd)
+static ks_status_t ttl_heap_insert(swclt_ttl_tracker_t *ttl, ks_time_t expiry, ks_uuid_t id)
 {
 	if (ttl->count >= TTL_HEAP_MAX_SIZE) {
 		return KS_STATUS_FAIL;
@@ -93,7 +96,7 @@ static ks_status_t ttl_heap_insert(swclt_ttl_tracker_t *ttl, ks_time_t expiry, s
 	int pos = ttl->count;
 	ttl->count++;
 	ttl->heap[pos].expiry = expiry;
-	ttl->heap[pos].cmd = cmd;
+	ttl->heap[pos].id = id;
 
 	// now sift up the value
 	while (pos > 0) {
@@ -105,15 +108,17 @@ static ks_status_t ttl_heap_insert(swclt_ttl_tracker_t *ttl, ks_time_t expiry, s
 			break;
 		}
 	}
+	return KS_STATUS_SUCCESS;
 }
 
-static ks_status_t ttl_tracker_watch(swclt_ttl_tracker_t *ttl, ks_time_t expiry, swclt_cmd_t cmd)
+static ks_status_t ttl_tracker_watch(swclt_ttl_tracker_t *ttl, ks_time_t expiry, ks_uuid_t id)
 {
 	ks_cond_lock(ttl->cond);
 	// need to wake thread if this TTL is before the next one
 	int wake_ttl_tracker_thread = !ttl->heap[TTL_HEAP_ROOT].expiry || ttl->heap[TTL_HEAP_ROOT].expiry > expiry;
-	if (ttl_heap_insert(ttl, expiry, cmd) != KS_STATUS_SUCCESS) {
+	if (ttl_heap_insert(ttl, expiry, id) != KS_STATUS_SUCCESS) {
 		ks_cond_unlock(ttl->cond);
+		ks_log(KS_LOG_ERROR, "Failed to track command %s TTL", ks_uuid_thr_str(&id));
 		return KS_STATUS_FAIL;
 	}
 	if (wake_ttl_tracker_thread) {
@@ -124,7 +129,7 @@ static ks_status_t ttl_tracker_watch(swclt_ttl_tracker_t *ttl, ks_time_t expiry,
 	return KS_STATUS_SUCCESS;
 }
 
-static ks_status_t ttl_tracker_next(swclt_ttl_tracker_t *ttl, swclt_cmd_t *cmd)
+static ks_status_t ttl_tracker_next(swclt_ttl_tracker_t *ttl, ks_uuid_t *id)
 {
 	ks_cond_lock(ttl->cond);
 	ks_time_t wait_ms = 0;
@@ -132,9 +137,11 @@ static ks_status_t ttl_tracker_next(swclt_ttl_tracker_t *ttl, swclt_cmd_t *cmd)
 
 	// how long to wait for next TTL expiration?
 	if (!ttl->heap[TTL_HEAP_ROOT].expiry) {
+		// nothing to wait for
 		wait_ms = 5000;
-	} else if (ttl->heap[TTL_HEAP_ROOT].expiry > now_ms) {
+	} else if (ttl->heap[TTL_HEAP_ROOT].expiry > now_ms) {		
 		wait_ms = ttl->heap[TTL_HEAP_ROOT].expiry - now_ms;
+		ks_log(KS_LOG_INFO, "Waiting %d for TTL expiration of %s", (uint32_t)wait_ms, ks_uuid_thr_str(&ttl->heap[TTL_HEAP_ROOT].id));
 	}
 
 	// wait for TTL
@@ -143,9 +150,9 @@ static ks_status_t ttl_tracker_next(swclt_ttl_tracker_t *ttl, swclt_cmd_t *cmd)
 	}
 
 	// check for TTL expiration
-	if (ttl->heap[TTL_HEAP_ROOT].expiry && ttl->heap[TTL_HEAP_ROOT].expiry < now_ms) {
+	if (ttl->heap[TTL_HEAP_ROOT].expiry && ttl->heap[TTL_HEAP_ROOT].expiry <= ks_time_now_ms()) {
 		// TTL expired
-		*cmd = ttl->heap[TTL_HEAP_ROOT].cmd;
+		*id = ttl->heap[TTL_HEAP_ROOT].id;
 		ttl_heap_remove(ttl);
 		ks_cond_unlock(ttl->cond);
 		return KS_STATUS_SUCCESS;
@@ -159,41 +166,50 @@ static ks_status_t ttl_tracker_next(swclt_ttl_tracker_t *ttl, swclt_cmd_t *cmd)
 static void *ttl_tracker_thread(ks_thread_t *thread, void *data)
 {
 	swclt_ttl_tracker_t *ttl = (swclt_ttl_tracker_t *)data;
+	ks_log(KS_LOG_INFO, "TTL tracker thread running");
 	while (ks_thread_stop_requested(thread) == KS_FALSE) {
-		swclt_cmd_t expired_cmd = KS_NULL_HANDLE;
-		if (ttl_tracker_next(ttl, &expired_cmd) == KS_STATUS_SUCCESS && expired_cmd != KS_NULL_HANDLE) {
-			ks_uuid_t id = { 0 };
-			if (swclt_cmd_id(expired_cmd, &id) == KS_STATUS_SUCCESS) {
-				swclt_cmd_report_failure_fmt_m(expired_cmd, KS_STATUS_TIMEOUT, "TTL expired for command %s", ks_uuid_thr_str(&id));
+		ks_uuid_t id = { 0 };
+		if (ttl_tracker_next(ttl, &id) == KS_STATUS_SUCCESS) {
+			swclt_cmd_t *cmd = NULL;
+			ks_hash_read_lock(ttl->conn->outstanding_requests);
+			if ((cmd = ks_hash_search(ttl->conn->outstanding_requests, &id, KS_UNLOCKED))) {
+				swclt_cmd_report_failure_fmt_m(*cmd, KS_STATUS_TIMEOUT, "TTL expired for command %s", ks_uuid_thr_str(&id));
+				ks_log(KS_LOG_INFO, "TTL expired for command %s", ks_uuid_thr_str(&id));
+				ks_hash_read_unlock(ttl->conn->outstanding_requests);
+			} else {
+				ks_hash_read_unlock(ttl->conn->outstanding_requests);
 			}
+			deregister_cmd(ttl->conn, id);
 		}
 	}
+	ks_log(KS_LOG_INFO, "TTL tracker thread finished");
 	return NULL;
 }
 
 static void ttl_tracker_destroy(swclt_ttl_tracker_t **ttl)
 {
 	if (ttl && *ttl) {
+		ks_log(KS_LOG_INFO, "Destroying TTL tracker");
 		if ((*ttl)->thread && ks_thread_request_stop((*ttl)->thread) != KS_STATUS_SUCCESS) {
 			*ttl = NULL;
 			ks_log(KS_LOG_ERROR, "Failed to stop TTL thread.  Leaking TTL data and moving on.");
 			return;
 		}
-		if ((*ttl)->thread && ks_thread_join((*ttl)->thread) != KS_STATUS_SUCCESS) {
-			ks_log(KS_LOG_ERROR, "Failed to join TTL thread.  Leaking TTL data and moving on.");
-			*ttl = NULL;
-			return;
-		}
+		ks_cond_lock((*ttl)->cond);
+		ks_cond_broadcast((*ttl)->cond);
+		ks_cond_unlock((*ttl)->cond);
+		ks_thread_destroy(&(*ttl)->thread);
 		ks_cond_destroy(&(*ttl)->cond);
 		ks_pool_free(ttl);
 	}
 }
 
-static void ttl_tracker_create(ks_pool_t *pool, swclt_ttl_tracker_t **ttl)
+static void ttl_tracker_create(ks_pool_t *pool, swclt_ttl_tracker_t **ttl, swclt_conn_t *ctx)
 {
 	ks_status_t status;
 	*ttl = ks_pool_alloc(pool, sizeof(swclt_ttl_tracker_t));
 	ks_cond_create(&(*ttl)->cond, pool);
+	(*ttl)->conn = ctx;
 	if (status = ks_thread_create(&(*ttl)->thread, ttl_tracker_thread, *ttl, NULL)) {
 		ks_abort_fmt("Failed to allocate connection TTL thread: %lu", status);
 	}
@@ -218,9 +234,9 @@ static ks_status_t register_cmd(swclt_conn_t *ctx, swclt_cmd_t cmd)
 	if (status = swclt_cmd_ttl(cmd, &ttl_ms))
 		return status;
 
-	ks_log(KS_LOG_DEBUG, "Tracking command handle: %16.16llx with id: %s", cmd, ks_uuid_thr_str(&id));
+	ks_log(KS_LOG_DEBUG, "Tracking command handle: %16.16llx with id: %s and TTL: %d", cmd, ks_uuid_thr_str(&id), ttl_ms);
 
-	if (!ctx->ttl || (status = ttl_tracker_watch(ctx->ttl, ttl_ms + ks_time_now_ms(), cmd))) {
+	if (!ctx->ttl || (status = ttl_tracker_watch(ctx->ttl, ks_time_now_ms() + (ks_time_t)ttl_ms, id))) {
 		ks_log(KS_LOG_ERROR, "Failed to track TTL for command: %16.16llx with id: %s and TTL: %d", cmd, ks_uuid_thr_str(&id), ttl_ms);
 		return status;
 	}
@@ -520,6 +536,9 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 			ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path, ctx->info.wss.connect_timeout_ms, ctx->info.wss.ssl))
 		return status;
 
+	/* Create TTL tracking thread */
+	ttl_tracker_create(ctx->pool, &ctx->ttl, ctx);
+
 	/* Now perform a logical connect to blade with the connect request */
 	if (status = do_logical_connect(ctx, previous_sessionid, authentication))
 		return status;
@@ -572,9 +591,6 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	new_conn->info.wss.ssl = (SSL_CTX *)ssl;
 	if (ident->path) strncpy(new_conn->info.wss.path, ident->path, sizeof(new_conn->info.wss.path));
 	new_conn->info.wss.connect_timeout_ms = 10000;
-
-	/* Create TTL tracking thread */
-	ttl_tracker_create(new_conn->pool, &new_conn->ttl);
 
 	/* Create our request hash */
 	if (status = ks_hash_create(&new_conn->outstanding_requests, KS_HASH_MODE_UUID,
