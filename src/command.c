@@ -74,8 +74,9 @@ static void __raise_callback(swclt_cmd_ctx_t *ctx)
 	if (cb)
 		cb(ctx->base.handle, cb_data);
 	swclt_cmd_ctx_lock(ctx);
+	if (!cb)
+		ks_cond_broadcast(ctx->cond);
 }
-
 
 static void __report_failure(const char *file, int line, const char *tag, swclt_cmd_ctx_t *ctx, ks_status_t failure_status, const char *failure_fmt, va_list *ap)
 {
@@ -742,6 +743,10 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_
 	/* Convert the frame to json */
 	ks_json_t *reply, *result, *error;
 
+	if (ctx->cb) {
+		*async = KS_TRUE;
+	}
+
 	if (ctx->type != SWCLT_CMD_TYPE_REQUEST) {
 		ks_log(KS_LOG_INFO, "Discarding reply - command %s has already been finalized", ks_uuid_thr_str(&ctx->id));
 		status = KS_STATUS_SUCCESS; // it is OK to continue
@@ -771,19 +776,13 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_
 		ctx->failure_reason = ks_pstrdup(ctx->base.pool, "The result did not contain an error or result key");
 	}
 
-	/* Command has completed, call the callback */
-	if (ctx->cb) {
-		*async = KS_TRUE;
-		__raise_callback(ctx);
-	}
-
 done:
 	if (status) {
 		/* Got an invalid frame, set ourselves to failure with
 		 * the status built in */
 		ctx->type = SWCLT_CMD_TYPE_FAILURE;
-		__raise_callback(ctx);
 	}
+	__raise_callback(ctx);
 
 	swclt_cmd_ctx_unlock(ctx);
 
