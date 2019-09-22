@@ -113,7 +113,7 @@ SWCLT_DECLARE(void) __swclt_hstate_changed(
 		ks_log(KS_LOG_WARNING, "State change [%s=>%s] denied, pending state change present [%s=>%s]",
 			swclt_hstate_str(ctx->state),
 			swclt_hstate_str(new_state),
-			swclt_hstate_str(ctx->pending_state_change_notification->new_state),
+			swclt_hstate_str(ctx->pending_state_change_notification->old_state),
 			swclt_hstate_str(ctx->pending_state_change_notification->new_state));
 
 		ks_debug_break();
