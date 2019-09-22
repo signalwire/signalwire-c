@@ -110,12 +110,11 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_request(swclt_cmd_t cmd, const ks_json_t 
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_id(swclt_cmd_t cmd, ks_uuid_t *id, const char *file, int line, const char *tag);
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_ttl(swclt_cmd_t cmd, uint32_t *response_ttl_ms, const char *file, int line, const char *tag);
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_set_ttl(swclt_cmd_t cmd, uint32_t response_ttl_ms, const char *file, int line, const char *tag);
-SWCLT_DECLARE(ks_status_t) __swclt_cmd_submit_time(swclt_cmd_t cmd, ks_time_t *submit_time, const char *file, int line, const char *tag);
-SWCLT_DECLARE(ks_status_t) __swclt_cmd_set_submit_time(swclt_cmd_t cmd, ks_time_t submit_time, const char *file, int line, const char *tag);
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_failure_info(swclt_cmd_t cmd, ks_status_t *failure_status, const char **failure_reason, const char *file, int line, const char *tag);
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_flags(swclt_cmd_t cmd, uint32_t *flags, const char *file, int line, const char *tag);
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_method(swclt_cmd_t cmd, const char **method, const char *file, int line, const char *tag);
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_frame_t *frame, ks_bool_t *async, const char *file, int line, const char *tag);
+SWCLT_DECLARE(ks_status_t) swclt_cmd_wait_result(swclt_cmd_t cmd);
 
 #define swclt_cmd_set_cb(cmd, cb, cb_data) __swclt_cmd_set_cb(cmd, cb, cb_data, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_cmd_cb(cmd, cb, cb_data) __swclt_cmd_cb(cmd, cb, cb_data, __FILE__, __LINE__, __PRETTY_FUNCTION__)
@@ -131,8 +130,6 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse_reply_frame(swclt_cmd_t cmd, swclt_
 #define swclt_cmd_id(cmd, id) __swclt_cmd_id(cmd, id, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_cmd_ttl(cmd, response_ttl_ms) __swclt_cmd_ttl(cmd, response_ttl_ms, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_cmd_set_ttl(cmd, response_ttl_ms) __swclt_cmd_set_ttl(cmd, response_ttl_ms, __FILE__, __LINE__, __PRETTY_FUNCTION__)
-#define swclt_cmd_submit_time(cmd, submit_time) __swclt_cmd_submit_time(cmd, submit_time, __FILE__, __LINE__, __PRETTY_FUNCTION__)
-#define swclt_cmd_set_submit_time(cmd, submit_time) __swclt_cmd_set_submit_time(cmd, submit_time, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_cmd_failure_info(cmd, failure_status, failure_reason) __swclt_cmd_failure_info(cmd, failure_status, failure_reason, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_cmd_flags(cmd, flags) __swclt_cmd_flags(cmd, flags, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_cmd_method(cmd, method) __swclt_cmd_method(cmd, method, __FILE__, __LINE__, __PRETTY_FUNCTION__)

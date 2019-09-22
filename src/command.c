@@ -24,6 +24,8 @@
 #include "signalwire-client-c/internal/command.h"
 #include "libks/ks_atomic.h"
 
+#define ks_time_now_ms() ks_time_ms(ks_time_now())
+
 static void __context_describe_locked(swclt_cmd_ctx_t *ctx, char *buffer, ks_size_t buffer_len)
 {
 	switch (ctx->type) {
@@ -192,6 +194,8 @@ static ks_status_t __context_init(swclt_cmd_ctx_t *ctx, swclt_cmd_cb_t cb, void 
 	/* We always start out as a request */
 	ctx->type = SWCLT_CMD_TYPE_REQUEST;
 
+	ks_cond_create(&ctx->cond, ctx->base.pool);
+
 	/* Now if they didn't specify anything its invalid, unless they're wanting to construct
 	 * from a frame */
 	if (!method || !request || !*request) {
@@ -224,6 +228,7 @@ static ks_status_t __context_init(swclt_cmd_ctx_t *ctx, swclt_cmd_cb_t cb, void 
 		return KS_STATUS_NO_MEM;
 
 	ctx->flags = flags;
+
 	return KS_STATUS_SUCCESS;
 }
 
@@ -235,6 +240,7 @@ static void __context_deinit(swclt_cmd_ctx_t *ctx)
 	ks_json_delete(&ctx->reply.error);
 	ks_pool_free(&ctx->failure_summary);
 	ks_pool_free(&ctx->failure_reason);
+	ks_cond_destroy(&ctx->cond);
 }
 
 static ks_json_t * __wrap_jsonrpc(swclt_cmd_ctx_t *ctx, const char *version,
@@ -492,17 +498,6 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_print(swclt_cmd_t cmd, ks_pool_t *pool, c
 	SWCLT_CMD_SCOPE_END_TAG(cmd, ctx, status, file, line, tag);
 }
 
-SWCLT_DECLARE(ks_status_t) __swclt_cmd_set_submit_time(swclt_cmd_t cmd, ks_time_t submit_time, const char *file, int line, const char *tag)
-{
-	SWCLT_CMD_SCOPE_BEG_TAG(cmd, ctx, status, file, line, tag);
-
-	swclt_cmd_ctx_lock(ctx);
-	ctx->submit_time = submit_time;
-	swclt_cmd_ctx_unlock(ctx);
-
-	SWCLT_CMD_SCOPE_END_TAG(cmd, ctx, status, file, line, tag);
-}
-
 SWCLT_DECLARE(ks_status_t) __swclt_cmd_set_cb(swclt_cmd_t cmd, swclt_cmd_cb_t cb, void *cb_data, const char *file, int line, const char *tag)
 {
 	SWCLT_CMD_SCOPE_BEG_TAG(cmd, ctx, status, file, line, tag);
@@ -532,17 +527,6 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_ttl(swclt_cmd_t cmd, uint32_t *response_t
 
 	swclt_cmd_ctx_lock(ctx);
 	*response_ttl_ms = ctx->response_ttl_ms;
-	swclt_cmd_ctx_unlock(ctx);
-
-	SWCLT_CMD_SCOPE_END_TAG(cmd, ctx, status, file, line, tag);
-}
-
-SWCLT_DECLARE(ks_status_t) __swclt_cmd_submit_time(swclt_cmd_t cmd, ks_time_t *submit_time, const char *file, int line, const char *tag)
-{
-	SWCLT_CMD_SCOPE_BEG_TAG(cmd, ctx, status, file, line, tag);
-
-	swclt_cmd_ctx_lock(ctx);
-	*submit_time = ctx->submit_time;
 	swclt_cmd_ctx_unlock(ctx);
 
 	SWCLT_CMD_SCOPE_END_TAG(cmd, ctx, status, file, line, tag);
@@ -793,6 +777,63 @@ done:
 	swclt_cmd_ctx_unlock(ctx);
 
 	SWCLT_CMD_SCOPE_END_TAG(cmd, ctx, status, file, line, tag);
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_cmd_wait_result(swclt_cmd_t cmd)
+{
+	SWCLT_CMD_SCOPE_BEG(cmd, ctx, status);
+
+	swclt_cmd_ctx_lock(ctx);
+
+	uint32_t ttl_ms, duration_total_ms;
+	ks_time_t start_ms;
+
+	ks_assert(ctx->response_ttl_ms >= 1000);
+	ttl_ms = ctx->response_ttl_ms;
+	start_ms = ks_time_now_ms();
+	while (KS_TRUE) {
+		switch (ctx->type) {
+			case SWCLT_CMD_TYPE_ERROR:
+			case SWCLT_CMD_TYPE_RESULT:
+				goto done;
+
+			case SWCLT_CMD_TYPE_REQUEST:
+				break;
+
+			case SWCLT_CMD_TYPE_FAILURE:
+				ks_log(KS_LOG_WARNING, "Command failure", status);
+				goto done;
+			default:
+				ks_abort_fmt("Invalid command type: %lu", ctx->type);
+		}
+
+		if (status = ks_cond_timedwait(ctx->cond, ttl_ms + 200)) {
+			if (status != KS_STATUS_TIMEOUT) {
+				ks_log(KS_LOG_WARNING, "Condition wait failed: %lu", status);
+				break;
+			}
+		}
+
+		/* Update remaining and figure out if we've timed out */
+		duration_total_ms = (uint32_t)(ks_time_now_ms() - start_ms);
+		if (duration_total_ms >= ttl_ms) {
+			swclt_cmd_report_failure_fmt_m(cmd, KS_STATUS_TIMEOUT, "TTL expired for command: %s (ttl_ms: %lu)", ctx->method, ctx->response_ttl_ms);
+
+			/* Return success, error is really within the cmd */
+			status = KS_STATUS_SUCCESS;
+			break;
+		}
+
+		ttl_ms -= duration_total_ms;
+	}
+
+done:
+
+	swclt_cmd_ctx_unlock(ctx);
+
+	SWCLT_CMD_SCOPE_END(cmd, ctx, status);
+
+	return status;
 }
 
 /* For Emacs:

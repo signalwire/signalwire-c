@@ -24,6 +24,8 @@
 
 KS_BEGIN_EXTERN_C
 
+typedef struct swclt_ttl_tracker swclt_ttl_tracker_t;
+
 typedef struct swclt_conn swclt_conn_t;
 
 typedef ks_status_t (*swclt_conn_incoming_cmd_cb_t)(swclt_conn_t *conn, swclt_cmd_t cmd, void *cb_data);
@@ -70,11 +72,14 @@ struct swclt_conn {
 	/* The result of our last connect, kept around for reference */
 	blade_connect_rpl_t *blade_connect_rpl;
 
-	/* A hash of oustanding commands, keyed by their request ids.
+	/* A hash of outstanding commands, keyed by their request ids.
 	 * This is the outgoing queue for requests born from the client or
 	 * requests which have been sent from blade. Since the uuids are
 	 * globally unique we can just use one hash for both */
 	ks_hash_t *outstanding_requests;
+
+	/* TTLs to expire */
+	swclt_ttl_tracker_t *ttl;
 
 	/* The outstanding condition is signalled anytime a command in the outstanding
 	 * requests hash parses a result. Client readers wait on this condition until
