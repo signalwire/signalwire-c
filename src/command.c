@@ -131,7 +131,7 @@ static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t *fra
 	/* Grab the json out of the frame, but don't copy it yet, we'll slice off just
 	 * the params portion */
 	if (status = swclt_frame_to_json(frame, ctx->base.pool, &original_json)) {
-		//ks_log(KS_LOG_CRIT, "Received invalid frame: %s", ks_handle_describe(frame));
+		ks_log(KS_LOG_CRIT, "Received invalid frame for command %s", ks_uuid_thr_str(&ctx->id));
 		return status;
 	}
 
@@ -142,23 +142,23 @@ static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t *fra
 	/* Now load the id, method, and verify it has at least a params structure in it as
 	 * well as the jsonrpc tag */
 	if (!(method = ks_json_get_object_cstr_def(original_json, "method", NULL))) {
-		//ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no method field present: %s", ks_handle_describe(frame));
+		ks_log(KS_LOG_WARNING, "Invalid frame given to command %s construction, no method field present", ks_uuid_thr_str(&ctx->id));
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
 	}
 	if (!(ctx->request = ks_json_get_object_item(original_json, "params"))) {
-		//ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no params field present: %s", ks_handle_describe(frame));
+		ks_log(KS_LOG_WARNING, "Invalid frame given to command %s construction, no params field present", ks_uuid_thr_str(&ctx->id));
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
 	}
 	if (!(jsonrpc = ks_json_get_object_cstr_def(original_json, "jsonrpc", NULL))) {
-		//ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no jsonrpc field present: %s", ks_handle_describe(frame));
+		ks_log(KS_LOG_WARNING, "Invalid frame given to command %s construction, no jsonrpc field present", ks_uuid_thr_str(&ctx->id));
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
 	}
 	ctx->id = ks_json_get_object_uuid(original_json, "id");
 	if (ks_uuid_is_null(&ctx->id)) {
-		//ks_log(KS_LOG_WARNING, "Invalid frame given to command construction, no id (or null id) field: %s", ks_handle_describe(frame));
+		ks_log(KS_LOG_WARNING, "Invalid frame given to command %s construction, no id (or null id) field", ks_uuid_thr_str(&ctx->id));
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
 	}
@@ -176,7 +176,7 @@ static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t *fra
 	/* We just need the request portion, dupe just that, leave the rest in ownership
 	 * of the frame */
 	if (!(ctx->request = ks_json_pduplicate(ctx->base.pool, ks_json_lookup(original_json, 1, "params"), KS_TRUE))) {
-		//ks_log(KS_LOG_CRIT, "Failed to allocate json request from frame: %s", ks_handle_describe(frame));
+		ks_log(KS_LOG_CRIT, "Failed to allocate json request from command %s frame", ks_uuid_thr_str(&ctx->id));
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
 	}
@@ -208,7 +208,7 @@ static ks_status_t __context_init(swclt_cmd_ctx_t *ctx, swclt_cmd_cb_t cb, void 
 		if (frame) {
 			return __context_init_frame(ctx, frame);
 		}
-		//ks_log(KS_LOG_CRIT, "Context init failed invalid arguments: %s", ks_handle_describe(frame));
+		ks_log(KS_LOG_CRIT, "Command %s init failed invalid arguments", ks_uuid_thr_str(&uuid));
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
 

@@ -48,6 +48,9 @@ struct swclt_ttl_tracker {
 
 inline static void ttl_heap_swap(swclt_ttl_tracker_t *ttl, int pos1, int pos2)
 {
+	if (pos1 == pos2) {
+		return;
+	}
 	swclt_ttl_node_t tmp = ttl->heap[pos1];
 	ttl->heap[pos1] = ttl->heap[pos2];
 	ttl->heap[pos2] = tmp;
@@ -58,8 +61,9 @@ static ks_status_t ttl_heap_remove(swclt_ttl_tracker_t *ttl)
 	if (ttl->count <= 0) {
 		return KS_STATUS_FAIL;
 	}
+	// clear entry at root and swap with last entry
 	memset(&ttl->heap[TTL_HEAP_ROOT], 0, sizeof(ttl->heap[TTL_HEAP_ROOT]));
-	int pos = ttl->count;
+	int pos = ttl->count - 1;
 	ttl->count--;
 	ttl_heap_swap(ttl, pos, TTL_HEAP_ROOT);
 
@@ -147,10 +151,11 @@ static ks_status_t ttl_tracker_next(swclt_ttl_tracker_t *ttl, ks_uuid_t *id)
 	// wait for TTL
 	if (wait_ms) {
 		ks_cond_timedwait(ttl->cond, wait_ms);
+		now_ms = ks_time_now_ms();
 	}
 
 	// check for TTL expiration
-	if (ttl->heap[TTL_HEAP_ROOT].expiry && ttl->heap[TTL_HEAP_ROOT].expiry <= ks_time_now_ms()) {
+	if (ttl->heap[TTL_HEAP_ROOT].expiry && ttl->heap[TTL_HEAP_ROOT].expiry <= now_ms) {
 		// TTL expired
 		*id = ttl->heap[TTL_HEAP_ROOT].id;
 		ttl_heap_remove(ttl);
