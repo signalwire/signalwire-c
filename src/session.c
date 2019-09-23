@@ -1091,9 +1091,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-
-		/* Parent it to connection for safe guard */
-		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1159,9 +1156,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-
-		/* Parent it to connection for safe guard */
-		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1248,9 +1242,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-
-		/* Parent it to connection for safe guard */
-		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1307,9 +1298,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-
-		/* Parent it to connection for safe guard */
-		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1367,9 +1355,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-
-		/* Parent it to connection for safe guard */
-		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1427,7 +1412,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1493,7 +1477,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-		//ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1502,9 +1485,6 @@ done:
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
-
-// @todo everything below here is high level supporting stuff related to future IDL templates
-// and should probably be moved to it's own separate file for each protocol supported
 
 // signalwire consumer
 
