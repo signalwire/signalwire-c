@@ -99,7 +99,7 @@ static ks_status_t ttl_heap_insert(swclt_ttl_tracker_t *ttl, ks_time_t expiry, k
 	ttl->heap[pos].id = id;
 
 	// now sift up the value
-	while (pos > 0) {
+	while (pos > TTL_HEAP_ROOT) {
 		int parent = TTL_HEAP_PARENT(pos);
 		if (ttl->heap[parent].expiry > expiry) {
 			ttl_heap_swap(ttl, parent, pos);
