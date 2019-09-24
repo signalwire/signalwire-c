@@ -29,19 +29,38 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, void *
 	return KS_STATUS_SUCCESS;
 }
 
-static void __on_protocol_response(swclt_cmd_t cmd, void *cb_data)
+static void __on_protocol_timeout_response(swclt_cmd_t cmd, void *cb_data)
 {
+	ks_status_t failure_status;
+	const char *failure_message;
+	SWCLT_CMD_TYPE cmd_type;
+	REQUIRE(ks_handle_valid(cmd));
+	REQUIRE(!swclt_cmd_type(cmd, &cmd_type));
+	REQUIRE(cmd_type == SWCLT_CMD_TYPE_FAILURE);
+	REQUIRE(!swclt_cmd_failure_info(cmd, &failure_status, &failure_message));
+	REQUIRE(failure_status == KS_STATUS_TIMEOUT);
+	printf("Validated failure code, message: %s\n", failure_message);
+	g_protocol_response_cb_called++;
+}
+
+static void __on_protocol_result_response(swclt_cmd_t cmd, void *cb_data)
+{
+	const ks_json_t *result;
+	SWCLT_CMD_TYPE cmd_type;
+	REQUIRE(ks_handle_valid(cmd));
+	REQUIRE(!swclt_cmd_type(cmd, &cmd_type));
+	REQUIRE(cmd_type == SWCLT_CMD_TYPE_RESULT);
+	REQUIRE(!swclt_cmd_result(cmd, &result));
 	g_protocol_response_cb_called++;
 }
 
 void test_async(ks_pool_t *pool)
 {
+	swclt_cmd_t cmd;
 	SSL_CTX *ssl = create_ssl_context();
 	swclt_conn_t *conn;
-	swclt_cmd_t cmd;
-	SWCLT_CMD_TYPE cmd_type;
-	const ks_json_t *result;
 	ks_json_t *channels;
+	int i;
 
 	REQUIRE(!swclt_conn_connect(pool, &conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, ssl));
 
@@ -49,7 +68,7 @@ void test_async(ks_pool_t *pool)
 
 	/* Create an async command (bogus command but will generate a reply at least) */
 	REQUIRE(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
-			__on_protocol_response,
+			__on_protocol_result_response,
 			NULL,
 			"a_protocol",
 			0,
@@ -64,27 +83,11 @@ void test_async(ks_pool_t *pool)
 	REQUIRE(!swclt_conn_submit_request(conn, cmd));
 
 	/* Wait for it to respond */
-	while (KS_TRUE) {
-
-		REQUIRE(!swclt_cmd_type(cmd, &cmd_type));
-
-		if (cmd_type != SWCLT_CMD_TYPE_REQUEST) {
-			break;
-		}
-
+	for (i = 0; i < 5 && g_protocol_response_cb_called == 0; i++) {
 		ks_sleep_ms(1000);
 	}
-
-	REQUIRE(cmd_type == SWCLT_CMD_TYPE_RESULT);
-	REQUIRE(!swclt_cmd_result(cmd, &result));
 	REQUIRE(g_protocol_response_cb_called == 1);
-
-	REQUIRE(ks_handle_valid(cmd));
-
 	swclt_conn_destroy(&conn);
-
-	/* Command should become invalid once we destroy the connection */
-	REQUIRE(!ks_handle_valid(cmd));
 	swclt_ssl_destroy_context(&ssl);
 }
 
@@ -96,14 +99,17 @@ void test_ttl(ks_pool_t *pool)
 	SWCLT_CMD_TYPE cmd_type;
 	swclt_cmd_ctx_t *cmd_ctx;
 	ks_json_t *channels;
+	int i;
+
+	g_protocol_response_cb_called = 0;
 
 	REQUIRE(!swclt_conn_connect(pool, &conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, ssl));
 
-	channels = ks_json_create_array_inline(1, BLADE_CHANNEL_MARSHAL(pool, &(blade_channel_t){"a_channel", 0, 0}));
+	channels = ks_json_create_array_inline(1, BLADE_CHANNEL_MARSHAL(conn->pool, &(blade_channel_t){"b_channel", 0, 0}));
 	REQUIRE(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
-			__on_protocol_response,
+			__on_protocol_timeout_response,
 			NULL,
-			"a_protocol",
+			"b_protocol",
 			0,
 			0,
 			0,
@@ -117,41 +123,22 @@ void test_ttl(ks_pool_t *pool)
 	REQUIRE(cmd_ctx->response_ttl_ms == BLADE_PROTOCOL_TTL_MS);
 	REQUIRE(cmd_ctx->flags == BLADE_PROTOCOL_FLAGS);
 	REQUIRE(!ks_mutex_lock(conn->wss->write_mutex));
+	cmd_put(&cmd_ctx);
 
 	/* And submit it */
 	REQUIRE(!swclt_conn_submit_request(conn, cmd));
 
-	/* Give it 4 seconds */
-	ks_sleep_ms(4000);
-
-	{
-		ks_status_t failure_status;
-		const char *failure_message;
-
-		/* Better have failed */
-		REQUIRE(!swclt_cmd_type(cmd, &cmd_type));
-
-		REQUIRE(cmd_type == SWCLT_CMD_TYPE_FAILURE);
-		REQUIRE(!swclt_cmd_failure_info(cmd, &failure_status, &failure_message));
-
-		/* One for this test, and the one prior */
-		REQUIRE(g_protocol_response_cb_called == 2);
-
-		REQUIRE(failure_status == KS_STATUS_TIMEOUT);
-		printf("Validated failure code, message: %s\n", failure_message);
+	/* Wait for it to respond */
+	for (i = 0; i < 7 && g_protocol_response_cb_called == 0; i++) {
+		ks_sleep_ms(1000);
 	}
+
+	REQUIRE(g_protocol_response_cb_called == 1);
 
 	/* Don't forget to unlock the poor websocket reader */
 	REQUIRE(!ks_mutex_unlock(conn->wss->write_mutex));
 
-	cmd_put(&cmd_ctx);
-
-	REQUIRE(ks_handle_valid(cmd));
-
 	swclt_conn_destroy(&conn);
-
-	/* Command should become invalid once we destroy the connection */
-	REQUIRE(!ks_handle_valid(cmd));
 	swclt_ssl_destroy_context(&ssl);
 }
 

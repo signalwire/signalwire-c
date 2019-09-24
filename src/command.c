@@ -127,6 +127,7 @@ static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t *fra
 	const char *method, *jsonrpc;
 	ks_json_t *original_json;
 	ks_status_t status;
+	ks_json_t *params;
 
 	/* Grab the json out of the frame, but don't copy it yet, we'll slice off just
 	 * the params portion */
@@ -146,7 +147,7 @@ static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t *fra
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
 	}
-	if (!(ctx->request = ks_json_get_object_item(original_json, "params"))) {
+	if (!(params = ks_json_get_object_item(original_json, "params"))) {
 		ks_log(KS_LOG_WARNING, "Invalid frame given to command %s construction, no params field present", ks_uuid_thr_str(&ctx->id));
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
@@ -175,7 +176,7 @@ static ks_status_t __context_init_frame(swclt_cmd_ctx_t *ctx, swclt_frame_t *fra
 
 	/* We just need the request portion, dupe just that, leave the rest in ownership
 	 * of the frame */
-	if (!(ctx->request = ks_json_pduplicate(ctx->base.pool, ks_json_lookup(original_json, 1, "params"), KS_TRUE))) {
+	if (!(ctx->request = ks_json_pduplicate(ctx->base.pool, params, KS_TRUE))) {
 		ks_log(KS_LOG_CRIT, "Failed to allocate json request from command %s frame", ks_uuid_thr_str(&ctx->id));
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
@@ -242,7 +243,7 @@ static void __context_deinit(swclt_cmd_ctx_t *ctx)
 {
 	ks_pool_free(&ctx->method);
 	ks_pool_free(&ctx->id_str);
-	ks_json_delete((ks_json_t **)&ctx->request);
+	ks_json_delete(&ctx->request);
 	ks_json_delete(&ctx->reply.error);
 	ks_pool_free(&ctx->failure_summary);
 	ks_pool_free(&ctx->failure_reason);
