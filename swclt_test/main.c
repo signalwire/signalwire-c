@@ -21,10 +21,7 @@
  */
 #include "swclt_test.h"
 
-DECLARE_TEST(hmanager);
 DECLARE_TEST(json);
-DECLARE_TEST(frame);
-DECLARE_TEST(websocket);
 DECLARE_TEST(command);
 DECLARE_TEST(execute);
 DECLARE_TEST(connection);
@@ -34,10 +31,7 @@ DECLARE_TEST(callback);
 DECLARE_TEST(uncert_exp);
 
 test_entry_t g_test_methods[] = {
-	TEST_ENTRY(hmanager),
 	TEST_ENTRY(json),
-	TEST_ENTRY(frame),
-	TEST_ENTRY(websocket),
 	TEST_ENTRY(command),
 	TEST_ENTRY(execute),
 	TEST_ENTRY(connection),
