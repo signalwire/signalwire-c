@@ -879,8 +879,10 @@ static ks_status_t __update_protocol_provider_remove(swclt_store_ctx_t *ctx, bla
 
 	if (cleanup) {
 		// cleanup protocol if no providers left
-		ks_hash_remove(ctx->protocols, (const void *)protocol->name);
-		__invoke_cb_protocol_remove(ctx, protocol->name);
+		char *protocol_name = ks_pstrdup(ctx->base.pool, protocol->name);
+		ks_hash_remove(ctx->protocols, (const void *)protocol->name); // now destroy it...
+		__invoke_cb_protocol_remove(ctx, protocol_name);
+		ks_pool_free(&protocol_name);
 	}
 
 done:
