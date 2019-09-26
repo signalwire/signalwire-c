@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -144,7 +144,7 @@ static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD_ASYNC(
 		*authentication = NULL;
 	}
 
-	if (!(obj = BLADE_CONNECT_RQU_MARSHAL(pool, connect_rqu)))
+	if (!(obj = BLADE_CONNECT_RQU_MARSHAL(connect_rqu)))
 		goto done;
 
 	if (swclt_cmd_create_ex(

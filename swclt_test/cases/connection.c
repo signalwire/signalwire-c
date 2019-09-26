@@ -45,7 +45,7 @@ static void __on_protocol_timeout_response(swclt_cmd_t cmd, void *cb_data)
 
 static void __on_protocol_result_response(swclt_cmd_t cmd, void *cb_data)
 {
-	const ks_json_t *result;
+	ks_json_t *result;
 	SWCLT_CMD_TYPE cmd_type;
 	REQUIRE(ks_handle_valid(cmd));
 	REQUIRE(!swclt_cmd_type(cmd, &cmd_type));
@@ -64,7 +64,8 @@ void test_async(ks_pool_t *pool)
 
 	REQUIRE(!swclt_conn_connect(pool, &conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, ssl));
 
-	channels = ks_json_create_array_inline(1, BLADE_CHANNEL_MARSHAL(pool, &(blade_channel_t){"a_channel", 0, 0}));
+	channels = ks_json_create_array();
+	ks_json_add_item_to_array(channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"a_channel", 0, 0}));
 
 	/* Create an async command (bogus command but will generate a reply at least) */
 	REQUIRE(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
@@ -105,7 +106,8 @@ void test_ttl(ks_pool_t *pool)
 
 	REQUIRE(!swclt_conn_connect(pool, &conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, ssl));
 
-	channels = ks_json_create_array_inline(1, BLADE_CHANNEL_MARSHAL(conn->pool, &(blade_channel_t){"b_channel", 0, 0}));
+	channels = ks_json_create_array();
+	ks_json_add_item_to_array(channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"b_channel", 0, 0}));
 	REQUIRE(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 			__on_protocol_timeout_response,
 			NULL,

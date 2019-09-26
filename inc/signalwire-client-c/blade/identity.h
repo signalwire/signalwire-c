@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -76,20 +76,14 @@ static inline swclt_cmd_t __CREATE_BLADE_IDENTITY_CMD_ASYNC(
 		return cmd;
 
 	/* Serialize the identity into an array */
-	if (!(identities = __ks_json_create_array_inline(
-			pool,
-		   	file,
-		   	line,
-		   	tag,
-		   	1,
-		   	ks_json_create_string(identity)))) {
-		ks_log(KS_LOG_WARNING, "Failed to marshal blade identity");
+	if (!(identities = ks_json_create_array())) {
+		ks_log(KS_LOG_WARNING, "Failed to allocate blade identity array");
 		ks_pool_close(&pool);
 		return cmd;
 	}
+	ks_json_add_string_to_array(identities, identity);
 
 	if (!(request = BLADE_IDENTITY_RQU_MARSHAL(
-			pool,
 			&(blade_identity_rqu_t){
 				BLADE_IDENTITY_CMD_ADD,
 				identities}))) {

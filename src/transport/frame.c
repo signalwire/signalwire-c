@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,41 +23,14 @@
 #include "signalwire-client-c/client.h"
 
 
-static ks_status_t __to_json(swclt_frame_t *frame, ks_pool_t *pool, ks_json_t **json)
+static ks_status_t __to_json(swclt_frame_t *frame, ks_json_t **json)
 {
-	if (!(*json = ks_json_pparse(pool, frame->data))) {
+	if (!(*json = ks_json_parse(frame->data))) {
 		ks_log(KS_LOG_WARNING, "Failed to parse json");
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
 
 	return KS_STATUS_SUCCESS;
-}
-
-static ks_status_t __to_json_lookup(swclt_frame_t *frame, ks_pool_t *pool, ks_json_t **json, uint32_t components, va_list args)
-{
-	ks_json_t *item = NULL;
-	ks_status_t status = KS_STATUS_SUCCESS;
-	ks_json_t *frame_json = NULL;
-
-	if (status = __to_json(frame, pool, &frame_json)) {
-		return status;
-	}
-
-	/* Do the lookup within our json object and duplicate it for them */
-	if (!(item = ks_json_valookup(frame_json, components, args))) {
-		status = KS_STATUS_NOT_FOUND;
-		goto done;
-	}
-
-	/* Found it so now dupe it for them */
-	if (!(*json = ks_json_pduplicate(pool, item, KS_TRUE))) {
-		status = KS_STATUS_NO_MEM;
-		goto done;
-	}
-
-done:
-	ks_json_delete(&frame_json);
-	return status;
 }
 
 static ks_status_t __copy_data(swclt_frame_t *frame, ks_pool_t *pool, void *data, ks_size_t len, kws_opcode_t opcode)
@@ -105,19 +78,9 @@ SWCLT_DECLARE(ks_status_t) swclt_frame_alloc(swclt_frame_t **frame, ks_pool_t *p
  * swclt_frame_to_json - Converts the json in the frame, and returns a copy which
  * the owner must release.
  */
-SWCLT_DECLARE(ks_status_t) swclt_frame_to_json(swclt_frame_t *frame, ks_pool_t *pool, ks_json_t **json)
+SWCLT_DECLARE(ks_status_t) swclt_frame_to_json(swclt_frame_t *frame, ks_json_t **json)
 {
-	return __to_json(frame, pool, json);
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_frame_to_json_lookup(swclt_frame_t *frame, ks_pool_t *pool, ks_json_t **json, int components, ...)
-{
-	ks_status_t status;
-	va_list ap;
-	va_start(ap, components);
-	status = __to_json_lookup(frame, pool, json, components, ap);
-	va_end(ap);
-	return status;
+	return __to_json(frame, json);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_frame_copy_data(swclt_frame_t *frame, ks_pool_t *pool, void *data, ks_size_t len, kws_opcode_t opcode)

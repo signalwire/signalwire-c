@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -143,9 +143,9 @@ static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
 		return status;
 
 	request = ks_json_create_object();
-	if (responder) ks_json_padd_string_to_object(pool, request, "responder_nodeid", responder);
-	ks_json_padd_string_to_object(pool, request, "protocol", protocol);
-	ks_json_padd_string_to_object(pool, request, "method", method);
+	if (responder) ks_json_add_string_to_object(request, "responder_nodeid", responder);
+	ks_json_add_string_to_object(request, "protocol", protocol);
+	ks_json_add_string_to_object(request, "method", method);
 	ks_json_add_item_to_object(request, "params", *params);
 
 	/* Clear callers ptr */

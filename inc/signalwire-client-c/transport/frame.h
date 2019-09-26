@@ -35,8 +35,7 @@ KS_BEGIN_EXTERN_C
 
 SWCLT_DECLARE(ks_status_t) swclt_frame_alloc(swclt_frame_t **frame, ks_pool_t *pool);
 
-SWCLT_DECLARE(ks_status_t) swclt_frame_to_json(swclt_frame_t *frame, ks_pool_t *pool, ks_json_t **json);
-SWCLT_DECLARE(ks_status_t) swclt_frame_to_json_lookup(swclt_frame_t *frame, ks_pool_t *pool, ks_json_t **json, int components, ...);
+SWCLT_DECLARE(ks_status_t) swclt_frame_to_json(swclt_frame_t *frame, ks_json_t **json);
 
 SWCLT_DECLARE(ks_status_t) swclt_frame_copy_data(swclt_frame_t *frame, ks_pool_t *pool, void *data, ks_size_t len, kws_opcode_t opcode);
 SWCLT_DECLARE(ks_status_t) swclt_frame_get_data(swclt_frame_t *frame, void **data, ks_size_t *len, kws_opcode_t *opcode);

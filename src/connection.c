@@ -333,12 +333,12 @@ static ks_status_t on_incoming_request(swclt_conn_t *ctx, ks_json_t *payload, sw
 
 	ks_log(KS_LOG_DEBUG, "Handling incoming request: %s", (*frame)->data);
 
-	if (!(method = ks_json_get_object_cstr_def(payload, "method", NULL))) {
+	if (!(method = ks_json_get_object_string(payload, "method", NULL))) {
 		ks_log(KS_LOG_WARNING, "Invalid response received: %s", (*frame)->data);
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
 
-	id = ks_json_get_object_uuid(payload, "id");
+	id = ks_uuid_from_str(ks_json_get_object_string(payload, "id", ""));
 	if (ks_uuid_is_null(&id)) {
 		ks_log(KS_LOG_WARNING, "Response missing id: %s", (*frame)->data);
 		return KS_STATUS_INVALID_ARGUMENT;
@@ -377,7 +377,7 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 	ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", (*frame)->data);
 
 	/* Parse the json out of the frame to figure out what it is */
-	if (status = swclt_frame_to_json(*frame, ctx->pool, &payload)) {
+	if (status = swclt_frame_to_json(*frame, &payload)) {
 		ks_log(KS_LOG_ERROR, "Failed to get frame json: %lu", status);
 		goto done;
 	}
@@ -390,7 +390,7 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 	}
 
 	/* Must be a reply, look up our outstanding request */
-	id = ks_json_get_object_uuid(payload, "id");
+	id = ks_uuid_from_str(ks_json_get_object_string(payload, "id", ""));
 	if (ks_uuid_is_null(&id)) {
 		ks_log(KS_LOG_WARNING, "Received invalid payload, missing id: %s", (*frame)->data);
 		status = KS_STATUS_INVALID_ARGUMENT;
@@ -434,7 +434,7 @@ done:
 	ks_pool_free(frame);
 
 	if (payload) {
-		ks_json_free(&payload);
+		ks_json_delete(&payload);
 	}
 
 	if (async) {
@@ -473,14 +473,14 @@ static ks_status_t do_logical_connect(swclt_conn_t *ctx, ks_uuid_t previous_sess
 		goto done;
 	}
 	if (cmd_type == SWCLT_CMD_TYPE_ERROR) {
-		if (status = swclt_cmd_error(cmd, (const ks_json_t **)&error)) {
+		if (status = swclt_cmd_error(cmd, &error)) {
 			ks_log(KS_LOG_ERROR, "Unable to get command error");
 		}
 		goto done;
 	}
 	
-	if (status = swclt_cmd_lookup_parse_s(cmd, ctx->pool,
-										  (swclt_cmd_parse_cb_t)BLADE_CONNECT_RPL_PARSE, (void **)&ctx->blade_connect_rpl)) {
+	if (status = swclt_cmd_parse(cmd, ctx->pool,
+								  (swclt_cmd_parse_cb_t)BLADE_CONNECT_RPL_PARSE, (void **)&ctx->blade_connect_rpl)) {
 		ks_log(KS_LOG_ERROR, "Unable to parse connect reply");
 		goto done;
 	}

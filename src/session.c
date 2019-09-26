@@ -148,7 +148,6 @@ static ks_status_t __execute_pmethod_cb(
 		ks_log(KS_LOG_ERROR, err_message);
 
 		ks_json_t *err = BLADE_EXECUTE_ERR_MARSHAL(
-					cmd_ctx->base.pool,
 					&(blade_execute_err_t){
 						rqu->requester_nodeid,
 						rqu->responder_nodeid,
@@ -324,7 +323,7 @@ static ks_status_t __on_connect_reply(swclt_conn_t *conn, ks_json_t *error, cons
 {
 	ks_status_t status = KS_STATUS_FAIL;
 
-	if (error && ks_json_get_object_number_int_def(error, "code", 0) == -32002) {
+	if (error && ks_json_get_object_number_int(error, "code", 0) == -32002) {
 		if (ctx->auth_failed_cb) ctx->auth_failed_cb(ctx->base.handle);
 	}
 
@@ -1520,8 +1519,8 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 
 	pool = ks_handle_pool(sess);
 
-	params = ks_json_pcreate_object(pool);
-	ks_json_padd_string_to_object(pool, params, "service", service);
+	params = ks_json_create_object();
+	ks_json_add_string_to_object(params, "service", service);
 
 	// Send the setup request syncronously, if it fails bail out
 	if (status = swclt_sess_execute(sess,
@@ -1556,7 +1555,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 	}
 
 	// Make sure we actually get a result to look at
-	if (status = swclt_cmd_result(cmd, (const ks_json_t **)&result)) {
+	if (status = swclt_cmd_result(cmd, &result)) {
 		ks_log(KS_LOG_ERROR, "Setup for '%s' response has no result: %d", service, status);
 		goto done;
 	}
@@ -1570,7 +1569,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 	}
 
 	// Get protocol from result, duplicate it so we can destroy the command
-	protocol = ks_json_get_object_cstr_def(result, "protocol", NULL);
+	protocol = ks_json_get_object_string(result, "protocol", NULL);
 	if (protocol) protocol = ks_pstrdup(ks_handle_pool(sess), protocol);
 
 	if (!protocol) {
@@ -1632,7 +1631,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 	}
 
 	// Make sure we actually get a result to look at
-	if (status = swclt_cmd_result(cmd, (const ks_json_t **)&result)) {
+	if (status = swclt_cmd_result(cmd, &result)) {
 		ks_log(KS_LOG_ERROR, "Setup for '%s', subscription add response has no result: %d", service, status);
 		goto done;
 	}
@@ -1645,6 +1644,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 done:
 	if (protocol) ks_pool_free(&protocol);
 	if (ks_handle_valid(cmd)) ks_handle_destroy(&cmd);
+	if (params) ks_json_delete(&params);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
@@ -1709,12 +1709,12 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t 
 		goto done;
 	}
 
-	params = ks_json_pcreate_object(pool);
+	params = ks_json_create_object();
 
-	ks_json_padd_string_to_object(pool, params, "target", target);
-	ks_json_padd_string_to_object(pool, params, "local_endpoint", local_endpoint);
-	ks_json_padd_string_to_object(pool, params, "external_endpoint", external_endpoint);
-	ks_json_padd_string_to_object(pool, params, "relay_connector_id", relay_connector_id);
+	ks_json_add_string_to_object(params, "target", target);
+	ks_json_add_string_to_object(params, "local_endpoint", local_endpoint);
+	ks_json_add_string_to_object(params, "external_endpoint", external_endpoint);
+	ks_json_add_string_to_object(params, "relay_connector_id", relay_connector_id);
 
 	status = swclt_sess_execute_async(sess,
 									  NULL,
@@ -1726,6 +1726,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t 
 									  cmdP);
 done:
 	if (protocol) ks_pool_free(&protocol);
+	if (params) ks_json_delete(&params);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }

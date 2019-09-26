@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -58,19 +58,19 @@ SWCLT_DECLARE(ks_status_t) swclt_config_load_from_json(swclt_config_t *config, k
 	ks_status_t ret = KS_STATUS_SUCCESS;
 	const char *val = NULL;
 
-	if ((val = ks_json_get_object_cstr_def(json, "private_key_path", NULL))) {
+	if ((val = ks_json_get_object_string(json, "private_key_path", NULL))) {
 		swclt_config_set_private_key_path(config, val);
 	}
 
-	if ((val = ks_json_get_object_cstr_def(json, "client_cert_path", NULL))) {
+	if ((val = ks_json_get_object_string(json, "client_cert_path", NULL))) {
 		swclt_config_set_client_cert_path(config, val);
 	}
 
-	if ((val = ks_json_get_object_cstr_def(json, "cert_chain_path", NULL))) {
+	if ((val = ks_json_get_object_string(json, "cert_chain_path", NULL))) {
 		swclt_config_set_cert_chain_path(config, val);
 	}
 	
-	if ((val = ks_json_get_object_cstr_def(json, "authentication", NULL))) {
+	if ((val = ks_json_get_object_string(json, "authentication", NULL))) {
 		swclt_config_set_authentication(config, val);
 	}
 	

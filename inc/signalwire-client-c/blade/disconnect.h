@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -63,7 +63,7 @@ static inline swclt_cmd_t CREATE_BLADE_DISCONNECT_CMD_ASYNC(
 	/* Fill in the disconnect request then marshal it, it will create copies
 	 * of all the fields so caller doesn't lose ownership here */
 
-	if (!(obj = BLADE_DISCONNECT_RQU_MARSHAL(pool, &disconnect_rqu))) {
+	if (!(obj = BLADE_DISCONNECT_RQU_MARSHAL(&disconnect_rqu))) {
 		ks_pool_close(&pool);
 
 		/* Since params is last, on error here we can be sure params was

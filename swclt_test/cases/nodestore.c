@@ -36,11 +36,11 @@ blade_netcast_rqu_t __netcast_protocol_provider_add_request(ks_pool_t *pool, con
 	blade_netcast_protocol_provider_add_param_t params;
 	params.protocol = protocol;
 	params.nodeid = ks_uuid_str(pool, &nodeid);
-	params.channels = ks_json_pcreate_array_inline(pool, 1,
-		BLADE_CHANNEL_MARSHAL(pool, &(blade_channel_t){channel, BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC}));
+	params.channels = ks_json_create_array();
+	ks_json_add_item_to_array(params.channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){channel, BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC}));
 
 	/* Marshal it into its parent request */
-	request.params = BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_MARSHAL(pool, &params);
+	request.params = BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_MARSHAL(&params);
 
 	return request;
 }
@@ -58,7 +58,7 @@ blade_netcast_rqu_t __netcast_route_add_request(ks_pool_t *pool, const char *nod
 	params.nodeid = nodeid;
 
 	/* Marshal it into its parent request */
-	request.params = BLADE_NETCAST_ROUTE_ADD_PARAM_MARSHAL(pool, &params);
+	request.params = BLADE_NETCAST_ROUTE_ADD_PARAM_MARSHAL(&params);
 
 	return request;
 }
@@ -76,43 +76,52 @@ blade_netcast_rqu_t __netcast_route_remove_request(ks_pool_t *pool, const char *
 	params.certified = KS_TRUE;
 
 	/* Marshal it into its parent request */
-	request.params = BLADE_NETCAST_ROUTE_REMOVE_PARAM_MARSHAL(pool, &params);
+	request.params = BLADE_NETCAST_ROUTE_REMOVE_PARAM_MARSHAL(&params);
 
 	return request;
 }
 
 blade_connect_rpl_t __connect_reply(ks_pool_t *pool)
 {
-	ks_json_t *routes = ks_json_pcreate_array(pool);
-	ks_json_t *protocols = ks_json_pcreate_array(pool);
-	ks_json_t *subscriptions = ks_json_pcreate_array(pool);
-
+	ks_json_t *routes = ks_json_create_array();
+	ks_json_t *protocols = ks_json_create_array();
+	ks_json_t *subscriptions = ks_json_create_array();
+	
 	/* Add a couple routes */
-	ks_json_add_item_to_array(routes, BLADE_NODE_MARSHAL(pool, &(blade_node_t){ks_uuid_str(pool, &g_route_nodeid_1)}));
-	ks_json_add_item_to_array(routes, BLADE_NODE_MARSHAL(pool, &(blade_node_t){ks_uuid_str(pool, &g_route_nodeid_2)}));
+	ks_json_add_item_to_array(routes, BLADE_NODE_MARSHAL(&(blade_node_t){ks_uuid_str(pool, &g_route_nodeid_1)}));
+	ks_json_add_item_to_array(routes, BLADE_NODE_MARSHAL(&(blade_node_t){ks_uuid_str(pool, &g_route_nodeid_2)}));
 
 	/* Add a couple protocols each with one provider and one channel */
+	ks_json_t *channels = ks_json_create_array();
+	ks_json_add_item_to_array(channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"bobo_channel_1", BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC}));
+	ks_json_t *providers = ks_json_create_array();
+	ks_json_add_item_to_array(providers, BLADE_PROVIDER_MARSHAL(&(blade_provider_t){ks_uuid_str(pool, &g_route_nodeid_1), ks_json_create_array()}));
 	ks_json_add_item_to_array(protocols,
-		BLADE_PROTOCOL_MARSHAL(pool, &(blade_protocol_t){
+		BLADE_PROTOCOL_MARSHAL(&(blade_protocol_t){
 				"bobo_protocol_1", BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC,
-				ks_json_pcreate_array_inline(pool, 1, BLADE_PROVIDER_MARSHAL(pool, &(blade_provider_t){ks_uuid_str(pool, &g_route_nodeid_1), ks_json_pcreate_array(pool)})),
-				ks_json_pcreate_array_inline(pool, 1, BLADE_CHANNEL_MARSHAL(pool, &(blade_channel_t){"bobo_channel_1", BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC}))
+				providers,
+				channels,
 			}));
 
+	channels = ks_json_create_array();
+	ks_json_add_item_to_array(channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"bobo_channel_2", BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC}));
+	providers = ks_json_create_array();
+	ks_json_add_item_to_array(providers, BLADE_PROVIDER_MARSHAL(&(blade_provider_t){ks_uuid_str(pool, &g_route_nodeid_2), ks_json_create_array()}));
 	ks_json_add_item_to_array(protocols,
-		BLADE_PROTOCOL_MARSHAL(pool, &(blade_protocol_t){
+		BLADE_PROTOCOL_MARSHAL(&(blade_protocol_t){
 				"bobo_protocol_2", BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC,
-				ks_json_pcreate_array_inline(pool, 1, BLADE_PROVIDER_MARSHAL(pool, &(blade_provider_t){ks_uuid_str(pool, &g_route_nodeid_2), ks_json_pcreate_array(pool)})),
-				ks_json_pcreate_array_inline(pool, 1, BLADE_CHANNEL_MARSHAL(pool, &(blade_channel_t){"bobo_channel_2", BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC}))
+				providers,
+				channels,
 			}));
 
 	/* Have the second node be subscribed to the first */
+	ks_json_t *nodeids = ks_json_create_array();
+	ks_json_add_string_to_array(nodeids, ks_uuid_str(pool, &g_route_nodeid_2));
 	ks_json_add_item_to_array(subscriptions,
-		BLADE_SUBSCRIPTION_MARSHAL(pool, &(blade_subscription_t){
+		BLADE_SUBSCRIPTION_MARSHAL(&(blade_subscription_t){
 			"bobo_protocol_1",
 			"bobo_channel_1",
-			ks_json_pcreate_array_inline(pool, 1,
-				ks_json_pcreate_uuid(pool, g_route_nodeid_2))
+			nodeids,
 		}));
 
 	/* Now compose it altogether in a connect result */
@@ -125,7 +134,7 @@ blade_connect_rpl_t __connect_reply(ks_pool_t *pool)
 			routes,
 			protocols,
 			subscriptions,
-			ks_json_pcreate_array(pool)
+			ks_json_create_array()
 		};
 	return reply;
 }
