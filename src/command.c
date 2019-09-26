@@ -579,12 +579,16 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_parse(const char *file, int line, const c
 	if (!pool)
 		pool = ctx->base.pool;
 
-	if (ctx->type != SWCLT_CMD_TYPE_REQUEST && ctx->type != SWCLT_CMD_TYPE_RESULT) {
+	if (ctx->type == SWCLT_CMD_TYPE_REQUEST) {
+		obj = ctx->request;
+	} else if (ctx->type == SWCLT_CMD_TYPE_RESULT) {
+		obj = ctx->reply.result;
+	} else {
 		status = KS_STATUS_INVALID_ARGUMENT;
 		ks_log(KS_LOG_CRIT, "Failed to parse: %s:%lu:%s", file, line, tag);
 		goto done;
 	}
-	status = parse_cb(pool, ctx->request, structure);
+	status = parse_cb(pool, obj, structure);
 
 done:
 	swclt_cmd_ctx_unlock(ctx);
