@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -111,7 +111,10 @@ SWCLT_DECLARE(void) __swclt_hstate_changed(
 	/* Layering is not allowed */
 	if (ctx->pending_state_change_notification) {
 		ks_log(KS_LOG_WARNING, "State change [%s=>%s] denied, pending state change present [%s=>%s]",
-			ctx->state, new_state, ctx->pending_state_change_notification->new_state, ctx->pending_state_change_notification->new_state);
+			swclt_hstate_str(ctx->state),
+			swclt_hstate_str(new_state),
+			swclt_hstate_str(ctx->pending_state_change_notification->old_state),
+			swclt_hstate_str(ctx->pending_state_change_notification->new_state));
 
 		ks_debug_break();
 		ks_spinlock_release(&ctx->lock);

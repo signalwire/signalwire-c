@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -64,7 +64,7 @@ KS_BEGIN_EXTERN_C
  * to also exist. */
 #define SWCLT_JSON_PARSE_BEG(function_name, target_type)										\
 	static inline ks_status_t function_name##_PARSE(ks_pool_t *pool,							\
-		const ks_json_t * const object, target_type **result)									\
+		ks_json_t *object, target_type **result)									\
 	{																							\
 		void (*release_cb)(target_type **) = (void(*)(target_type **))function_name##_DESTROY;	\
 		target_type *target = (target_type *)ks_pool_alloc(pool, sizeof(target_type));			\
@@ -96,7 +96,9 @@ KS_BEGIN_EXTERN_C
 				release_cb(&target);										\
 				return KS_STATUS_INVALID_ARGUMENT;							\
 			}																\
-			target->key = ks_json_value_uuid(item);						\
+			const char *str = "";											\
+			ks_json_value_string(item, &str);								\
+			target->key = ks_uuid_from_str(str);							\
 		}																	\
 	}
 
@@ -108,7 +110,7 @@ KS_BEGIN_EXTERN_C
 				release_cb(&target);									\
 				return KS_STATUS_INVALID_ARGUMENT;						\
 			}															\
-			target->key = ks_json_value_bool(item);					\
+			ks_json_value_bool(item, &target->key);					\
 		}																\
 	}
 
@@ -116,11 +118,11 @@ KS_BEGIN_EXTERN_C
 	{																	\
 		ks_json_t *item = ks_json_get_object_item(object, #key);		\
 		if (item) {														\
-				if (!ks_json_type_is_number(item))  {					\
-					release_cb(&target);								\
-					return KS_STATUS_INVALID_ARGUMENT;					\
+			if (!ks_json_type_is_number(item))  {					\
+				release_cb(&target);								\
+				return KS_STATUS_INVALID_ARGUMENT;					\
 			}															\
-			*((int *)&target->key) = ks_json_value_number_int(item);	\
+			ks_json_value_number_int(item, (int *)&target->key);	\
 		}																\
 	}
 
@@ -128,17 +130,17 @@ KS_BEGIN_EXTERN_C
 	{																	\
 		ks_json_t *item = ks_json_get_object_item(object, #key);		\
 		if (item) {														\
-				if (!ks_json_type_is_number(item))  {					\
-					release_cb(&target);								\
-					return KS_STATUS_INVALID_ARGUMENT;					\
+			if (!ks_json_type_is_number(item))  {					\
+				release_cb(&target);								\
+				return KS_STATUS_INVALID_ARGUMENT;					\
 			}															\
-			*((int *)&target->key) = ks_json_value_number_int(item);	\
+			ks_json_value_number_int(item, (int *)&target->key);	\
 		} else *((int *)&target->key) = def;							\
 	}
 
 #define SWCLT_JSON_PARSE_STRING_OPT(key)								\
 	{																	\
-		const char *str = ks_json_get_object_cstr(object, #key);		\
+		const char *str = ks_json_get_object_string(object, #key, NULL);		\
 		if (str)  {														\
 			if (!(target->key = ks_pstrdup(pool, str))) {				\
 				release_cb(&target);									\
@@ -151,7 +153,7 @@ KS_BEGIN_EXTERN_C
 	{																			\
 		ks_json_t *item = ks_json_get_object_item(object, #key);				\
 		if (item) {																\
-			if (!(target->key = ks_json_pduplicate(pool, item, KS_TRUE)))	 {	\
+			if (!(target->key = ks_json_duplicate(item, KS_TRUE)))	 {	\
 				release_cb(&target);											\
 				return KS_STATUS_NO_MEM;										\
 			}																	\
@@ -180,7 +182,9 @@ KS_BEGIN_EXTERN_C
 			release_cb(&target);										\
 			return KS_STATUS_INVALID_ARGUMENT;							\
 		}																\
-		target->key = ks_json_value_uuid(item);						\
+		const char *str = "";											\
+		ks_json_value_string(item, &str);								\
+		target->key = ks_uuid_from_str(str);							\
 	}
 
 #define SWCLT_JSON_PARSE_BOOL(key)										\
@@ -190,7 +194,7 @@ KS_BEGIN_EXTERN_C
 			release_cb(&target);										\
 			return KS_STATUS_INVALID_ARGUMENT;							\
 		}																\
-		target->key = ks_json_value_bool(item);						\
+		ks_json_value_bool(item, &target->key);							\
 	}
 
 #define SWCLT_JSON_PARSE_DOUBLE(key)										\
@@ -200,7 +204,7 @@ KS_BEGIN_EXTERN_C
 			release_cb(&target);											\
 			return KS_STATUS_INVALID_ARGUMENT;								\
 		}																	\
-		*((double *)&target->key) = ks_json_value_number_double(item);	\
+		ks_json_value_number_double(item, (double *)&target->key);			\
 	}
 
 #define SWCLT_JSON_PARSE_INT_EX(source_key, target_key)						\
@@ -210,7 +214,7 @@ KS_BEGIN_EXTERN_C
 			release_cb(&target);											\
 			return KS_STATUS_INVALID_ARGUMENT;								\
 		}																	\
-		*((int *)&target->source_key) = ks_json_value_number_int(item);	\
+		ks_json_value_number_int(item, (int *)&target->source_key);			\
 	}
 
 
@@ -221,20 +225,20 @@ KS_BEGIN_EXTERN_C
 			release_cb(&target);										\
 			return KS_STATUS_INVALID_ARGUMENT;							\
 		}																\
-		*((int *)&target->key) = ks_json_value_number_int(item);		\
+		ks_json_value_number_int(item, (int *)&target->key);			\
 	}
 
-#define SWCLT_JSON_PARSE_STRING(key)									\
-	{																	\
-		const char *str = ks_json_get_object_cstr(object, #key);		\
-		if (!str)  {													\
-			release_cb(&target);										\
-			return KS_STATUS_INVALID_ARGUMENT;							\
-		}																\
-		if (!(target->key = ks_pstrdup(pool, str))) {					\
-			release_cb(&target);										\
-			return KS_STATUS_NO_MEM;									\
-		}																\
+#define SWCLT_JSON_PARSE_STRING(key)											\
+	{																			\
+		const char *str = ks_json_get_object_string(object, #key, NULL);		\
+		if (!str)  {															\
+			release_cb(&target);												\
+			return KS_STATUS_INVALID_ARGUMENT;									\
+		}																		\
+		if (!(target->key = ks_pstrdup(pool, str))) {							\
+			release_cb(&target);												\
+			return KS_STATUS_NO_MEM;											\
+		}																		\
 	}
 
 #define SWCLT_JSON_PARSE_ITEM(key)											\
@@ -244,7 +248,7 @@ KS_BEGIN_EXTERN_C
 			release_cb(&target);											\
 			return KS_STATUS_INVALID_ARGUMENT;								\
 		}																	\
-		if (!(target->key = ks_json_pduplicate(pool, item, KS_TRUE)))	 {	\
+		if (!(target->key = ks_json_duplicate(item, KS_TRUE)))	 {			\
 			release_cb(&target);											\
 			return KS_STATUS_NO_MEM;										\
 		}																	\
@@ -285,89 +289,63 @@ KS_BEGIN_EXTERN_C
 	ks_pool_free(__free_target);			\
 }
 
-/* MARHSAL - Converts the type to a json object, opposite of alloc/parse.
+/* MARSHAL - Converts the type to a json object, opposite of alloc/parse.
  * Creates an inline function called function_name_MARSHAL. */
 #define SWCLT_JSON_MARSHAL_BEG(function_name, target_type)											\
-	static inline ks_json_t * function_name##_MARSHAL(ks_pool_t *pool, target_type *source)			\
+	static inline ks_json_t * function_name##_MARSHAL(target_type *source)							\
 	{																								\
 		if (!source)																				\
 			return NULL;																			\
-		ks_json_t *target = ks_json_pcreate_object(pool);											\
+		ks_json_t *target = ks_json_create_object();												\
 		if (!target)																				\
 			return NULL;
 
 #define SWCLT_JSON_MARSHAL_UUID(key)										\
-	if (!(ks_json_padd_uuid_to_object(pool, target, #key, source->key))) {	\
-		ks_json_delete(&target);											\
-		return NULL;														\
-	}
+		{																	\
+			char *str = ks_uuid_str(NULL, &source->key);					\
+			ks_json_add_string_to_object(target, #key, str);				\
+			ks_pool_free(&str);												\
+		}
 
-#define SWCLT_JSON_MARSHAL_BOOL(key)											\
-	if (!(ks_json_padd_bool_to_object(pool, target, #key, source->key))) {		\
-		ks_json_delete(&target);												\
-		return NULL;															\
-	}
+#define SWCLT_JSON_MARSHAL_BOOL(key)									\
+	ks_json_add_bool_to_object(target, #key, source->key);
 
-#define SWCLT_JSON_MARSHAL_DOUBLE(key)													\
-	if (!(ks_json_padd_number_to_object(pool, target, #key, (double)source->key))) {		\
-		ks_json_delete(&target);														\
-		return NULL;																	\
-	}
+#define SWCLT_JSON_MARSHAL_DOUBLE(key)												\
+	ks_json_add_number_to_object(target, #key, (double)source->key);
 
-#define SWCLT_JSON_MARSHAL_INT_EX(source_key, target_key)										\
-	if (!(ks_json_padd_number_to_object(pool, target, #target_key, (int)source->source_key))) {	\
-		ks_json_delete(&target);																\
-		return NULL;																			\
-	}
+#define SWCLT_JSON_MARSHAL_INT_EX(source_key, target_key)							\
+	ks_json_add_number_to_object(target, #target_key, (int)source->source_key);
 
-#define SWCLT_JSON_MARSHAL_INT(key)														\
-	if (!(ks_json_padd_number_to_object(pool, target, #key, (int)source->key))) {		\
-		ks_json_delete(&target);														\
-		return NULL;																	\
-	}
+#define SWCLT_JSON_MARSHAL_INT(key)													\
+	ks_json_add_number_to_object(target, #key, (int)source->key);
 
 #define SWCLT_JSON_MARSHAL_CUSTOM(function_name, key)							\
 	{																			\
 		ks_json_t *__custom_obj;												\
-		if (!(__custom_obj = function_name##_MARSHAL(pool, source->key))) {		\
+		if (!(__custom_obj = function_name##_MARSHAL(source->key))) {			\
 			ks_json_delete(&target);											\
 			return NULL;														\
 		}																		\
-		if (!ks_json_add_item_to_object(target, #key, __custom_obj)) {			\
-			ks_json_delete(&target);											\
-			return NULL;														\
-		}																		\
+		ks_json_add_item_to_object(target, #key, __custom_obj);					\
 	}
 
 #define SWCLT_JSON_MARSHAL_STRING_OPT(key)								\
 	if (source->key) {													\
-		if (!(ks_json_padd_string_to_object(pool, target, #key, source->key))) {	\
-			ks_json_delete(&target);									\
-			return NULL;												\
-		}																\
+		ks_json_add_string_to_object(target, #key, source->key);		\
 		source->key = NULL;												\
 	}
 
-#define SWCLT_JSON_MARSHAL_STRING(key)											\
-	if (!(ks_json_padd_string_to_object(pool, target, #key, source->key))) {		\
-		ks_json_delete(&target);												\
-		return NULL;															\
-	}
+#define SWCLT_JSON_MARSHAL_STRING(key)									\
+	ks_json_add_string_to_object(target, #key, source->key);
 
 #define SWCLT_JSON_MARSHAL_ITEM_OPT(key)								\
 	if (source->key) {													\
-		if (!(ks_json_add_item_to_object(target, #key, source->key))) {	\
-			ks_json_delete(&target);									\
-			return NULL;												\
-		}																\
+		ks_json_add_item_to_object(target, #key, source->key);			\
 		source->key = NULL;												\
 	}
 
 #define SWCLT_JSON_MARSHAL_ITEM(key)								\
-	if (!(ks_json_add_item_to_object(target, #key, source->key))){	\
-		ks_json_delete(&target);									\
-		return NULL;												\
-	}																\
+	ks_json_add_item_to_object(target, #key, source->key);			\
 	source->key = NULL;
 
 #define SWCLT_JSON_MARSHAL_END()									\

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -151,8 +151,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 	if (ks_pool_open(&pool))
 		return cmd;
 
-	if (!(params = BLADE_PROTOCOL_PROVIDER_ADD_PARAM_MARSHAL(pool,
-															 &(blade_protocol_provider_add_param_t){
+	if (!(params = BLADE_PROTOCOL_PROVIDER_ADD_PARAM_MARSHAL(&(blade_protocol_provider_add_param_t){
 																 default_method_execute_access,
 																 default_channel_subscribe_access,
 																 default_channel_broadcast_access,
@@ -173,7 +172,6 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 	if (channels) *channels = NULL;
 	
 	if (!(request = BLADE_PROTOCOL_RQU_MARSHAL(
-			pool,
 			&(blade_protocol_rqu_t){
 				BLADE_PROTOCOL_CMD_PROVIDER_ADD,
 				protocol,
@@ -256,7 +254,6 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
 		return cmd;
 
 	if (!(request = BLADE_PROTOCOL_RQU_MARSHAL(
-			pool,
 			&(blade_protocol_rqu_t){
 				BLADE_PROTOCOL_CMD_PROVIDER_REMOVE,
 				protocol,
@@ -322,7 +319,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC
 	if (ks_pool_open(&pool))
 		return cmd;
 
-	if (!(params = BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_PARAM_MARSHAL(pool, &(blade_protocol_provider_rank_update_param_t){ rank }))) {
+	if (!(params = BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_PARAM_MARSHAL(&(blade_protocol_provider_rank_update_param_t){ rank }))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol request params");
 
 		/* Since provider_data and channels was at the end of the macro declartaion, it will have
@@ -333,7 +330,6 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC
 											  
 	/* We have taken ownership of the provider_data and channels from here on out */
 	if (!(request = BLADE_PROTOCOL_RQU_MARSHAL(
-			pool,
 			&(blade_protocol_rqu_t){
 				BLADE_PROTOCOL_CMD_PROVIDER_RANK_UPDATE,
 				protocol,

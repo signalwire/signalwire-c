@@ -48,9 +48,7 @@ struct swclt_cmd_ctx {
 	const char *failure_tag;
 #endif
 
-	/* Each command is thread safe in terms of access to its apis
-	 * using a spinlock to avoid excessive resource allocations. */
-	ks_spinlock_t lock;
+	ks_cond_t *cond;
 
 	/* The request ids, generated once on allocation */
 	ks_uuid_t id;
@@ -79,11 +77,6 @@ struct swclt_cmd_ctx {
 	/* This is the time to live value, when non zero, the command will fail if the
 	 * response is not received within the appropriate window. */
 	uint32_t response_ttl_ms;
-
-	/* This is a timestamp for when we got submitted in the connectins outstanding
-	 * request hash. This is used by the service manager to timeout commands
-	 * which have exceeded their time to live amount */
-	ks_time_t submit_time;
 };
 
 /* Internal api for providing read only access to the command */
@@ -98,8 +91,8 @@ static inline ks_status_t __swclt_cmd_ctx_get(
 #define swclt_cmd_ctx_get(cmd, ctx)\
    	__swclt_cmd_ctx_get(cmd, ctx, __FILE__, __LINE__, __FILE__)
 
-static inline void swclt_cmd_ctx_lock(const swclt_cmd_ctx_t *ctx) { ks_spinlock_acquire(&ctx->lock); }
-static inline void swclt_cmd_ctx_unlock(const swclt_cmd_ctx_t *ctx) { ks_spinlock_release(&ctx->lock); }
+static inline void swclt_cmd_ctx_lock(const swclt_cmd_ctx_t *ctx) { ks_cond_lock(ctx->cond); }
+static inline void swclt_cmd_ctx_unlock(const swclt_cmd_ctx_t *ctx) { ks_cond_unlock(ctx->cond); }
 
 static inline void __swclt_cmd_ctx_put(
    	const swclt_cmd_ctx_t **ctx,

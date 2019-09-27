@@ -21,10 +21,7 @@
  */
 #include "swclt_test.h"
 
-DECLARE_TEST(hmanager);
 DECLARE_TEST(json);
-DECLARE_TEST(frame);
-DECLARE_TEST(websocket);
 DECLARE_TEST(command);
 DECLARE_TEST(execute);
 DECLARE_TEST(connection);
@@ -34,10 +31,7 @@ DECLARE_TEST(callback);
 DECLARE_TEST(uncert_exp);
 
 test_entry_t g_test_methods[] = {
-	TEST_ENTRY(hmanager),
 	TEST_ENTRY(json),
-	TEST_ENTRY(frame),
-	TEST_ENTRY(websocket),
 	TEST_ENTRY(command),
 	TEST_ENTRY(execute),
 	TEST_ENTRY(connection),
@@ -145,17 +139,17 @@ int main(int argc, char **argv)
 	swclt_init(KS_LOG_LEVEL_DEBUG);
 	ks_global_set_logger(__test_logger);
 
-	certified_config = ks_json_pcreate_object(NULL);
-	uncertified_config = ks_json_pcreate_object(NULL);
+	certified_config = ks_json_create_object();
+	uncertified_config = ks_json_create_object();
 
-	ks_json_padd_string_to_object(NULL, certified_config, "private_key_path", "./ca/intermediate/private/controller@freeswitch-upstream.key.pem");
-	ks_json_padd_string_to_object(NULL, certified_config, "client_cert_path", "./ca/intermediate/certs/controller@freeswitch-upstream.cert.pem");
-	ks_json_padd_string_to_object(NULL, certified_config, "cert_chain_path", "./ca/intermediate/certs/ca-chain.cert.pem");
+	ks_json_add_string_to_object(certified_config, "private_key_path", "./ca/intermediate/private/controller@freeswitch-upstream.key.pem");
+	ks_json_add_string_to_object(certified_config, "client_cert_path", "./ca/intermediate/certs/controller@freeswitch-upstream.cert.pem");
+	ks_json_add_string_to_object(certified_config, "cert_chain_path", "./ca/intermediate/certs/ca-chain.cert.pem");
 
 	swclt_config_create(&g_certified_config);
 	swclt_config_load_from_json(g_certified_config, certified_config);
 	
-	ks_json_padd_string_to_object(NULL, uncertified_config, "authentication", "{ \"project\": \"06f784c6-6bd5-47fb-9897-407d66551333\", \"token\": \"PT2eddbccd77832e761d191513df8945d4e1bf70e8f3f74aaa\" }");
+	ks_json_add_string_to_object(uncertified_config, "authentication", "{ \"project\": \"06f784c6-6bd5-47fb-9897-407d66551333\", \"token\": \"PT2eddbccd77832e761d191513df8945d4e1bf70e8f3f74aaa\" }");
 
 	swclt_config_create(&g_uncertified_config);
 	swclt_config_load_from_json(g_uncertified_config, uncertified_config);

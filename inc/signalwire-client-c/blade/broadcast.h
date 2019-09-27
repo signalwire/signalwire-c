@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -92,7 +92,7 @@ static inline swclt_cmd_t CREATE_BLADE_BROADCAST_CMD_ASYNC(
 	broadcast_rqu.broadcaster_nodeid = broadcast_nodeid;
 	broadcast_rqu.params = (!params || !*params) ? ks_json_create_object() : *params;
 
-	if (!(obj = BLADE_BROADCAST_RQU_MARSHAL(pool, &broadcast_rqu))) {
+	if (!(obj = BLADE_BROADCAST_RQU_MARSHAL(&broadcast_rqu))) {
 		ks_pool_close(&pool);
 
 		/* Since params is last, on error here we can be sure params was

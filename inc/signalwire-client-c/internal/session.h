@@ -22,8 +22,6 @@
 
 #pragma once
 
-#include "signalwire-client-c/internal/connection.h"
-
 KS_BEGIN_EXTERN_C
 
 /* Create a structure containing some handy peices of info */
@@ -51,7 +49,7 @@ struct swclt_sess_ctx {
 	swclt_store_t store;
 
 	/* Our connection */
-	swclt_conn_t conn;
+	swclt_conn_t *conn;
 
 	/* The extracted identity info */
 	swclt_ident_t ident;

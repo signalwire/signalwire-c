@@ -24,11 +24,8 @@
 
 /* Load all internals for unit testing */
 #include "signalwire-client-c/internal/command.h"
-#include "signalwire-client-c/internal/connection.h"
 #include "signalwire-client-c/internal/session.h"
 #include "signalwire-client-c/internal/subscription.h"
-#include "signalwire-client-c/transport/internal/frame.h"
-#include "signalwire-client-c/transport/internal/websocket.h"
 
 /* Create uber handle shortcuts for testing */
 #define SWCLT_TEST_HANDLE_GET_DEF(name)										\
@@ -45,9 +42,6 @@ static inline void name##_put(swclt_##name##_ctx_t **ctx)					\
 }
 
 SWCLT_TEST_HANDLE_GET_DEF(sess)
-SWCLT_TEST_HANDLE_GET_DEF(conn)
 SWCLT_TEST_HANDLE_GET_DEF(cmd)
-SWCLT_TEST_HANDLE_GET_DEF(frame)
-SWCLT_TEST_HANDLE_GET_DEF(wss)
 SWCLT_TEST_HANDLE_GET_DEF(sub)
 

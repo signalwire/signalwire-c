@@ -39,7 +39,7 @@ static ks_status_t __context_state_transition(swclt_sess_ctx_t *ctx, SWCLT_HSTAT
 static void __context_deinit(
 	swclt_sess_ctx_t *ctx)
 {
-	ks_handle_destroy(&ctx->conn);
+	swclt_conn_destroy(&ctx->conn);
 	ks_hash_destroy(&ctx->subscriptions);
 	ks_hash_destroy(&ctx->methods);
 	ks_hash_destroy(&ctx->setups);
@@ -148,7 +148,6 @@ static ks_status_t __execute_pmethod_cb(
 		ks_log(KS_LOG_ERROR, err_message);
 
 		ks_json_t *err = BLADE_EXECUTE_ERR_MARSHAL(
-					cmd_ctx->base.pool,
 					&(blade_execute_err_t){
 						rqu->requester_nodeid,
 						rqu->responder_nodeid,
@@ -168,7 +167,7 @@ static ks_status_t __execute_pmethod_cb(
 	return KS_STATUS_SUCCESS;
 }
 
-static ks_status_t __on_incoming_cmd(swclt_conn_t conn, swclt_cmd_t cmd, swclt_sess_ctx_t *ctx)
+static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_sess_ctx_t *ctx)
 {
 	const char * method;
 	ks_status_t status;
@@ -316,15 +315,15 @@ done:
 
 static ks_status_t __do_disconnect(swclt_sess_ctx_t *ctx)
 {
-	ks_handle_destroy(&ctx->conn);
+	swclt_conn_destroy(&ctx->conn);
 	return KS_STATUS_SUCCESS;
 }
 
-static ks_status_t __on_connect_reply(swclt_conn_t conn, ks_json_t *error, const blade_connect_rpl_t *connect_rpl, swclt_sess_ctx_t *ctx)
+static ks_status_t __on_connect_reply(swclt_conn_t *conn, ks_json_t *error, const blade_connect_rpl_t *connect_rpl, swclt_sess_ctx_t *ctx)
 {
 	ks_status_t status = KS_STATUS_FAIL;
 
-	if (error && ks_json_get_object_number_int_def(error, "code", 0) == -32002) {
+	if (error && ks_json_get_object_number_int(error, "code", 0) == -32002) {
 		if (ctx->auth_failed_cb) ctx->auth_failed_cb(ctx->base.handle);
 	}
 
@@ -334,18 +333,24 @@ static ks_status_t __on_connect_reply(swclt_conn_t conn, ks_json_t *error, const
 		{
 			/* Great we got the reply populate the node store */
 			swclt_store_reset(ctx->store);
-			if (status = swclt_store_populate(ctx->store, connect_rpl))
+			if (status = swclt_store_populate(ctx->store, connect_rpl)) {
 				ks_log(KS_LOG_WARNING, "Failed to populate node store from connect reply (%lu)", status);
+			} else {
+				ks_log(KS_LOG_INFO, "Populated node store from connect reply");
+			}
+		} else {
+			ks_log(KS_LOG_INFO, "Restored session");
 		}
 	}
 
 	return status;
 }
 
-static void __on_conn_state_change(swclt_sess_ctx_t *ctx, swclt_hstate_change_t *state_change)
+static void __on_conn_failed(swclt_conn_t *conn, void *data)
 {
+	swclt_sess_ctx_t *ctx = (swclt_sess_ctx_t *)data;
 	/* Enqueue a state change on ourselves as well */
-	char *reason = ks_psprintf(ctx->base.pool, "Connection failed: %s", swclt_hstate_describe_change(state_change));
+	char *reason = ks_pstrdup(ctx->base.pool, "Connection failed");
 	swclt_hstate_changed(&ctx->base, SWCLT_HSTATE_DEGRADED, KS_STATUS_FAIL, reason);
 	ks_pool_free(&reason);
 
@@ -369,7 +374,8 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 	ks_log(KS_LOG_INFO, "Session is performing connect");
 
 	/* Delete the previous connection if present */
-	ks_handle_destroy(&ctx->conn);
+	swclt_conn_destroy(&ctx->conn);
+	ctx->conn = 0;
 
 	/* Re-allocate a new ssl context */
 	if (status = __setup_ssl(ctx)) {
@@ -385,10 +391,13 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 
 	/* Create a connection and have it call us back anytime a new read is detected */
 	if (status = swclt_conn_connect_ex(
+			ctx->base.pool,
 			&ctx->conn,
 			(swclt_conn_incoming_cmd_cb_t)__on_incoming_cmd,
 			ctx,
 			(swclt_conn_connect_cb_t)__on_connect_reply,
+			ctx,
+			(swclt_conn_failed_cb_t)__on_conn_failed,
 			ctx,
 			&ctx->ident,
 			ctx->info.sessionid,			/* Pass in our session id, if it was previous valid we'll try to re-use it */
@@ -400,7 +409,7 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 
 	if (status = swclt_conn_info(ctx->conn, &ctx->info.conn)) {
 		ks_debug_break();	/* unexpected */
-		ks_handle_destroy(&ctx->conn);
+		swclt_conn_destroy(&ctx->conn);
 		return status;
 	}
 
@@ -418,9 +427,6 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 	ctx->info.nodeid = ks_pstrdup(ctx->base.pool, ctx->info.conn.nodeid);
 	ctx->info.master_nodeid = ks_pstrdup(ctx->base.pool, ctx->info.conn.master_nodeid);
 
-	/* Monitor for state changed on the connection */
-	swclt_hstate_register_listener(&ctx->base, __on_conn_state_change, ctx->conn);
-
 	ks_log(KS_LOG_INFO, "Successfully established sessionid: %s", ks_uuid_thr_str(&ctx->info.sessionid));
 	ks_log(KS_LOG_INFO, "   nodeid: %s", ctx->info.nodeid);
 	ks_log(KS_LOG_INFO, "   master_nodeid: %s", ctx->info.master_nodeid);
@@ -430,18 +436,10 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 
 static void __context_describe(swclt_sess_ctx_t *ctx, char *buffer, ks_size_t buffer_len)
 {
-	const char *desc = NULL;
-	if (ctx->conn && (desc = ks_handle_describe(ctx->conn))) {
-		/* We have to do all this garbage because of the poor decision to nest ks_handle_describe() calls that return a common thread local buffer */
-		ks_size_t desc_len = strlen(desc);
-		const char *preamble = "SWCLT Session - ";
-		ks_size_t preamble_len = strlen(preamble);
-		if (desc_len + preamble_len + 1 > buffer_len) {
-			desc_len = buffer_len - preamble_len - 1;
-		}
-		memmove(buffer + preamble_len, desc, desc_len + 1);
-		memcpy(buffer, preamble, preamble_len);
-		buffer[buffer_len - 1] = '\0';
+	char *desc = NULL;
+	if (ctx->conn && (desc = swclt_conn_describe(ctx->conn))) {
+		snprintf(buffer, buffer_len, "SWCLT Session - %s", desc);
+		ks_pool_free(&desc);
 	} else {
 		snprintf(buffer, buffer_len, "SWCLT Session (not connected)");
 	}
@@ -1020,13 +1018,6 @@ done:
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_sess_get_rates(swclt_sess_t sess, ks_throughput_t *recv, ks_throughput_t *send)
-{
-	SWCLT_SESS_SCOPE_BEG(sess, ctx, status);
-	status = swclt_conn_get_rates(ctx->conn, recv, send);
-	SWCLT_SESS_SCOPE_END(sess, ctx, status);
-}
-
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
 	swclt_sess_t sess,
 	const char *protocol,
@@ -1099,9 +1090,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-
-		/* Parent it to connection for safe guard */
-		ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1167,9 +1155,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-
-		/* Parent it to connection for safe guard */
-		ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1256,9 +1241,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-
-		/* Parent it to connection for safe guard */
-		ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1315,9 +1297,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-
-		/* Parent it to connection for safe guard */
-		ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1375,9 +1354,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-
-		/* Parent it to connection for safe guard */
-		ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1435,7 +1411,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-		ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1501,7 +1476,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 		ks_handle_destroy(&cmd);
 	else {
 		if (cmdP) *cmdP = cmd;
-		ks_handle_set_parent(cmd, ctx->conn);
 	}
 
 done:
@@ -1510,9 +1484,6 @@ done:
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
-
-// @todo everything below here is high level supporting stuff related to future IDL templates
-// and should probably be moved to it's own separate file for each protocol supported
 
 // signalwire consumer
 
@@ -1548,8 +1519,8 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 
 	pool = ks_handle_pool(sess);
 
-	params = ks_json_pcreate_object(pool);
-	ks_json_padd_string_to_object(pool, params, "service", service);
+	params = ks_json_create_object();
+	ks_json_add_string_to_object(params, "service", service);
 
 	// Send the setup request syncronously, if it fails bail out
 	if (status = swclt_sess_execute(sess,
@@ -1584,7 +1555,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 	}
 
 	// Make sure we actually get a result to look at
-	if (status = swclt_cmd_result(cmd, (const ks_json_t **)&result)) {
+	if (status = swclt_cmd_result(cmd, &result)) {
 		ks_log(KS_LOG_ERROR, "Setup for '%s' response has no result: %d", service, status);
 		goto done;
 	}
@@ -1598,7 +1569,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 	}
 
 	// Get protocol from result, duplicate it so we can destroy the command
-	protocol = ks_json_get_object_cstr_def(result, "protocol", NULL);
+	protocol = ks_json_get_object_string(result, "protocol", NULL);
 	if (protocol) protocol = ks_pstrdup(ks_handle_pool(sess), protocol);
 
 	if (!protocol) {
@@ -1660,7 +1631,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 	}
 
 	// Make sure we actually get a result to look at
-	if (status = swclt_cmd_result(cmd, (const ks_json_t **)&result)) {
+	if (status = swclt_cmd_result(cmd, &result)) {
 		ks_log(KS_LOG_ERROR, "Setup for '%s', subscription add response has no result: %d", service, status);
 		goto done;
 	}
@@ -1673,6 +1644,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 done:
 	if (protocol) ks_pool_free(&protocol);
 	if (ks_handle_valid(cmd)) ks_handle_destroy(&cmd);
+	if (params) ks_json_delete(&params);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
@@ -1737,12 +1709,12 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t 
 		goto done;
 	}
 
-	params = ks_json_pcreate_object(pool);
+	params = ks_json_create_object();
 
-	ks_json_padd_string_to_object(pool, params, "target", target);
-	ks_json_padd_string_to_object(pool, params, "local_endpoint", local_endpoint);
-	ks_json_padd_string_to_object(pool, params, "external_endpoint", external_endpoint);
-	ks_json_padd_string_to_object(pool, params, "relay_connector_id", relay_connector_id);
+	ks_json_add_string_to_object(params, "target", target);
+	ks_json_add_string_to_object(params, "local_endpoint", local_endpoint);
+	ks_json_add_string_to_object(params, "external_endpoint", external_endpoint);
+	ks_json_add_string_to_object(params, "relay_connector_id", relay_connector_id);
 
 	status = swclt_sess_execute_async(sess,
 									  NULL,
@@ -1754,6 +1726,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t 
 									  cmdP);
 done:
 	if (protocol) ks_pool_free(&protocol);
+	if (params) ks_json_delete(&params);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }

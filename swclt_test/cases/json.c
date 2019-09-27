@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,11 +33,11 @@ static blade_netcast_rqu_t __netcast_protocol_provider_add_request(ks_pool_t *po
 	blade_netcast_protocol_provider_add_param_t params;
 	params.protocol = protocol;
 	params.nodeid = ks_uuid_str(NULL, &nodeid);
-	params.channels = ks_json_create_array_inline(1,
-		BLADE_CHANNEL_MARSHAL(NULL, &(blade_channel_t){channel, BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC}));
+	params.channels = ks_json_create_array();
+	ks_json_add_item_to_array(params.channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){channel, BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC}));
 
 	/* Marshal it into its parent request */
-	request.params = BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_MARSHAL(NULL, &params);
+	request.params = BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_MARSHAL(&params);
 
 	return request;
 }
@@ -45,7 +45,7 @@ static blade_netcast_rqu_t __netcast_protocol_provider_add_request(ks_pool_t *po
 static void test_blade_execute(ks_pool_t *pool)
 {
 	ks_json_t *params = ks_json_create_object();
-	ks_json_padd_string_to_object(NULL, params, "tag", "hi");
+	ks_json_add_string_to_object(params, "tag", "hi");
 	swclt_cmd_t cmd = CREATE_BLADE_EXECUTE_CMD(
 		    "responder_a",
 		   	"test.protocol",
@@ -53,7 +53,7 @@ static void test_blade_execute(ks_pool_t *pool)
 			&params);
 	REQUIRE(!params);
 
-	const ks_json_t *obj;
+	ks_json_t *obj;
 	REQUIRE(swclt_cmd_error(cmd, &obj));
 	REQUIRE(swclt_cmd_result(cmd, &obj));
 	REQUIRE(!swclt_cmd_request(cmd, &obj));
@@ -62,10 +62,10 @@ static void test_blade_execute(ks_pool_t *pool)
 	REQUIRE(!swclt_cmd_print(cmd, NULL, &desc));
 	ks_log(KS_LOG_INFO, "Created command: %s", desc);
 
-	REQUIRE(!strcmp(ks_json_get_object_cstr(obj, "responder_nodeid"), "responder_a"));
-	REQUIRE(!strcmp(ks_json_get_object_cstr(obj, "protocol"), "test.protocol"));
-	REQUIRE(!strcmp(ks_json_get_object_cstr(obj, "method"), "test.method"));
-	REQUIRE(!strcmp(ks_json_lookup_cstr(obj, 2, "params", "tag"), "hi"));
+	REQUIRE(!strcmp(ks_json_get_object_string(obj, "responder_nodeid", ""), "responder_a"));
+	REQUIRE(!strcmp(ks_json_get_object_string(obj, "protocol", ""), "test.protocol"));
+	REQUIRE(!strcmp(ks_json_get_object_string(obj, "method", ""), "test.method"));
+	REQUIRE(!strcmp(ks_json_get_object_string(ks_json_get_object_item(obj, "params"), "tag", ""), "hi"));
 
 	ks_pool_free(&desc);
 	ks_handle_destroy(&cmd);
@@ -73,7 +73,7 @@ static void test_blade_execute(ks_pool_t *pool)
 
 static void test_blade_channel(ks_pool_t *pool)
 {
-	ks_json_t *obj = BLADE_CHANNEL_MARSHAL(NULL, &(blade_channel_t){"bobo", BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC});
+	ks_json_t *obj = BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"bobo", BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC});
 	ks_json_delete(&obj);
 }
 

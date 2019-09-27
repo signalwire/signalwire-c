@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -35,11 +35,10 @@ static ks_status_t __on_incoming_test_execute_rqu(swclt_sess_t sess, swclt_cmd_t
 	/* Formulate a response */
 	ks_cond_t *cond = (ks_cond_t *)data;
 	ks_pool_t *cmd_pool = ks_handle_pool(cmd);
-	ks_json_t *result = ks_json_pcreate_object(cmd_pool);
-	ks_json_padd_string_to_object(cmd_pool, result, "reply", "i got it!");
+	ks_json_t *result = ks_json_create_object();
+	ks_json_add_string_to_object(result, "reply", "i got it!");
 
 	ks_json_t *cmd_result = BLADE_EXECUTE_RPL_MARSHAL(
-		cmd_pool,
 		&(blade_execute_rpl_t){
 			rqu->requester_nodeid,
 			rqu->responder_nodeid,
@@ -100,7 +99,7 @@ void test_execute(ks_pool_t *pool)
 	ks_json_t *params = ks_json_create_object();
 	swclt_cmd_t sess1_exec_cmd;
 	REQUIRE(params);
-	REQUIRE(ks_json_add_string_to_object(params, "arg", "value"));
+	ks_json_add_string_to_object(params, "arg", "value");
 	REQUIRE(!swclt_sess_execute_async(sess1, nodeid2, "test", "test.method", &params, (swclt_cmd_cb_t)__on_outgoing_test_execute_rpl, cond, &sess1_exec_cmd));
 	ks_cond_wait(cond);
 	ks_cond_wait(cond);

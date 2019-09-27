@@ -367,8 +367,9 @@ static ks_status_t __add_protocol_uncertified_obj(swclt_store_ctx_t *ctx, ks_jso
 		ks_log(KS_LOG_ERROR, "Failed to parse protocol uncertified: %d", status);
 		return status;
 	}
-
-	key = ks_pstrdup(ks_pool_get(ctx->protocols_uncertified), ks_json_value_string(obj));
+	const char *str;
+	ks_json_value_string(obj, &str);
+	key = ks_pstrdup(ks_pool_get(ctx->protocols_uncertified), str);
 
 	if (status = ks_hash_insert(ctx->protocols_uncertified, key, (void *)KS_TRUE)) {
 		ks_log(KS_LOG_ERROR, "Failed to insert protocol: %d", status);
@@ -612,12 +613,11 @@ done:
 }
 
 static ks_status_t __get_protocols(swclt_store_ctx_t *ctx,
-								   ks_pool_t *pool,
 								   ks_json_t **protocols)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
 
-	*protocols = ks_json_pcreate_array(pool);
+	*protocols = ks_json_create_array();
 
 	ks_hash_read_lock(ctx->protocols);
 
@@ -627,7 +627,7 @@ static ks_status_t __get_protocols(swclt_store_ctx_t *ctx,
 
 		ks_hash_this(it, (const void **)&key, NULL, (void **)&proto);
 
-		ks_json_padd_string_to_array(pool, *protocols, key);
+		ks_json_add_string_to_array(*protocols, key);
 	}
 
 	ks_hash_read_unlock(ctx->protocols);
@@ -636,7 +636,6 @@ static ks_status_t __get_protocols(swclt_store_ctx_t *ctx,
 
 static ks_status_t __get_protocol_providers(swclt_store_ctx_t *ctx,
 											const char *name,
-											ks_pool_t *pool,
 											ks_json_t **providers)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
@@ -654,7 +653,7 @@ static ks_status_t __get_protocol_providers(swclt_store_ctx_t *ctx,
 		goto done;
 	}
 
-	*providers = ks_json_pduplicate(pool, protocol->providers, KS_TRUE);
+	*providers = ks_json_duplicate(protocol->providers, KS_TRUE);
 
 done:
 	ks_hash_read_unlock(ctx->protocols);
@@ -766,7 +765,7 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 			return KS_STATUS_NO_MEM;
 		}
 
-		protocol->channels = ks_json_pduplicate(ctx->base.pool, params->channels, KS_TRUE);
+		protocol->channels = ks_json_duplicate(params->channels, KS_TRUE);
 
 		protocol->default_channel_broadcast_access = params->default_channel_broadcast_access;
 		protocol->default_channel_subscribe_access = params->default_channel_subscribe_access;
@@ -775,17 +774,21 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 		protocol->name = ks_pstrdup(ctx->base.pool, params->protocol);
 
 		if (params->data) {
-			provider_data = ks_json_pduplicate(ctx->base.pool, params->data, KS_TRUE);
+			provider_data = ks_json_duplicate(params->data, KS_TRUE);
 		}
-		if (!(protocol->providers = ks_json_pcreate_array_inline(ctx->base.pool, 1,
-																										BLADE_PROVIDER_MARSHAL(ctx->base.pool,
-																										   &(blade_provider_t){params->nodeid, NULL, params->rank, provider_data})))) {
+
+		if (!(protocol->providers = ks_json_create_array())) {
 			ks_pool_free(&protocol);
-			ks_pool_free(&provider_data);
+			ks_json_delete(&provider_data);
 			BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_DESTROY(&params);
 			ks_hash_write_unlock(ctx->protocols);
 			return KS_STATUS_NO_MEM;
 		}
+		ks_json_add_item_to_array(protocol->providers,
+			BLADE_PROVIDER_MARSHAL(
+				&(blade_provider_t){params->nodeid, NULL, params->rank, provider_data}
+			)
+		);
 
 		/* And add it */
 		if (status = ks_hash_insert(ctx->protocols, protocol->name, protocol)) {
@@ -814,14 +817,10 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 
 	/* Now add any provider entries to the protocol */
 	if (params->data) {
-		provider_data = ks_json_pduplicate(ctx->base.pool, params->data, KS_TRUE);
+		provider_data = ks_json_duplicate(params->data, KS_TRUE);
 	}
-	if (!ks_json_add_item_to_array(protocol->providers,
-					BLADE_PROVIDER_MARSHAL(ctx->base.pool, &(blade_provider_t){params->nodeid, NULL, params->rank, provider_data}))) {
-		ks_pool_free(&provider_data);
-		ks_hash_write_unlock(ctx->protocols);
-		return KS_STATUS_NO_MEM;
-	}
+	ks_json_add_item_to_array(protocol->providers,
+					BLADE_PROVIDER_MARSHAL(&(blade_provider_t){params->nodeid, NULL, params->rank, provider_data}));
 
 	ks_log(KS_LOG_INFO, "Protocol %s add complete, provider count %lu", protocol->name, ks_json_get_array_size(protocol->providers));
 
@@ -880,8 +879,10 @@ static ks_status_t __update_protocol_provider_remove(swclt_store_ctx_t *ctx, bla
 
 	if (cleanup) {
 		// cleanup protocol if no providers left
-		ks_hash_remove(ctx->protocols, (const void *)protocol->name);
-		__invoke_cb_protocol_remove(ctx, protocol->name);
+		char *protocol_name = ks_pstrdup(ctx->base.pool, protocol->name);
+		ks_hash_remove(ctx->protocols, (const void *)protocol->name); // now destroy it...
+		__invoke_cb_protocol_remove(ctx, protocol_name);
+		ks_pool_free(&protocol_name);
 	}
 
 done:
@@ -919,11 +920,11 @@ static ks_status_t __update_protocol_provider_rank_update(swclt_store_ctx_t *ctx
 	for (int32_t index = 0; index < ks_json_get_array_size(protocol->providers); ++index) {
 		entry = ks_json_get_array_item(protocol->providers, index);
 
-		const char *provider_nodeid = ks_json_get_object_cstr_def(entry, "nodeid", "");
+		const char *provider_nodeid = ks_json_get_object_string(entry, "nodeid", "");
 		if (!strcmp(provider_nodeid, params->nodeid)) {
 			found = KS_TRUE;
 			ks_json_delete_item_from_object(entry, "rank");
-			ks_json_padd_number_to_object(ctx->base.pool, entry, "rank", params->rank);
+			ks_json_add_number_to_object(entry, "rank", params->rank);
 		}
 	}
 
@@ -961,11 +962,11 @@ static ks_status_t __update_protocol_provider_data_update(swclt_store_ctx_t *ctx
 	// find provider
 	for (int32_t index = 0; index < ks_json_get_array_size(protocol->providers); ++index) {
 		entry = ks_json_get_array_item(protocol->providers, index);
-		const char *provider_nodeid = ks_json_get_object_cstr_def(entry, "nodeid", "");
+		const char *provider_nodeid = ks_json_get_object_string(entry, "nodeid", "");
 		if (!strcmp(provider_nodeid, params->nodeid)) {
 			found = KS_TRUE;
 			ks_json_delete_item_from_object(entry, "data");
-			ks_json_add_item_to_object(entry, "data", ks_json_pduplicate(ctx->base.pool, params->data, KS_TRUE));
+			ks_json_add_item_to_object(entry, "data", ks_json_duplicate(params->data, KS_TRUE));
 		}
 	}
 
@@ -1250,14 +1251,14 @@ static ks_status_t __populate_routes(swclt_store_ctx_t *ctx, blade_connect_rpl_t
 		}
 
 		// Identities
-		nodeid = ks_json_get_object_cstr(entry, "nodeid");
+		nodeid = ks_json_get_object_string(entry, "nodeid", NULL);
 		identities = ks_json_get_object_item(entry, "identities");
 		if (nodeid && identities && ks_json_type_is_array(identities))
 		{
 			int size = ks_json_get_array_size(identities);
 			for (int index = 0; index < size; ++index)
 			{
-				const char *identity = ks_json_get_array_cstr(identities, index);
+				const char *identity = ks_json_get_array_string(identities, index, NULL);
 				if (!identity) continue;
 				ks_hash_insert(ctx->identities, ks_pstrdup(ctx->base.pool, identity), ks_pstrdup(ctx->base.pool, nodeid));
 			}
@@ -1321,13 +1322,15 @@ static ks_status_t __populate_authorities(swclt_store_ctx_t *ctx, blade_connect_
 
 	/* Walk the protocols and add them */
 	KS_JSON_ARRAY_FOREACH(entry, connect_rpl->authorities) {
-		const char *authority = ks_json_value_string(entry);
-		authority = ks_pstrdup(ks_pool_get(ctx->authorities), authority);
+		const char *authority;
+		if (!ks_json_value_string(entry, &authority)) {
+			authority = ks_pstrdup(ks_pool_get(ctx->authorities), authority);
 
-		if (status = ks_hash_insert(ctx->authorities, authority, (void *)KS_TRUE)) {
-			ks_log(KS_LOG_ERROR, "Failed to insert authority: %d", status);
-			ks_pool_free(&authority);
-			return status;
+			if (status = ks_hash_insert(ctx->authorities, authority, (void *)KS_TRUE)) {
+				ks_log(KS_LOG_ERROR, "Failed to insert authority: %d", status);
+				ks_pool_free(&authority);
+				return status;
+			}
 		}
 	}
 
@@ -1545,10 +1548,10 @@ SWCLT_DECLARE(ks_status_t) swclt_store_get_node_identities(swclt_store_t store,
 	SWCLT_STORE_SCOPE_END(store, ctx, status)
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_store_get_protocols(swclt_store_t store, ks_pool_t *pool, ks_json_t **protocols)
+SWCLT_DECLARE(ks_status_t) swclt_store_get_protocols(swclt_store_t store, ks_json_t **protocols)
 {
 	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
-	status = __get_protocols(ctx, pool, protocols);
+	status = __get_protocols(ctx, protocols);
 	SWCLT_STORE_SCOPE_END(store, ctx, status)
 }
 
@@ -1575,11 +1578,10 @@ SWCLT_DECLARE(ks_status_t) swclt_store_select_random_protocol_provider(
 
 SWCLT_DECLARE(ks_status_t) swclt_store_get_protocol_providers(swclt_store_t store,
 															  const char *name,
-															  ks_pool_t *pool,
 															  ks_json_t **providers)
 {
 	SWCLT_STORE_SCOPE_BEG(store, ctx, status)
-	status = __get_protocol_providers(ctx, name, pool, providers);
+	status = __get_protocol_providers(ctx, name, providers);
 	SWCLT_STORE_SCOPE_END(store, ctx, status)
 }
 
