@@ -6,7 +6,7 @@ CTestTestfile.cmake
 Makefile
 *_cotire.cmake
 cmake_install.cmake
-libsignalwire_client.so
+libsignalwire_client.so*
 testclient
 /cotire
 /build
