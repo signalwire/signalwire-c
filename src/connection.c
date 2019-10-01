@@ -563,9 +563,9 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn)
 {
 	if (conn && *conn) {
+		ttl_tracker_destroy(&(*conn)->ttl);
 		swclt_wss_destroy(&(*conn)->wss);
 		ks_hash_destroy(&(*conn)->outstanding_requests);
-		ttl_tracker_destroy(&(*conn)->ttl);
 		ks_pool_free(conn);
 	}
 }
