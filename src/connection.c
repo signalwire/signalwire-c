@@ -178,9 +178,16 @@ static void *ttl_tracker_thread(ks_thread_t *thread, void *data)
 			swclt_cmd_t *cmd = NULL;
 			ks_hash_read_lock(ttl->conn->outstanding_requests);
 			if ((cmd = ks_hash_search(ttl->conn->outstanding_requests, &id, KS_UNLOCKED))) {
+				swclt_cmd_t cmd_dup = *cmd;
+				swclt_cmd_cb_t cb = { 0 };
+				void *cb_data = NULL;
+				swclt_cmd_cb(*cmd, &cb, &cb_data);
 				swclt_cmd_report_failure_fmt_m(*cmd, KS_STATUS_TIMEOUT, "TTL expired for command %s", ks_uuid_thr_str(&id));
 				ks_log(KS_LOG_INFO, "TTL expired for command %s", ks_uuid_thr_str(&id));
 				ks_hash_read_unlock(ttl->conn->outstanding_requests);
+				if (cb) {
+					ks_handle_destroy(&cmd_dup);
+				}
 			} else {
 				ks_hash_read_unlock(ttl->conn->outstanding_requests);
 			}
@@ -371,7 +378,7 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 	const char *method;
 	ks_uuid_t id;
 	swclt_cmd_t *outstanding_cmd = NULL;
-	swclt_cmd_t cmd;
+	swclt_cmd_t cmd = KS_NULL_HANDLE;
 	ks_bool_t async = KS_FALSE;
 
 	ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", (*frame)->data);

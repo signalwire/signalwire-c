@@ -27,6 +27,7 @@ static uint32_t g_protocol_response_cb_called;
 static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, void *cb_data)
 {
 	printf("ON INCOMING COMMAND\n");
+	ks_handle_destroy(&cmd);
 	return KS_STATUS_SUCCESS;
 }
 
