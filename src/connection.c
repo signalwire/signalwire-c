@@ -424,13 +424,15 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 	ks_log(KS_LOG_DEBUG, "Fetched cmd handle: %8.8llx", cmd);
 
 	if (status = swclt_cmd_method(cmd, &method)) {
-		ks_log(KS_LOG_ERROR, "Failed to get command method: %lu", status);
+		ks_log(KS_LOG_WARNING, "Failed to get command method: %lu", status);
+		status = KS_STATUS_SUCCESS; // keep the connection ONLINE
 		goto done;
 	}
 
 	/* Great, feed it the reply */
 	if (status = swclt_cmd_parse_reply_frame(cmd, *frame, &async)) {
 		ks_log(KS_LOG_ERROR, "Failed to parse command reply: %lu", status);
+		status = KS_STATUS_SUCCESS; // keep the connection ONLINE
 		goto done;
 	}
 

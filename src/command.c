@@ -810,7 +810,7 @@ SWCLT_DECLARE(ks_status_t) swclt_cmd_wait_result(swclt_cmd_t cmd)
 				break;
 
 			case SWCLT_CMD_TYPE_FAILURE:
-				ks_log(KS_LOG_WARNING, "Command failure", status);
+				ks_log(KS_LOG_WARNING, "Command failure");
 				goto done;
 			default:
 				ks_abort_fmt("Invalid command type: %lu", ctx->type);
