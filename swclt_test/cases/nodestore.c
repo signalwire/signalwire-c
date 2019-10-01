@@ -27,13 +27,13 @@ ks_uuid_t g_route_nodeid_1, g_route_nodeid_2, g_sessionid;
 
 blade_netcast_rqu_t __netcast_protocol_provider_add_request(ks_pool_t *pool, const char *protocol, ks_uuid_t nodeid, const char *channel)
 {
-	blade_netcast_rqu_t request;
+	blade_netcast_rqu_t request = { 0 };
 	request.command = BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_ADD;
 	request.certified_only = KS_TRUE;
 	request.netcaster_nodeid = ks_uuid_null_str(pool);
 
 	/* Fill in the params too */
-	blade_netcast_protocol_provider_add_param_t params;
+	blade_netcast_protocol_provider_add_param_t params = { 0 };
 	params.protocol = protocol;
 	params.nodeid = ks_uuid_str(pool, &nodeid);
 	params.channels = ks_json_create_array();
@@ -47,13 +47,13 @@ blade_netcast_rqu_t __netcast_protocol_provider_add_request(ks_pool_t *pool, con
 
 blade_netcast_rqu_t __netcast_route_add_request(ks_pool_t *pool, const char *nodeid, ks_bool_t certified)
 {
-	blade_netcast_rqu_t request;
+	blade_netcast_rqu_t request = { 0 };
 	request.command = BLADE_NETCAST_CMD_ROUTE_ADD;
 	request.certified_only = KS_TRUE;
 	request.netcaster_nodeid = ks_uuid_null_str(pool);
 
 	/* Fill in the params too */
-	blade_netcast_route_add_param_t params;
+	blade_netcast_route_add_param_t params = { 0 };
 	params.certified = certified;
 	params.nodeid = nodeid;
 
@@ -65,13 +65,13 @@ blade_netcast_rqu_t __netcast_route_add_request(ks_pool_t *pool, const char *nod
 
 blade_netcast_rqu_t __netcast_route_remove_request(ks_pool_t *pool, const char *nodeid)
 {
-	blade_netcast_rqu_t request;
+	blade_netcast_rqu_t request = { 0 };
 	request.command = BLADE_NETCAST_CMD_ROUTE_REMOVE;
 	request.certified_only = KS_TRUE;
 	request.netcaster_nodeid = ks_uuid_null_str(pool);
 
 	/* Fill in the params too */
-	blade_netcast_route_remove_param_t params;
+	blade_netcast_route_remove_param_t params = { 0 };
 	params.nodeid = nodeid;
 	params.certified = KS_TRUE;
 
@@ -142,9 +142,9 @@ blade_connect_rpl_t __connect_reply(ks_pool_t *pool)
 void test_nodestore_update(ks_pool_t *pool)
 {
 	blade_connect_rpl_t connect_rpl = __connect_reply(pool);
-	swclt_store_t store;
+	swclt_store_t store = { 0 };
 	swclt_store_ctx_t *store_ctx;
-	ks_uuid_t new_route_nodeid;
+	ks_uuid_t new_route_nodeid = { 0 };
 	const char *new_route_nodeid_str;
 
 	ks_uuid(&new_route_nodeid);
@@ -205,6 +205,10 @@ void test_nodestore_protocol_select(ks_pool_t *pool)
 
 void test_nodestore(ks_pool_t *pool)
 {
+	ks_uuid(&g_route_nodeid_1);
+	ks_uuid(&g_route_nodeid_2);
+	ks_uuid(&g_sessionid);
+
 	test_nodestore_update(pool);
 	test_nodestore_protocol_select(pool);
 }
