@@ -317,7 +317,7 @@ SWCLT_DECLARE(void) __swclt_hstate_initiate_change_in(
 
 	/* Update our pending service flag to true */
 	ks_spinlock_acquire(&base->lock);
-	ks_assert(base->state != new_state);
+	//ks_assert(base->state != new_state);
 	base->pending_state_change_service = new_state;
 	base->pending_state_change_handler_cb = cb;
 	base->next_service_time_stamp_ms = now() + next_service_ms;
