@@ -391,7 +391,6 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 
 	/* If it's a request, we need to raise this directly with the callback */
 	if (ks_json_get_object_item(payload, "params")) {
-		/* Ok we don't need this lock anymore since we're not a result */
 		status = on_incoming_request(ctx, payload, frame);
 		goto done;
 	}
@@ -449,6 +448,10 @@ done:
 	if (async) {
 		ks_log(KS_LOG_DEBUG, "Destroying command: %s", ks_handle_describe(cmd));
 		ks_handle_destroy(&cmd);
+	}
+
+	if (status == KS_STATUS_INVALID_ARGUMENT) {
+		status = KS_STATUS_SUCCESS; // keep the connection ONLINE- bad requests can happen
 	}
 
 	return status;
