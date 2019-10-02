@@ -450,8 +450,8 @@ done:
 		ks_handle_destroy(&cmd);
 	}
 
-	if (status == KS_STATUS_INVALID_ARGUMENT) {
-		status = KS_STATUS_SUCCESS; // keep the connection ONLINE- bad requests can happen
+	if (status == KS_STATUS_INVALID_ARGUMENT || status == KS_STATUS_HANDLE_INVALID) {
+		status = KS_STATUS_SUCCESS; // keep the connection ONLINE
 	}
 
 	return status;
