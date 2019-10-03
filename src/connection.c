@@ -491,6 +491,9 @@ static ks_status_t do_logical_connect(swclt_conn_t *ctx, ks_uuid_t previous_sess
 		goto done;
 	}
 	
+	if (ctx->blade_connect_rpl) {
+		BLADE_CONNECT_RPL_DESTROY(&ctx->blade_connect_rpl);
+	}
 	if (status = swclt_cmd_parse(cmd, ctx->pool,
 								  (swclt_cmd_parse_cb_t)BLADE_CONNECT_RPL_PARSE, (void **)&ctx->blade_connect_rpl)) {
 		ks_log(KS_LOG_ERROR, "Unable to parse connect reply");
@@ -566,6 +569,9 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn)
 {
 	if (conn && *conn) {
+		if ((*conn)->blade_connect_rpl) {
+			BLADE_CONNECT_RPL_DESTROY(&(*conn)->blade_connect_rpl);
+		}
 		ttl_tracker_destroy(&(*conn)->ttl);
 		swclt_wss_destroy(&(*conn)->wss);
 		ks_hash_destroy(&(*conn)->outstanding_requests);

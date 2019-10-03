@@ -762,6 +762,7 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 		/* Gotta add a new one */
 		if (!(protocol = ks_pool_alloc(ctx->base.pool, sizeof(blade_protocol_t)))) {
 			ks_hash_write_unlock(ctx->protocols);
+			BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_DESTROY(&params);
 			return KS_STATUS_NO_MEM;
 		}
 
@@ -778,6 +779,7 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 		}
 
 		if (!(protocol->providers = ks_json_create_array())) {
+			ks_json_delete(&protocol->channels);
 			ks_pool_free(&protocol);
 			ks_json_delete(&provider_data);
 			BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_DESTROY(&params);
@@ -792,6 +794,8 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 
 		/* And add it */
 		if (status = ks_hash_insert(ctx->protocols, protocol->name, protocol)) {
+			ks_json_delete(&protocol->channels);
+			ks_json_delete(&protocol->providers);
 			ks_pool_free(&protocol);
 			BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_DESTROY(&params);
 			ks_hash_write_unlock(ctx->protocols);
@@ -807,6 +811,8 @@ static ks_status_t __update_protocol_provider_add(swclt_store_ctx_t *ctx, const 
 		__invoke_cb_protocol_provider_add(ctx, netcast_rqu, params);
 
 		ks_hash_write_unlock(ctx->protocols);
+
+		BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_DESTROY(&params);
 
 		return status;
 
