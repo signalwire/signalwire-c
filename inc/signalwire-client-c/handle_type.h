@@ -63,7 +63,7 @@ static inline ks_bool_t swclt_htype_valid(swclt_htype_t type)
 		KS_HANDLE_GROUP_FROM_TYPE(type) == KS_HANDLE_GROUP_SWCLT_SYS;
 }
 
-static inline const char *const swclt_htype_str(swclt_htype_t type)
+static inline const char *swclt_htype_str(swclt_htype_t type)
 {
 	switch(type) {
 	case SWCLT_HTYPE_CMD:

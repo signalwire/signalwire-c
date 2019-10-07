@@ -23,7 +23,7 @@
 #pragma once
 
 /* The method name for a connect request */
-static const char *BLADE_CONNECT_METHOD = "blade.connect";
+#define BLADE_CONNECT_METHOD "blade.connect"
 
 /* Flags for the command */
 #define BLADE_CONNECT_FLAGS 0

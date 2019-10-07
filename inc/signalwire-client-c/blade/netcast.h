@@ -23,31 +23,31 @@
 #pragma once
 
 /* Define all our commands */
-static const char *BLADE_NETCAST_CMD_ROUTE_ADD = "route.add";
-static const char *BLADE_NETCAST_CMD_ROUTE_REMOVE = "route.remove";
-static const char *BLADE_NETCAST_CMD_IDENTITY_ADD = "identity.add";
-static const char *BLADE_NETCAST_CMD_IDENTITY_REMOVE = "identity.remove";
-static const char *BLADE_NETCAST_CMD_PROTOCOL_ADD = "protocol.add";
-static const char *BLADE_NETCAST_CMD_PROTOCOL_REMOVE = "protocol.remove";
-static const char *BLADE_NETCAST_CMD_PROTOCOL_UPDATE = "protocol.update";
-static const char *BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_ADD = "protocol.provider.add";
-static const char *BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_REMOVE = "protocol.provider.remove";
-static const char *BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_RANK_UPDATE = "protocol.provider.rank.update";
-static const char *BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_DATA_UPDATE = "protocol.provider.data.update";
-static const char *BLADE_NETCAST_CMD_PROTOCOL_CHANNEL_ADD = "protocol.channel.add";
-static const char *BLADE_NETCAST_CMD_PROTOCOL_CHANNEL_REMOVE = "protocol.channel.remove";
-static const char *BLADE_NETCAST_CMD_SUBSCRIPTION_ADD = "subscription.add";
-static const char *BLADE_NETCAST_CMD_SUBSCRIPTION_REMOVE = "subscription.remove";
-static const char *BLADE_NETCAST_CMD_AUTHORITY_ADD = "authority.add";
-static const char *BLADE_NETCAST_CMD_AUTHORITY_REMOVE = "authority.remove";
-static const char *BLADE_NETCAST_CMD_AUTHORIZATION_ADD = "authorization.add";
-static const char *BLADE_NETCAST_CMD_AUTHORIZATION_UPDATE = "authorization.update";
-static const char *BLADE_NETCAST_CMD_AUTHORIZATION_REMOVE = "authorization.remove";
-static const char *BLADE_NETCAST_CMD_ACCESS_ADD = "access.add";
-static const char *BLADE_NETCAST_CMD_ACCESS_REMOVE = "access.remove";
+#define BLADE_NETCAST_CMD_ROUTE_ADD "route.add"
+#define BLADE_NETCAST_CMD_ROUTE_REMOVE "route.remove"
+#define BLADE_NETCAST_CMD_IDENTITY_ADD "identity.add"
+#define BLADE_NETCAST_CMD_IDENTITY_REMOVE "identity.remove"
+#define BLADE_NETCAST_CMD_PROTOCOL_ADD "protocol.add"
+#define BLADE_NETCAST_CMD_PROTOCOL_REMOVE "protocol.remove"
+#define BLADE_NETCAST_CMD_PROTOCOL_UPDATE "protocol.update"
+#define BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_ADD "protocol.provider.add"
+#define BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_REMOVE "protocol.provider.remove"
+#define BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_RANK_UPDATE "protocol.provider.rank.update"
+#define BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_DATA_UPDATE "protocol.provider.data.update"
+#define BLADE_NETCAST_CMD_PROTOCOL_CHANNEL_ADD "protocol.channel.add"
+#define BLADE_NETCAST_CMD_PROTOCOL_CHANNEL_REMOVE "protocol.channel.remove"
+#define BLADE_NETCAST_CMD_SUBSCRIPTION_ADD "subscription.add"
+#define BLADE_NETCAST_CMD_SUBSCRIPTION_REMOVE "subscription.remove"
+#define BLADE_NETCAST_CMD_AUTHORITY_ADD "authority.add"
+#define BLADE_NETCAST_CMD_AUTHORITY_REMOVE "authority.remove"
+#define BLADE_NETCAST_CMD_AUTHORIZATION_ADD "authorization.add"
+#define BLADE_NETCAST_CMD_AUTHORIZATION_UPDATE "authorization.update"
+#define BLADE_NETCAST_CMD_AUTHORIZATION_REMOVE "authorization.remove"
+#define BLADE_NETCAST_CMD_ACCESS_ADD "access.add"
+#define BLADE_NETCAST_CMD_ACCESS_REMOVE "access.remove"
 
 /* The method name for a netcast request */
-static const char *BLADE_NETCAST_METHOD = "blade.netcast";
+#define BLADE_NETCAST_METHOD "blade.netcast"
 
 /* Flags for the command, in our case we don't get replies */
 #define BLADE_NETCAST_FLAGS  SWCLT_CMD_FLAG_NOREPLY

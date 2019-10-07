@@ -24,11 +24,11 @@
 
 KS_BEGIN_EXTERN_C
 
-static const char *BLADE_SUBSCRIPTION_CMD_ADD = "add";
-static const char *BLADE_SUBSCRIPTION_CMD_REMOVE = "remove";
+#define BLADE_SUBSCRIPTION_CMD_ADD "add"
+#define BLADE_SUBSCRIPTION_CMD_REMOVE "remove"
 
 /* The method name for a subscription request */
-static const char *BLADE_SUBSCRIPTION_METHOD = "blade.subscription";
+#define BLADE_SUBSCRIPTION_METHOD "blade.subscription"
 
 /* Flags for the command */
 #define BLADE_SUBSCRIPTION_FLAGS 0
@@ -169,6 +169,9 @@ static inline ks_json_t *BLADE_SUBSCRIPTION_RQU(
 	ks_json_add_string_to_object(request, "protocol", protocol);
 	ks_json_t *channels = ks_json_add_array_to_object(request, "channels");
 	ks_json_add_string_to_array(channels, channel);
+	(void)(pool);  // unused
+	(void)(broadcast_access);  // unused
+	(void)(subscribe_access);  // unused
 	return request;
 }
 

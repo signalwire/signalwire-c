@@ -23,7 +23,7 @@
 #pragma once
 
 /* The method name for an identity request */
-static const char *BLADE_IDENTITY_METHOD = "blade.identity";
+#define BLADE_IDENTITY_METHOD "blade.identity"
 
 /* Flags for the command */
 #define BLADE_IDENTITY_FLAGS 0
@@ -85,7 +85,7 @@ static inline swclt_cmd_t __CREATE_BLADE_IDENTITY_CMD_ASYNC(
 
 	if (!(request = BLADE_IDENTITY_RQU_MARSHAL(
 			&(blade_identity_rqu_t){
-				BLADE_IDENTITY_CMD_ADD,
+				command,
 				identities}))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate identity request");
 		ks_pool_close(&pool);
@@ -94,7 +94,7 @@ static inline swclt_cmd_t __CREATE_BLADE_IDENTITY_CMD_ASYNC(
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if ((status = swclt_cmd_create_ex(
+	if ((status = __swclt_cmd_create_ex(
 			&cmd,
 			&pool,
 			cb,
@@ -103,7 +103,7 @@ static inline swclt_cmd_t __CREATE_BLADE_IDENTITY_CMD_ASYNC(
 			&request,
 			BLADE_IDENTITY_TTL_MS,
 			BLADE_IDENTITY_FLAGS,
-			ks_uuid_null()))) {
+			ks_uuid_null(), file, line, tag))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate identity cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it

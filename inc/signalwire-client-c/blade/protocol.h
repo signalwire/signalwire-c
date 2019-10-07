@@ -23,7 +23,7 @@
 #pragma once
 
 /* The method name for a protocol request */
-static const char *BLADE_PROTOCOL_METHOD = "blade.protocol";
+#define BLADE_PROTOCOL_METHOD "blade.protocol"
 
 /* Flags for the command */
 #define BLADE_PROTOCOL_FLAGS 0
@@ -31,11 +31,11 @@ static const char *BLADE_PROTOCOL_METHOD = "blade.protocol";
 /* Default time to live for protocol */
 #define BLADE_PROTOCOL_TTL_MS	BLADE_DEFAULT_CMD_TTL_MS
 
-static const char *BLADE_PROTOCOL_CMD_PROVIDER_ADD = "provider.add";
-static const char *BLADE_PROTOCOL_CMD_PROVIDER_REMOVE = "provider.remove";
-static const char *BLADE_PROTOCOL_CMD_PROVIDER_RANK_UPDATE = "provider.rank.update";
-static const char *BLADE_PROTOCOL_CMD_CHANNEL_ADD = "channel.add";
-static const char *BLADE_PROTOCOL_CMD_CHANNEL_REMOVE = "channel.remove";
+#define BLADE_PROTOCOL_CMD_PROVIDER_ADD "provider.add"
+#define BLADE_PROTOCOL_CMD_PROVIDER_REMOVE "provider.remove"
+#define BLADE_PROTOCOL_CMD_PROVIDER_RANK_UPDATE "provider.rank.update"
+#define BLADE_PROTOCOL_CMD_CHANNEL_ADD "channel.add"
+#define BLADE_PROTOCOL_CMD_CHANNEL_REMOVE "channel.remove"
 
 typedef struct blade_protocol_rqu_s {
 	const char *command;
@@ -186,7 +186,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if ((status = swclt_cmd_create_ex(
+	if ((status = __swclt_cmd_create_ex(
 			&cmd,
 			&pool,
 			cb,
@@ -195,7 +195,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 			&request,
 			BLADE_PROTOCOL_TTL_MS,
 			BLADE_PROTOCOL_FLAGS,
-			ks_uuid_null()))) {
+			ks_uuid_null(), file, line, tag))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
@@ -267,7 +267,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if ((status = swclt_cmd_create_ex(
+	if ((status = __swclt_cmd_create_ex(
 			&cmd,
 			&pool,
 			cb,
@@ -276,7 +276,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
 			&request,
 			BLADE_PROTOCOL_TTL_MS,
 			BLADE_PROTOCOL_FLAGS,
-			ks_uuid_null()))) {
+			ks_uuid_null(), file, line, tag))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
@@ -344,7 +344,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if ((status = swclt_cmd_create_ex(
+	if ((status = __swclt_cmd_create_ex(
 			&cmd,
 			&pool,
 			cb,
@@ -353,7 +353,7 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC
 			&request,
 			BLADE_PROTOCOL_TTL_MS,
 			BLADE_PROTOCOL_FLAGS,
-			ks_uuid_null()))) {
+			ks_uuid_null(), file, line, tag))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it

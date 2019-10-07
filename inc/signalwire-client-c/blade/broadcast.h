@@ -22,7 +22,7 @@
 #pragma once
 
 /* The method name for a broadcast request */
-static const char *BLADE_BROADCAST_METHOD = "blade.broadcast";
+#define BLADE_BROADCAST_METHOD "blade.broadcast"
 
 /* Flags for the command, in our case we don't get replies */
 #define BLADE_BROADCAST_FLAGS SWCLT_CMD_FLAG_NOREPLY

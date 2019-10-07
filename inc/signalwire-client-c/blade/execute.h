@@ -23,7 +23,7 @@
 #pragma once
 
 /* The method name for a protocol request */
-static const char *BLADE_EXECUTE_METHOD = "blade.execute";
+#define BLADE_EXECUTE_METHOD "blade.execute"
 
 /* Flags for the command */
 #define BLADE_EXECUTE_FLAGS 0
@@ -153,7 +153,7 @@ static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if ((status = swclt_cmd_create_ex(
+	if ((status = __swclt_cmd_create_ex(
 			&cmd,
 			&pool,
 			cb,
@@ -162,7 +162,7 @@ static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
 			&request,
 			BLADE_EXECUTE_TTL_MS,
 			BLADE_EXECUTE_FLAGS,
-			ks_uuid_null()))) {
+			ks_uuid_null(), file, line, tag))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate execute cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it

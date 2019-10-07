@@ -22,7 +22,7 @@
 #pragma once
 
 /* The method name for a disconnect request */
-static const char *BLADE_DISCONNECT_METHOD = "blade.disconnect";
+#define BLADE_DISCONNECT_METHOD "blade.disconnect"
 
 /* Flags for the command, in our case we don't get replies */
 #define BLADE_DISCONNECT_FLAGS SWCLT_CMD_FLAG_NOREPLY

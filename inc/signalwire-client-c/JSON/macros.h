@@ -69,6 +69,8 @@ KS_BEGIN_EXTERN_C
 		void (*release_cb)(target_type **) = (void(*)(target_type **))function_name##_DESTROY;	\
 		target_type *target = (target_type *)ks_pool_alloc(pool, sizeof(target_type));			\
 																								\
+		(void)(object); /* suppress unused warnings */ 										\
+		(void)(release_cb); /* suppress unused warnings */									\
 		if (!target) return KS_STATUS_NO_MEM;
 
 #define SWCLT_JSON_PARSE_CUSTOM_OPT(function_name, key)							\
@@ -122,7 +124,7 @@ KS_BEGIN_EXTERN_C
 				release_cb(&target);								\
 				return KS_STATUS_INVALID_ARGUMENT;					\
 			}															\
-			ks_json_value_number_int(item, (int *)&target->key);	\
+			target->key = ks_json_get_number_int(item, 0);				\
 		}																\
 	}
 
@@ -134,8 +136,8 @@ KS_BEGIN_EXTERN_C
 				release_cb(&target);								\
 				return KS_STATUS_INVALID_ARGUMENT;					\
 			}															\
-			ks_json_value_number_int(item, (int *)&target->key);	\
-		} else *((int *)&target->key) = def;							\
+			target->key = ks_json_get_number_int(item, 0);				\
+		} else target->key = def;							\
 	}
 
 #define SWCLT_JSON_PARSE_STRING_OPT(key)								\
@@ -264,10 +266,11 @@ KS_BEGIN_EXTERN_C
 #define SWCLT_JSON_DESTROY_BEG(function_name, type)						\
 	static inline void function_name##_DESTROY(type **__free_target)	\
 	{																	\
-		type *target;													\
+		type *target = NULL;											\
 		if (!__free_target || !*__free_target)							\
 			return;														\
-		target = *__free_target;
+		target = *__free_target;										\
+		(void)(target); /* suppress unused warnings */
 
 #define SWCLT_JSON_DESTROY_STRING(key)	ks_pool_free(&target->key);
 
