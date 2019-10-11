@@ -73,6 +73,14 @@ SWCLT_DECLARE(ks_status_t) swclt_config_load_from_json(swclt_config_t *config, k
 	if ((val = ks_json_get_object_string(json, "authentication", NULL))) {
 		swclt_config_set_authentication(config, val);
 	}
+
+	if ((val = ks_json_get_object_string(json, "agent", NULL))) {
+		swclt_config_set_agent(config, val);
+	}
+
+	if ((val = ks_json_get_object_string(json, "identity", NULL))) {
+		swclt_config_set_identity(config, val);
+	}
 	
 	return ret;
 }
@@ -96,6 +104,14 @@ SWCLT_DECLARE(ks_status_t) swclt_config_load_from_env(swclt_config_t *config)
 	
 	if ((val = getenv("SW_AUTHENTICATION"))) {
 		swclt_config_set_authentication(config, val);
+	}
+
+	if ((val = getenv("SW_AGENT"))) {
+		swclt_config_set_agent(config, val);
+	}
+
+	if ((val = getenv("SW_IDENTITY"))) {
+		swclt_config_set_identity(config, val);
 	}
 
 	return ret;
@@ -166,6 +182,40 @@ SWCLT_DECLARE(ks_status_t) swclt_config_set_authentication(swclt_config_t *confi
 
 	if (config->authentication) ks_pool_free(&config->authentication);
 	if (value) config->authentication = ks_pstrdup(ks_pool_get(config), value);
+
+	return KS_STATUS_SUCCESS;
+}
+
+SWCLT_DECLARE(const char *) swclt_config_get_agent(swclt_config_t *config)
+{
+	ks_assert(config);
+
+	return config->agent;
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_config_set_agent(swclt_config_t *config, const char *value)
+{
+	ks_assert(config);
+
+	if (config->agent) ks_pool_free(&config->agent);
+	if (value) config->agent = ks_pstrdup(ks_pool_get(config), value);
+
+	return KS_STATUS_SUCCESS;
+}
+
+SWCLT_DECLARE(const char *) swclt_config_get_identity(swclt_config_t *config)
+{
+	ks_assert(config);
+
+	return config->identity;
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_config_set_identity(swclt_config_t *config, const char *value)
+{
+	ks_assert(config);
+
+	if (config->identity) ks_pool_free(&config->identity);
+	if (value) config->identity = ks_pstrdup(ks_pool_get(config), value);
 
 	return KS_STATUS_SUCCESS;
 }

@@ -226,20 +226,55 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 		BLADE_BROADCAST_RQU_DESTROY(&rqu);
 		goto done;
 	} else if (!strcmp(method, BLADE_DISCONNECT_METHOD)) {
-		//blade_disconnect_rqu_t *rqu;
+		blade_disconnect_rqu_t *rqu;
 
-		//status = BLADE_DISCONNECT_RQU_PARSE(cmd_pool, request, &rqu);
+		status = BLADE_DISCONNECT_RQU_PARSE(cmd_pool, request, &rqu);
 
 		swclt_cmd_ctx_unlock(cmd_ctx);
 
-		//if (status) {
-		//	ks_log(KS_LOG_ERROR, "Failed to parse netcast command: %s (%lu)", ks_handle_describe_ctx(cmd_ctx), status);
-		//	goto done;
-		//}
+		if (status) {
+			ks_log(KS_LOG_ERROR, "Failed to parse disconnect command: %s (%lu)", ks_handle_describe_ctx(cmd_ctx), status);
+			goto done;
+		}
 
 		// TODO: Handle disconnect properly, should halt sending more data until restored
+		ks_json_t *cmd_result = ks_json_create_object();
+		status = swclt_cmd_set_result(cmd, &cmd_result);
 
-		//BLADE_DISCONNECT_RQU_DESTROY(&rqu);
+		BLADE_DISCONNECT_RQU_DESTROY(&rqu);
+
+		if (!status) {
+			/* Now the command is ready to be sent back, enqueue it */
+			if (status = swclt_conn_submit_result(ctx->conn, cmd))
+				ks_log(KS_LOG_ERROR, "Failed to submit reply from disconnect: %lu", status);
+			else
+				ks_log(KS_LOG_INFO, "Sent reply back from disconnect request: %s", ks_handle_describe(cmd));
+		}
+		goto done;
+	} else if (!strcmp(method, BLADE_PING_METHOD)) {
+		blade_ping_rqu_t *rqu;
+
+		status = BLADE_PING_RQU_PARSE(cmd_pool, request, &rqu);
+
+		swclt_cmd_ctx_unlock(cmd_ctx);
+
+		if (status) {
+			ks_log(KS_LOG_ERROR, "Failed to parse ping command: %s (%lu)", ks_handle_describe_ctx(cmd_ctx), status);
+			goto done;
+		}
+
+		ks_json_t *cmd_result = BLADE_PING_RPL_MARSHAL(&(blade_ping_rpl_t){ rqu->timestamp, rqu->payload });
+		status = swclt_cmd_set_result(cmd, &cmd_result);
+
+		BLADE_PING_RQU_DESTROY(&rqu);
+
+		if (!status) {
+			/* Now the command is ready to be sent back, enqueue it */
+			if (status = swclt_conn_submit_result(ctx->conn, cmd))
+				ks_log(KS_LOG_ERROR, "Failed to submit reply from ping: %lu", status);
+			else
+				ks_log(KS_LOG_INFO, "Sent reply back from ping request: %s", ks_handle_describe(cmd));
+		}
 		goto done;
 	} else if (!strcmp(method, BLADE_NETCAST_METHOD)) {
 		blade_netcast_rqu_t *rqu;
@@ -402,6 +437,8 @@ static ks_status_t __do_connect(swclt_sess_ctx_t *ctx)
 			&ctx->ident,
 			ctx->info.sessionid,			/* Pass in our session id, if it was previous valid we'll try to re-use it */
 			&authentication,
+			ctx->config->agent,
+			ctx->config->identity,
 			ctx->ssl)) {
 		if (authentication) ks_json_delete(&authentication);
 		return status;

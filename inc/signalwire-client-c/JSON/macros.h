@@ -140,6 +140,30 @@ KS_BEGIN_EXTERN_C
 		} else target->key = def;							\
 	}
 
+#define SWCLT_JSON_PARSE_DOUBLE_OPT(key)									\
+	{																	\
+		ks_json_t *item = ks_json_get_object_item(object, #key);		\
+		if (item) {														\
+			if (!ks_json_type_is_number(item))  {					\
+				release_cb(&target);								\
+				return KS_STATUS_INVALID_ARGUMENT;					\
+			}															\
+			target->key = ks_json_get_number_double(item, 0);				\
+		}																\
+	}
+
+#define SWCLT_JSON_PARSE_DOUBLE_OPT_DEF(key, def)							\
+	{																	\
+		ks_json_t *item = ks_json_get_object_item(object, #key);		\
+		if (item) {														\
+			if (!ks_json_type_is_number(item))  {					\
+				release_cb(&target);								\
+				return KS_STATUS_INVALID_ARGUMENT;					\
+			}															\
+			target->key = ks_json_get_number_double(item, 0);				\
+		} else target->key = def;							\
+	}
+
 #define SWCLT_JSON_PARSE_STRING_OPT(key)								\
 	{																	\
 		const char *str = ks_json_get_object_string(object, #key, NULL);		\
