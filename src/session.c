@@ -240,9 +240,9 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 		// TODO: Handle disconnect properly, should halt sending more data until restored
 		ks_json_t *cmd_result = ks_json_create_object();
 		status = swclt_cmd_set_result(cmd, &cmd_result);
-		
+
 		BLADE_DISCONNECT_RQU_DESTROY(&rqu);
-		
+
 		if (!status) {
 			/* Now the command is ready to be sent back, enqueue it */
 			if (status = swclt_conn_submit_result(ctx->conn, cmd))
@@ -265,7 +265,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 
 		ks_json_t *cmd_result = BLADE_PING_RPL_MARSHAL(&(blade_ping_rpl_t){ rqu->timestamp, rqu->payload });
 		status = swclt_cmd_set_result(cmd, &cmd_result);
-		
+
 		BLADE_PING_RQU_DESTROY(&rqu);
 
 		if (!status) {
