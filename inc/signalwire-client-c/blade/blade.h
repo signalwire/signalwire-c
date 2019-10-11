@@ -22,7 +22,7 @@
 #pragma once
 
 #define SWCLT_BLADE_VERSION_MAJOR		2
-#define SWCLT_BLADE_VERSION_MINOR		2
+#define SWCLT_BLADE_VERSION_MINOR		4
 #define SWCLT_BLADE_VERSION_REVISION	0
 
 /* Define the default time to live amount for all blade commands */
@@ -36,6 +36,7 @@
 #include "signalwire-client-c/blade/broadcast.h"
 #include "signalwire-client-c/blade/execute.h"
 #include "signalwire-client-c/blade/identity.h"
+#include "signalwire-client-c/blade/ping.h"
 #include "signalwire-client-c/blade/protocol.h"
 #include "signalwire-client-c/blade/register.h"
 #include "signalwire-client-c/blade/subscription.h"

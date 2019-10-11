@@ -64,7 +64,7 @@ void test_async(ks_pool_t *pool)
 	ks_json_t *channels;
 	int i;
 
-	REQUIRE(!swclt_conn_connect(pool, &conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, ssl));
+	REQUIRE(!swclt_conn_connect(pool, &conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, NULL, NULL, ssl));
 
 	channels = ks_json_create_array();
 	ks_json_add_item_to_array(channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"a_channel", 0, 0}));
@@ -106,7 +106,7 @@ void test_ttl(ks_pool_t *pool)
 
 	g_protocol_response_cb_called = 0;
 
-	REQUIRE(!swclt_conn_connect(pool, &conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, ssl));
+	REQUIRE(!swclt_conn_connect(pool, &conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, NULL, NULL, ssl));
 
 	channels = ks_json_create_array();
 	ks_json_add_item_to_array(channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"b_channel", 0, 0}));

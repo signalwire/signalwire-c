@@ -41,17 +41,23 @@ typedef struct blade_connect_rqu_s {
 	blade_version_t *version;
 	ks_uuid_t sessionid;
 	ks_json_t *authentication;
+	const char *agent;
+	const char *identity;
 } blade_connect_rqu_t;
 
 SWCLT_JSON_MARSHAL_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
 	SWCLT_JSON_MARSHAL_CUSTOM(BLADE_VERSION, version)
 	SWCLT_JSON_MARSHAL_UUID(sessionid)
 	SWCLT_JSON_MARSHAL_ITEM_OPT(authentication)
+	SWCLT_JSON_MARSHAL_STRING_OPT(agent)
+	SWCLT_JSON_MARSHAL_STRING_OPT(identity)
 SWCLT_JSON_MARSHAL_END()
 
 SWCLT_JSON_DESTROY_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
 	SWCLT_JSON_DESTROY_CUSTOM(BLADE_VERSION, version)
 	SWCLT_JSON_DESTROY_UUID(sessionid)
+	SWCLT_JSON_DESTROY_STRING(agent)
+	SWCLT_JSON_DESTROY_STRING(identity)
 SWCLT_JSON_DESTROY_END()
 
 SWCLT_JSON_ALLOC_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
@@ -62,6 +68,8 @@ SWCLT_JSON_PARSE_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
 	SWCLT_JSON_PARSE_CUSTOM(BLADE_VERSION, version)
 	SWCLT_JSON_PARSE_UUID(sessionid)
 	SWCLT_JSON_PARSE_ITEM_OPT(authentication)
+	SWCLT_JSON_PARSE_STRING_OPT(agent)
+	SWCLT_JSON_PARSE_STRING_OPT(identity)
 SWCLT_JSON_PARSE_END()
 
 /* Define our reply structure */
@@ -124,6 +132,8 @@ SWCLT_JSON_PARSE_END()
 static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD_ASYNC(
 	ks_uuid_t previous_sessionid,
 	ks_json_t **authentication,
+	const char *agent,
+	const char *identity,
 	swclt_cmd_cb_t cb,
 	void *cb_data)
 {
@@ -139,6 +149,8 @@ static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD_ASYNC(
 		goto done;
 
 	connect_rqu->sessionid = previous_sessionid;
+	connect_rqu->agent = agent;
+	connect_rqu->identity = identity;
 	if (authentication && *authentication) {
 		connect_rqu->authentication = *authentication;
 		*authentication = NULL;
@@ -160,6 +172,10 @@ static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD_ASYNC(
 		goto done;
 
 done:
+	// These are not owned by the request, don't destroy them
+	connect_rqu->agent = NULL;
+	connect_rqu->identity = NULL;
+	
 	BLADE_CONNECT_RQU_DESTROY(&connect_rqu);
 	ks_json_delete(&obj);
 	ks_pool_close(&pool);
@@ -168,7 +184,9 @@ done:
 }
 
 static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD(ks_uuid_t previous_sessionid,
-												   ks_json_t **authentication)
+												   ks_json_t **authentication,
+												   const char *agent,
+												   const char *identity)
 {
-	return CREATE_BLADE_CONNECT_CMD_ASYNC(previous_sessionid, authentication, NULL, NULL);
+	return CREATE_BLADE_CONNECT_CMD_ASYNC(previous_sessionid, authentication, agent, identity, NULL, NULL);
 }

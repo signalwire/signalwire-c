@@ -465,9 +465,13 @@ SWCLT_DECLARE(char *) swclt_conn_describe(swclt_conn_t *ctx)
 	return NULL;
 }
 
-static ks_status_t do_logical_connect(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, ks_json_t **authentication)
+static ks_status_t do_logical_connect(swclt_conn_t *ctx,
+									  ks_uuid_t previous_sessionid,
+									  ks_json_t **authentication,
+									  const char *agent,
+									  const char *identity)
 {
-	swclt_cmd_t cmd = CREATE_BLADE_CONNECT_CMD(previous_sessionid, authentication);
+	swclt_cmd_t cmd = CREATE_BLADE_CONNECT_CMD(previous_sessionid, authentication, agent, identity);
 	SWCLT_CMD_TYPE cmd_type;
 	ks_json_t *error = NULL;
 	ks_status_t status = KS_STATUS_SUCCESS;
@@ -526,7 +530,7 @@ static void on_wss_failed(swclt_wss_t *wss, void *data)
 	}
 }
 
-static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, ks_json_t **authentication)
+static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, ks_json_t **authentication, const char *agent, const char *identity)
 {
 	ks_status_t status;
 
@@ -560,7 +564,7 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 	ttl_tracker_create(ctx->pool, &ctx->ttl, ctx);
 
 	/* Now perform a logical connect to blade with the connect request */
-	if (status = do_logical_connect(ctx, previous_sessionid, authentication))
+	if (status = do_logical_connect(ctx, previous_sessionid, authentication, agent, identity))
 		return status;
 
 	return status;
@@ -591,6 +595,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	swclt_ident_t *ident,
 	ks_uuid_t previous_sessionid,
 	ks_json_t **authentication,
+	const char *agent,
+	const char *identity,
 	const SSL_CTX *ssl)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
@@ -621,7 +627,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 		goto done;
 
 	/* Connect our websocket */
-	if (status = connect_wss(new_conn, previous_sessionid, authentication))
+	if (status = connect_wss(new_conn, previous_sessionid, authentication, agent, identity))
 		goto done;
 
 done:
@@ -639,6 +645,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 	void *incoming_cmd_cb_data,
 	swclt_ident_t *ident,
 	ks_json_t **authentication,
+	const char *agent,
+	const char *identity,
 	const SSL_CTX *ssl)
 {
 	return swclt_conn_connect_ex(
@@ -653,6 +661,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 		ident,
 		ks_uuid_null(),
 		authentication,
+		agent,
+		identity,
 		ssl);
 }
 
