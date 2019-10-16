@@ -10,6 +10,7 @@ steps:
       - apt-get update && apt-get install -yq git build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-4.0
       - apt-get install -yq cmake uuid-dev libssl1.0-dev      
       - git clone https://github.com/signalwire/libks libks
+      - cd libks && git checkout v2.0 && git pull
       - cd libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
       - sed -i '/cotire/d' ./CMakeLists.txt
       - sed -i '/cotire/d' ./swclt_test/CMakeLists.txt
