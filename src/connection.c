@@ -450,7 +450,7 @@ done:
 		ks_handle_destroy(&cmd);
 	}
 
-	if (status == KS_STATUS_INVALID_ARGUMENT || status == KS_STATUS_HANDLE_INVALID) {
+	if (status == KS_STATUS_INVALID_ARGUMENT || status == KS_STATUS_HANDLE_INVALID ||status == KS_STATUS_HANDLE_SEQ_MISMATCH || status == KS_STATUS_HANDLE_TYPE_MISMATCH) {
 		status = KS_STATUS_SUCCESS; // keep the connection ONLINE
 	}
 
