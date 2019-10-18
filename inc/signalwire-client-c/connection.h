@@ -36,7 +36,7 @@ typedef ks_status_t (*swclt_conn_failed_cb_t)(swclt_conn_t *conn, void *cb_data)
 typedef struct swclt_conn_info_s {
 	/* We also store a copy of the wss's info structure */
 	swclt_wss_info_t wss;
-	
+
 	/* Pulled from the blade connect result */
 	ks_uuid_t sessionid;
 	const char *nodeid;
@@ -60,6 +60,11 @@ struct swclt_conn {
 	swclt_conn_failed_cb_t failed_cb;
 	void *failed_cb_data;
 
+	/* Connection failed state */
+	int failed;
+
+	ks_mutex_t *failed_mutex;
+
 	/* Our websocket transport, basically our connection to blade */
 	swclt_wss_t *wss;
 
@@ -80,11 +85,6 @@ struct swclt_conn {
 
 	/* TTLs to expire */
 	swclt_ttl_tracker_t *ttl;
-
-	/* The outstanding condition is signalled anytime a command in the outstanding
-	 * requests hash parses a result. Client readers wait on this condition until
-	 * signalled */
-	ks_cond_t *cmd_condition;
 };
 
 SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn);

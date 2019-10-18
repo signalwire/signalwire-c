@@ -22,6 +22,8 @@
 
 #include "swclt_test.h"
 
+#include "../../src/connection.c"
+
 static uint32_t g_protocol_response_cb_called;
 
 static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, void *cb_data)
@@ -146,8 +148,44 @@ void test_ttl(ks_pool_t *pool)
 	swclt_ssl_destroy_context(&ssl);
 }
 
+void test_ttl_heap(ks_pool_t *pool)
+{
+	swclt_ttl_tracker_t *ttl = NULL;
+	ttl_tracker_create(pool, &ttl, NULL);
+	ks_thread_destroy(&ttl->thread); // don't want it
+
+	int i;
+	int min = INT_MAX;
+	for (i = 0; i < 100; i++) {
+		ks_uuid_t uuid = { 0 };
+		ks_uuid(&uuid);
+		int expiry = rand();
+		if (expiry < min) {
+			min = expiry;
+		}
+		if (ttl_heap_insert(ttl, expiry, uuid) != KS_STATUS_SUCCESS) {
+			printf("Failed to insert UUID = %s, TTL = %d, min = %d, root = %d, count = %d\n", ks_uuid_thr_str(&uuid), expiry, min, ttl->heap[TTL_HEAP_ROOT].expiry, ttl->count);
+		} else {
+			printf("Insert UUID = %s, TTL = %d, min = %d, root = %d, count = %d\n", ks_uuid_thr_str(&uuid), expiry, min, ttl->heap[TTL_HEAP_ROOT].expiry, ttl->count);
+		}
+		REQUIRE(ttl->heap[TTL_HEAP_ROOT].expiry == min);
+	}
+
+	min = 0;
+	while (ttl->count) {
+		REQUIRE(ttl->heap[TTL_HEAP_ROOT].expiry > 0);
+		printf("Remove UUID = %s, TTL = %d, count = %d\n", ks_uuid_thr_str(&ttl->heap[TTL_HEAP_ROOT].id), ttl->heap[TTL_HEAP_ROOT].expiry, ttl->count);
+		REQUIRE(ttl->heap[TTL_HEAP_ROOT].expiry >= min);
+		min = ttl->heap[TTL_HEAP_ROOT].expiry;
+		ttl_heap_remove(ttl);
+	}
+
+	ttl_tracker_destroy(&ttl);
+}
+
 void test_connection(ks_pool_t *pool)
 {
 	test_async(pool);
 	test_ttl(pool);
+	test_ttl_heap(pool);
 }

@@ -11,7 +11,7 @@ steps:
       - apt-get install -yq cmake uuid-dev libssl1.0-dev      
       - git clone https://github.com/signalwire/libks libks
       - cd libks && git checkout v2.0 && git pull
-      - cd libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
+      - cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
       - sed -i '/cotire/d' ./CMakeLists.txt
       - sed -i '/cotire/d' ./swclt_test/CMakeLists.txt
       - mkdir -p scan-build
