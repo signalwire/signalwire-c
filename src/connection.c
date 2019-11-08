@@ -63,11 +63,11 @@ static ks_status_t ttl_heap_remove(swclt_ttl_tracker_t *ttl)
 	}
 	// clear entry at root and swap with last entry
 	memset(&ttl->heap[TTL_HEAP_ROOT], 0, sizeof(ttl->heap[TTL_HEAP_ROOT]));
-	int pos = ttl->count - 1;
+	ttl_heap_swap(ttl, ttl->count - 1, TTL_HEAP_ROOT);
 	ttl->count--;
-	ttl_heap_swap(ttl, pos, TTL_HEAP_ROOT);
 
 	// sift down the value...
+	int pos = TTL_HEAP_ROOT;
 	while (pos < ttl->count) {
 		int swap = TTL_HEAP_LEFT_CHILD(pos);
 		int right = TTL_HEAP_RIGHT_CHILD(pos);
@@ -148,7 +148,10 @@ static ks_status_t ttl_tracker_next(swclt_ttl_tracker_t *ttl, ks_uuid_t *id)
 		ks_log(KS_LOG_INFO, "Waiting %d for TTL expiration of %s", (uint32_t)wait_ms, ks_uuid_thr_str(&ttl->heap[TTL_HEAP_ROOT].id));
 	}
 
-	// wait for TTL
+	// wait for TTL, up to 5 seconds
+	if (wait_ms > 5000) {
+		wait_ms = 5000;
+	}
 	if (wait_ms) {
 		ks_cond_timedwait(ttl->cond, wait_ms);
 		now_ms = ks_time_now_ms();
@@ -235,6 +238,21 @@ static ks_handle_t *dup_handle(swclt_conn_t *conn, ks_handle_t handle)
 	return dup;
 }
 
+static void report_connection_failure(swclt_conn_t *conn)
+{
+	ks_mutex_lock(conn->failed_mutex);
+	if (!conn->failed) {
+		conn->failed = 1;
+		ks_mutex_unlock(conn->failed_mutex);
+		ks_log(KS_LOG_WARNING, "Reporting connection state failure");
+		if (conn->failed_cb) {
+			conn->failed_cb(conn, conn->failed_cb_data);
+		}
+	} else {
+		ks_mutex_unlock(conn->failed_mutex);
+	}
+}
+
 static ks_status_t register_cmd(swclt_conn_t *ctx, swclt_cmd_t cmd)
 {
 	ks_status_t status;
@@ -250,6 +268,7 @@ static ks_status_t register_cmd(swclt_conn_t *ctx, swclt_cmd_t cmd)
 
 	if (!ctx->ttl || (status = ttl_tracker_watch(ctx->ttl, ks_time_now_ms() + (ks_time_t)ttl_ms, id))) {
 		ks_log(KS_LOG_ERROR, "Failed to track TTL for command: %16.16llx with id: %s and TTL: %d", cmd, ks_uuid_thr_str(&id), ttl_ms);
+		report_connection_failure(ctx);
 		return status;
 	}
 	return ks_hash_insert(ctx->outstanding_requests, ks_uuid_dup(ctx->pool, &id), dup_handle(ctx, cmd));
@@ -265,7 +284,7 @@ static ks_status_t submit_result(swclt_conn_t *ctx, swclt_cmd_t cmd)
 	SWCLT_CMD_TYPE type;
 	ks_status_t status;
 
-	if (!ctx->wss || ctx->wss->failed) {
+	if (ctx->failed || !ctx->wss) {
 		return KS_STATUS_FAIL;
 	}
 
@@ -284,7 +303,7 @@ static ks_status_t submit_request(swclt_conn_t *ctx, swclt_cmd_t cmd)
 	uint32_t flags = 0;
 
 	/* Check state */
-	if (!ctx->wss || ctx->wss->failed) {
+	if (ctx->failed || !ctx->wss) {
 		return KS_STATUS_FAIL;
 	}
 
@@ -334,7 +353,7 @@ static ks_status_t on_incoming_request(swclt_conn_t *ctx, ks_json_t *payload, sw
 	ks_status_t status;
 
 	/* Check state */
-	if (!ctx->wss || ctx->wss->failed) {
+	if (ctx->failed || !ctx->wss) {
 		return KS_STATUS_FAIL;
 	}
 
@@ -450,7 +469,7 @@ done:
 		ks_handle_destroy(&cmd);
 	}
 
-	if (status == KS_STATUS_INVALID_ARGUMENT || status == KS_STATUS_HANDLE_INVALID) {
+	if (status == KS_STATUS_INVALID_ARGUMENT || status == KS_STATUS_HANDLE_INVALID ||status == KS_STATUS_HANDLE_SEQ_MISMATCH || status == KS_STATUS_HANDLE_TYPE_MISMATCH) {
 		status = KS_STATUS_SUCCESS; // keep the connection ONLINE
 	}
 
@@ -525,9 +544,7 @@ done:
 static void on_wss_failed(swclt_wss_t *wss, void *data)
 {
 	swclt_conn_t *conn = (swclt_conn_t *)data;
-	if (conn->failed_cb) {
-		conn->failed_cb(conn, conn->failed_cb_data);
-	}
+	report_connection_failure(conn);
 }
 
 static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, ks_json_t **authentication, const char *agent, const char *identity)
@@ -550,7 +567,7 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 		ks_log(KS_LOG_INFO, "Port not specified, defaulting to 2100");
 		ctx->info.wss.port = 2100;
 	}
-	
+
 	ks_log(KS_LOG_INFO, "Connecting to %s:%d/%s", ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path);
 
 	/* Create our websocket transport */
@@ -579,6 +596,7 @@ SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn)
 		ttl_tracker_destroy(&(*conn)->ttl);
 		swclt_wss_destroy(&(*conn)->wss);
 		ks_hash_destroy(&(*conn)->outstanding_requests);
+		ks_mutex_destroy(&(*conn)->failed_mutex);
 		ks_pool_free(conn);
 	}
 }
@@ -625,6 +643,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	if (status = ks_hash_create(&new_conn->outstanding_requests, KS_HASH_MODE_UUID,
 			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_VALUE | KS_HASH_FLAG_FREE_KEY, new_conn->pool))
 		goto done;
+
+	ks_mutex_create(&new_conn->failed_mutex, KS_MUTEX_FLAG_DEFAULT, new_conn->pool);
 
 	/* Connect our websocket */
 	if (status = connect_wss(new_conn, previous_sessionid, authentication, agent, identity))

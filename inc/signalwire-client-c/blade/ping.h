@@ -82,7 +82,6 @@ static inline swclt_cmd_t CREATE_BLADE_PING_CMD_ASYNC(
 	const char *payload)
 {
 	ks_json_t *obj = NULL;
-	blade_ping_rqu_t ping_rqu;
 	swclt_cmd_t cmd = KS_NULL_HANDLE;
 	ks_pool_t *pool;
 

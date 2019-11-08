@@ -145,7 +145,7 @@ static ks_status_t __execute_pmethod_cb(
 	if (err_code) {
 		ks_status_t status;
 
-		ks_log(KS_LOG_ERROR, err_message);
+		ks_log(KS_LOG_WARNING, err_message);
 
 		ks_json_t *err = BLADE_EXECUTE_ERR_MARSHAL(
 					&(blade_execute_err_t){
@@ -155,7 +155,7 @@ static ks_status_t __execute_pmethod_cb(
 						err_message});
 
 		if (status = swclt_cmd_set_error(cmd_ctx->base.handle, &err)) {
-			ks_log(KS_LOG_ERROR, "Failed to set result in command: %lu", status);
+			ks_log(KS_LOG_WARNING, "Failed to set result in command: %lu", status);
 			ks_json_delete(&err);
 			ks_pool_free(&err_message);
 		}
@@ -265,7 +265,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 
 		ks_json_t *cmd_result = BLADE_PING_RPL_MARSHAL(&(blade_ping_rpl_t){ rqu->timestamp, rqu->payload });
 		status = swclt_cmd_set_result(cmd, &cmd_result);
-		
+
 		BLADE_PING_RQU_DESTROY(&rqu);
 
 		if (!status) {
