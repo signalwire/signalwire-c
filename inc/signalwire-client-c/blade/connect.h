@@ -176,7 +176,7 @@ done:
 	connect_rqu->agent = NULL;
 	connect_rqu->identity = NULL;
 
-  BLADE_CONNECT_RQU_DESTROY(&connect_rqu);
+	BLADE_CONNECT_RQU_DESTROY(&connect_rqu);
 	ks_json_delete(&obj);
 	ks_pool_close(&pool);
 
