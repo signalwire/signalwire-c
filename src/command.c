@@ -615,7 +615,6 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_error(swclt_cmd_t cmd, const ks_json_t **
 
 	if (ctx->type != SWCLT_CMD_TYPE_ERROR) {
 		status = KS_STATUS_INVALID_ARGUMENT;
-		ks_log(KS_LOG_CRIT, "Invalid type except SWCLT_CMD_TYPE_ERROR");
 		goto done;
 	}
 
@@ -635,7 +634,6 @@ SWCLT_DECLARE(ks_status_t) __swclt_cmd_result(swclt_cmd_t cmd, const ks_json_t *
 
 	if (ctx->type != SWCLT_CMD_TYPE_RESULT) {
 		status = KS_STATUS_INVALID_ARGUMENT;
-		ks_log(KS_LOG_CRIT, "Invalid type expected result");
 		goto done;
 	}
 
