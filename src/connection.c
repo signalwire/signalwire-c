@@ -68,8 +68,8 @@ static ks_status_t ttl_heap_remove(swclt_ttl_tracker_t *ttl)
 
 	// sift down the value...
 	int pos = TTL_HEAP_ROOT;
-	while (pos < ttl->count) {
-		int swap = TTL_HEAP_LEFT_CHILD(pos);
+	int swap;
+	while ((swap = TTL_HEAP_LEFT_CHILD(pos)) < ttl->count) {
 		int right = TTL_HEAP_RIGHT_CHILD(pos);
 		// if there is no left child or there is a right child and it is higher priority than left
 		if (!ttl->heap[swap].expiry || (ttl->heap[right].expiry && ttl->heap[right].expiry < ttl->heap[swap].expiry)) {
@@ -453,8 +453,6 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 		status = KS_STATUS_SUCCESS; // keep the connection ONLINE
 		goto done;
 	}
-
-	ks_log(KS_LOG_DEBUG, "Successfully read command result: %s", ks_handle_describe(cmd));
 
 done:
 
