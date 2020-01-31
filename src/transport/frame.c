@@ -60,6 +60,11 @@ static ks_status_t __copy_data(swclt_frame_t *frame, ks_pool_t *pool, void *data
 	return KS_STATUS_SUCCESS;
 }
 
+static void swclt_frame_cleanup(void *ptr, void *arg, ks_pool_cleanup_action_t action, ks_pool_cleanup_type_t type)
+{
+	swclt_frame_t *frame = (swclt_frame_t *)ptr;
+	if (frame->data) ks_pool_free(&frame->data);
+}
 
 /**
  * Allocates a frame, wrapped in a handle. A frame is a context used
@@ -69,6 +74,7 @@ SWCLT_DECLARE(ks_status_t) swclt_frame_alloc(swclt_frame_t **frame, ks_pool_t *p
 {
 	if (frame) {
 		*frame = ks_pool_alloc(pool, sizeof(swclt_frame_t));
+		ks_pool_set_cleanup(*frame, NULL, swclt_frame_cleanup);
 		return KS_STATUS_SUCCESS;
 	}
 	return KS_STATUS_INVALID_ARGUMENT;
