@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 
 void test_command_properties(ks_pool_t *pool)
 {
-	swclt_cmd_t cmd;
+	swclt_cmd_t *cmd;
 	uint32_t flags;
 	const char *method;
 	SWCLT_CMD_TYPE type;
@@ -44,7 +44,7 @@ void test_command_properties(ks_pool_t *pool)
 
 	REQUIRE(!swclt_cmd_type(cmd, &type));
 	REQUIRE(type == SWCLT_CMD_TYPE_REQUEST);
-	ks_handle_destroy(&cmd);
+	swclt_cmd_destroy(&cmd);
 }
 
 void test_command(ks_pool_t *pool)

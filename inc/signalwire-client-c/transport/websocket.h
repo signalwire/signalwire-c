@@ -98,7 +98,7 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 
 SWCLT_DECLARE(void) swclt_wss_destroy(swclt_wss_t **wss);
 
-SWCLT_DECLARE(ks_status_t) swclt_wss_write_cmd(swclt_wss_t *wss, swclt_cmd_t cmd);
+SWCLT_DECLARE(ks_status_t) swclt_wss_write(swclt_wss_t *wss, char *data);
 SWCLT_DECLARE(ks_status_t) swclt_wss_get_info(swclt_wss_t *wss, swclt_wss_info_t *info);
 SWCLT_DECLARE(char *) swclt_wss_describe(swclt_wss_t *ctx);
 

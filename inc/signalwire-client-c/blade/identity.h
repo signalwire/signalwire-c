@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -58,27 +58,21 @@ SWCLT_JSON_PARSE_END()
  * CREATE_BLADE_IDENTITY_CMD_ASYNC - Creates a command which holds
  * and owns the request json for an identity request.
  */
-#define CREATE_BLADE_IDENTITY_CMD_ASYNC(...)	__CREATE_BLADE_IDENTITY_CMD_ASYNC(__FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-static inline swclt_cmd_t __CREATE_BLADE_IDENTITY_CMD_ASYNC(
-	const char *file, int line, const char *tag,
+static inline swclt_cmd_t *CREATE_BLADE_IDENTITY_CMD_ASYNC(
+	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *command,
 	const char *identity)
 {
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 	ks_status_t status;
 	ks_json_t *identities;
 	ks_json_t *request;
-	ks_pool_t *pool;
-
-	if (ks_pool_open(&pool))
-		return cmd;
 
 	/* Serialize the identity into an array */
 	if (!(identities = ks_json_create_array())) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate blade identity array");
-		ks_pool_close(&pool);
 		return cmd;
 	}
 	ks_json_add_string_to_array(identities, identity);
@@ -88,28 +82,25 @@ static inline swclt_cmd_t __CREATE_BLADE_IDENTITY_CMD_ASYNC(
 				command,
 				identities}))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate identity request");
-		ks_pool_close(&pool);
 		return cmd;
 	}
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if ((status = __swclt_cmd_create_ex(
+	if ((status = swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_IDENTITY_METHOD,
 			&request,
 			BLADE_IDENTITY_TTL_MS,
 			BLADE_IDENTITY_FLAGS,
-			ks_uuid_null(), file, line, tag))) {
+			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate identity cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
 		 * took ownership of it */
 		ks_json_delete(&request);
-		ks_pool_close(&pool);
 		return KS_NULL_HANDLE;
 	}
 
@@ -117,11 +108,13 @@ static inline swclt_cmd_t __CREATE_BLADE_IDENTITY_CMD_ASYNC(
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_IDENTITY_CMD(
+static inline swclt_cmd_t *CREATE_BLADE_IDENTITY_CMD(
+	ks_pool_t *pool,
 	const char *command,
 	const char *identity)
 {
 	return CREATE_BLADE_IDENTITY_CMD_ASYNC(
+		pool,
 		NULL,
 		NULL,
 		command,

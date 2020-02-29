@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -85,20 +85,17 @@ SWCLT_JSON_PARSE_END()
  * CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC - Creates a command which holds
  * and owns the request json for a subscription request.
  */
-static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
+static inline swclt_cmd_t *CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
+	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *command,
 	const char *protocol,
 	const char *channel)
 {
-	ks_pool_t *pool;
 	ks_json_t *request_obj;
 	ks_status_t status;
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
-
-	if (ks_pool_open(&pool))
-		return cmd;
+	swclt_cmd_t *cmd = NULL;
 
 	ks_json_t *channels = ks_json_create_array();
 	ks_json_add_string_to_array(channels, channel);
@@ -115,7 +112,6 @@ static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 
 		/* Don't forget to free the channels we instantiated inline above */
 		ks_json_delete(&request.channels);
-		ks_pool_close(&pool);
 		return cmd;
 	}
 
@@ -124,7 +120,6 @@ static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 	/* Now wrap it in a command */
 	if ((status = swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_SUBSCRIPTION_METHOD,
@@ -134,20 +129,21 @@ static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate subscription command: %lu", status);
 		ks_json_delete(&request_obj);
-		ks_pool_close(&pool);
-		return status;
+		return cmd;
 	}
 
 	/* Success */
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD(
+static inline swclt_cmd_t *CREATE_BLADE_SUBSCRIPTION_CMD(
+	ks_pool_t *pool,
 	const char *command,
 	const char *protocol,
 	const char *channel)
 {
 	return CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
+		pool,
 		NULL,
 		NULL,
 		command,

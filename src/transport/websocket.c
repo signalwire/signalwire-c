@@ -374,19 +374,13 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_get_info(swclt_wss_t *wss, swclt_wss_info_t
 	memcpy(info, &wss->info, sizeof(wss->info));
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_wss_write_cmd(swclt_wss_t *wss, swclt_cmd_t cmd)
+SWCLT_DECLARE(ks_status_t) swclt_wss_write(swclt_wss_t *wss, char *data)
 {
-	char *data = NULL;
 	ks_size_t len, wrote;
 	ks_status_t status;
 
 	/* Ensure we have valid state */
 	if (wss->failed) {
-		return KS_STATUS_FAIL;
-	}
-
-	if (status = swclt_cmd_print(cmd, wss->pool, &data)) {
-		ks_log(KS_LOG_CRIT, "Invalid command, failed to render payload string: %lu", status);
 		return KS_STATUS_FAIL;
 	}
 
@@ -396,13 +390,14 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_write_cmd(swclt_wss_t *wss, swclt_cmd_t cmd
 	wrote = kws_write_frame(wss->wss, WSOC_TEXT, data, len);
 	ks_mutex_unlock(wss->write_mutex);
 
-	ks_log(KS_LOG_DEBUG, "Wrote frame: %s", ks_handle_describe(cmd));
-
 	if (len != wrote) {
+		ks_log(KS_LOG_WARNING, "Short write to websocket.  wrote = %ul, len = %ul", wrote, len);
 		status = KS_STATUS_FAIL;
+		wss->failed = 1;
+	} else {
+		ks_log(KS_LOG_DEBUG, "Wrote frame: %s", data);
+		status = KS_STATUS_SUCCESS;
 	}
-
-	ks_pool_free(&data);
 
 	return status;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,10 +23,10 @@
 
 #define ks_time_now_ms() ks_time_ms(ks_time_now())
 
-static void deregister_cmd(swclt_conn_t *ctx, ks_uuid_t id);
+static swclt_cmd_t *deregister_cmd(swclt_conn_t *ctx, ks_uuid_t id);
 
-/* 1638 commands per second over 5 second average TTL */
-#define TTL_HEAP_MAX_SIZE 8192
+/* 13107 commands per second over 5 second average TTL */
+#define TTL_HEAP_MAX_SIZE 65536
 
 typedef struct swclt_ttl_node {
 	ks_time_t expiry;
@@ -178,23 +178,15 @@ static void *ttl_tracker_thread(ks_thread_t *thread, void *data)
 	while (ks_thread_stop_requested(thread) == KS_FALSE) {
 		ks_uuid_t id = { 0 };
 		if (ttl_tracker_next(ttl, &id) == KS_STATUS_SUCCESS) {
-			swclt_cmd_t *cmd = NULL;
-			ks_hash_read_lock(ttl->conn->outstanding_requests);
-			if ((cmd = ks_hash_search(ttl->conn->outstanding_requests, &id, KS_UNLOCKED))) {
-				swclt_cmd_t cmd_dup = *cmd;
+			swclt_cmd_t *cmd;
+			if ((cmd = deregister_cmd(ttl->conn, id))) {
 				swclt_cmd_cb_t cb = { 0 };
 				void *cb_data = NULL;
-				swclt_cmd_cb(*cmd, &cb, &cb_data);
-				swclt_cmd_report_failure_fmt_m(*cmd, KS_STATUS_TIMEOUT, "TTL expired for command %s", ks_uuid_thr_str(&id));
+				swclt_cmd_cb(cmd, &cb, &cb_data);
+				swclt_cmd_report_failure_fmt(cmd, KS_STATUS_TIMEOUT, "TTL expired for command %s", ks_uuid_thr_str(&id));
 				ks_log(KS_LOG_INFO, "TTL expired for command %s", ks_uuid_thr_str(&id));
-				ks_hash_read_unlock(ttl->conn->outstanding_requests);
-				if (cb) {
-					ks_handle_destroy(&cmd_dup);
-				}
-			} else {
-				ks_hash_read_unlock(ttl->conn->outstanding_requests);
+				swclt_cmd_destroy(&cmd);
 			}
-			deregister_cmd(ttl->conn, id);
 		}
 	}
 	ks_log(KS_LOG_INFO, "TTL tracker thread finished");
@@ -230,14 +222,6 @@ static void ttl_tracker_create(ks_pool_t *pool, swclt_ttl_tracker_t **ttl, swclt
 	}
 }
 
-static ks_handle_t *dup_handle(swclt_conn_t *conn, ks_handle_t handle)
-{
-	ks_handle_t *dup = ks_pool_alloc(conn->pool, sizeof(handle));
-	ks_assertd(dup);
-	memcpy(dup, &handle, sizeof(handle));
-	return dup;
-}
-
 static void report_connection_failure(swclt_conn_t *conn)
 {
 	ks_mutex_lock(conn->failed_mutex);
@@ -253,94 +237,125 @@ static void report_connection_failure(swclt_conn_t *conn)
 	}
 }
 
-static ks_status_t register_cmd(swclt_conn_t *ctx, swclt_cmd_t cmd)
+static ks_status_t register_cmd(swclt_conn_t *ctx, swclt_cmd_t **cmd)
 {
 	ks_status_t status;
 	ks_uuid_t id = { 0 };
 	uint32_t ttl_ms = { 0 };
 
-	if (status = swclt_cmd_id(cmd, &id))
+	if (status = swclt_cmd_id(*cmd, &id))
 		return status;
-	if (status = swclt_cmd_ttl(cmd, &ttl_ms))
+	if (status = swclt_cmd_ttl(*cmd, &ttl_ms))
 		return status;
 
-	ks_log(KS_LOG_DEBUG, "Tracking command handle: %16.16llx with id: %s and TTL: %d", cmd, ks_uuid_thr_str(&id), ttl_ms);
+	ks_log(KS_LOG_DEBUG, "Tracking command with id: %s and TTL: %d", ks_uuid_thr_str(&id), ttl_ms);
 
 	if (!ctx->ttl || (status = ttl_tracker_watch(ctx->ttl, ks_time_now_ms() + (ks_time_t)ttl_ms, id))) {
-		ks_log(KS_LOG_ERROR, "Failed to track TTL for command: %16.16llx with id: %s and TTL: %d", cmd, ks_uuid_thr_str(&id), ttl_ms);
+		ks_log(KS_LOG_ERROR, "Failed to track TTL for command with id: %s and TTL: %d", ks_uuid_thr_str(&id), ttl_ms);
 		report_connection_failure(ctx);
 		return status;
 	}
-	return ks_hash_insert(ctx->outstanding_requests, ks_uuid_dup(ctx->pool, &id), dup_handle(ctx, cmd));
+	ks_hash_insert(ctx->outstanding_requests, ks_uuid_dup(ctx->pool, &id), *cmd);
+	*cmd = NULL;
+
+	return KS_STATUS_SUCCESS;
 }
 
-static void deregister_cmd(swclt_conn_t *ctx, ks_uuid_t id)
+static swclt_cmd_t *deregister_cmd(swclt_conn_t *conn, ks_uuid_t id)
 {
-	ks_hash_remove(ctx->outstanding_requests, &id);
+	return ks_hash_remove(conn->outstanding_requests, &id);
 }
 
-static ks_status_t submit_result(swclt_conn_t *ctx, swclt_cmd_t cmd)
+static ks_status_t submit_result(swclt_conn_t *ctx, swclt_cmd_t *cmd)
 {
-	SWCLT_CMD_TYPE type;
 	ks_status_t status;
 
 	if (ctx->failed || !ctx->wss) {
 		return KS_STATUS_FAIL;
 	}
 
-	if (status = swclt_cmd_type(cmd, &type)) {
-		return status;
+	if (cmd->type != SWCLT_CMD_TYPE_RESULT && cmd->type != SWCLT_CMD_TYPE_ERROR) {
+		char *cmd_str = swclt_cmd_describe(cmd);
+		ks_log(KS_LOG_ERROR, "Invalid command type to send as result: %s", cmd_str);
+		ks_pool_free(&cmd_str);
+		return KS_STATUS_FAIL;
 	}
 
-	ks_assert(type == SWCLT_CMD_TYPE_RESULT || type == SWCLT_CMD_TYPE_ERROR);
+	/* convert command to JSON string */
+	char *data = NULL;
+	if (status = swclt_cmd_print(cmd, cmd->pool, &data)) {
+		ks_log(KS_LOG_CRIT, "Invalid command, failed to render payload string: %lu", status);
+		return KS_STATUS_FAIL;
+	}
 
-	return swclt_wss_write_cmd(ctx->wss, cmd);
+	/* Write the command data on the socket */
+	if ((status = swclt_wss_write(ctx->wss, data))) {
+		ks_log(KS_LOG_WARNING, "Failed to write to websocket: %lu, %s", status, data);
+	}
+	ks_pool_free(&data);
+
+	return status;
 }
 
-static ks_status_t submit_request(swclt_conn_t *ctx, swclt_cmd_t cmd)
+static ks_status_t submit_request(swclt_conn_t *ctx, swclt_cmd_t **cmdP, swclt_cmd_future_t **cmd_future)
 {
-	ks_status_t status;
+	ks_status_t status = KS_STATUS_SUCCESS;
 	uint32_t flags = 0;
+	swclt_cmd_t *cmd = *cmdP;
+	*cmdP = NULL;
 
-	/* Check state */
+	/* Check state of connection and websocket */
 	if (ctx->failed || !ctx->wss) {
+		swclt_cmd_destroy(&cmd);
 		return KS_STATUS_FAIL;
 	}
 
-	if (status = swclt_cmd_flags(cmd, &flags))
-		return status;
+	char *cmd_str = swclt_cmd_describe(cmd);
+	ks_log(KS_LOG_DEBUG, "Submitting request: %s", cmd_str);
+	ks_pool_free(&cmd_str);
 
-	ks_log(KS_LOG_DEBUG, "Submitting request: %s", ks_handle_describe(cmd));
-
-	/* Register this cmd in our outstanding requests if we expect a reply */
-	if (!(flags & SWCLT_CMD_FLAG_NOREPLY) && (status = register_cmd(ctx, cmd))) {
-		ks_log(KS_LOG_WARNING, "Failed to register cmd: %lu", status);
-		return status;
+	/* convert command to JSON string */
+	char *data = NULL;
+	if (status = swclt_cmd_print(cmd, ctx->pool, &data)) {
+		ks_log(KS_LOG_CRIT, "Invalid command, failed to render payload string: %lu", status);
+		swclt_cmd_destroy(&cmd);
+		return KS_STATUS_FAIL;
 	}
 
-	/* And write it on the socket */
-	if (status = swclt_wss_write_cmd(ctx->wss, cmd)) {
-		ks_log(KS_LOG_WARNING, "Failed to write to websocket: %lu", status);
-		return status;
-	}
-
-	/* If the command has a reply, wait for it (it will get
-	 * de-registered by wait_cmd_result) */
-	if (!(flags & SWCLT_CMD_FLAG_NOREPLY)) {
+	/* Register this cmd in our outstanding requests if there is a reply */
+	if (!(cmd->flags & SWCLT_CMD_FLAG_NOREPLY)) {
 		swclt_cmd_cb_t cb;
 		void *cb_data;
-
-		/* Don't wait if a callback is set */
-		if (status = swclt_cmd_cb(cmd, &cb, &cb_data))
-			return status;
-
-		if (!cb) {
-			if (status = swclt_cmd_wait_result(cmd)) {
-				ks_log(KS_LOG_WARNING, "Failed to wait for cmd: %lu", status);
+		if (status = swclt_cmd_cb(cmd, &cb, &cb_data)) {
+			ks_log(KS_LOG_CRIT, "Failed to get command callback");
+			swclt_cmd_destroy(&cmd);
+			return KS_STATUS_FAIL;
+		}
+		if (!cb && cmd_future) {
+			/* set up our own callbacks to wait if none exist */
+			if (status = swclt_cmd_future_create(cmd_future, cmd)) {
+				ks_log(KS_LOG_CRIT, "Failed to create command cmd_future");
+				swclt_cmd_destroy(&cmd);
+				return KS_STATUS_FAIL;
 			}
 		}
-		return status;
+
+		if ((cb || cmd_future) && (status = register_cmd(ctx, &cmd))) {
+			ks_log(KS_LOG_WARNING, "Failed to register cmd: %lu", status);
+			swclt_cmd_future_destroy(cmd_future);
+			swclt_cmd_destroy(&cmd);
+			return status;
+		}
 	}
+
+	/* Write the command data on the socket */
+	if ((status = swclt_wss_write(ctx->wss, data))) {
+		ks_log(KS_LOG_WARNING, "Failed to write to websocket: %lu, %s", status, data);
+	}
+	ks_pool_free(&data);
+
+	/* destroy command if we didn't register it (it is not NULL) */
+	swclt_cmd_destroy(&cmd);
 
 	return status;
 }
@@ -349,7 +364,7 @@ static ks_status_t on_incoming_request(swclt_conn_t *ctx, ks_json_t *payload, sw
 {
 	const char *method;
 	ks_uuid_t id;
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 	ks_status_t status;
 
 	/* Check state */
@@ -370,6 +385,7 @@ static ks_status_t on_incoming_request(swclt_conn_t *ctx, ks_json_t *payload, sw
 		return KS_STATUS_INVALID_ARGUMENT;
 	}
 
+	/* Create the command */
 	if (status = swclt_cmd_create_frame(
 			&cmd,
 			NULL,
@@ -386,8 +402,13 @@ static ks_status_t on_incoming_request(swclt_conn_t *ctx, ks_json_t *payload, sw
 	/* And we're in charge of the frame now, we copied it, so free it */
 	ks_pool_free(frame);
 
-	/* And raise the client */
-	return ctx->incoming_cmd_cb(ctx, cmd, ctx->incoming_cmd_cb_data);
+	/* Send command to client */
+	ctx->incoming_cmd_cb(ctx, cmd, ctx->incoming_cmd_cb_data);
+
+	/* Free the command */
+	swclt_cmd_destroy(&cmd);
+
+	return KS_STATUS_SUCCESS;
 }
 
 static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, swclt_conn_t *ctx)
@@ -396,9 +417,7 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 	ks_status_t status = KS_STATUS_SUCCESS;
 	const char *method;
 	ks_uuid_t id;
-	swclt_cmd_t *outstanding_cmd = NULL;
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
-	ks_bool_t async = KS_FALSE;
+	swclt_cmd_t *cmd = NULL;
 
 	ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", (*frame)->data);
 
@@ -422,24 +441,14 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 		goto done;
 	}
 
-	ks_hash_read_lock(ctx->outstanding_requests);
-	if (!(outstanding_cmd = ks_hash_search(ctx->outstanding_requests, &id, KS_UNLOCKED))) {
+	if (!(cmd = deregister_cmd(ctx, id))) {
 		/* Command probably timed out or we don't care about the reply, or a node sent bad data - 
 		   this is completely fine and should not cause us to tear down the connection.
 		 */
 		ks_log(KS_LOG_DEBUG, "Could not locate cmd for frame: %s", (*frame)->data);
 		status = KS_STATUS_SUCCESS;
-		ks_hash_read_unlock(ctx->outstanding_requests);
 		goto done;
 	}
-	/* Copy the value before we unlock the hash and lose safe access to the value */
-	cmd = *outstanding_cmd;
-	ks_hash_read_unlock(ctx->outstanding_requests);
-
-	/* Remove the command from outstanding requests */
-	deregister_cmd(ctx, id);
-
-	ks_log(KS_LOG_DEBUG, "Fetched cmd handle: %8.8llx", cmd);
 
 	if (status = swclt_cmd_method(cmd, &method)) {
 		ks_log(KS_LOG_WARNING, "Failed to get command method: %lu", status);
@@ -448,7 +457,7 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 	}
 
 	/* Great, feed it the reply */
-	if (status = swclt_cmd_parse_reply_frame(cmd, *frame, &async)) {
+	if (status = swclt_cmd_parse_reply_frame(cmd, *frame)) {
 		ks_log(KS_LOG_ERROR, "Failed to parse command reply: %lu", status);
 		status = KS_STATUS_SUCCESS; // keep the connection ONLINE
 		goto done;
@@ -462,12 +471,14 @@ done:
 		ks_json_delete(&payload);
 	}
 
-	if (async) {
-		ks_log(KS_LOG_DEBUG, "Destroying command: %s", ks_handle_describe(cmd));
-		ks_handle_destroy(&cmd);
+	if (cmd) {
+		char *cmd_str = swclt_cmd_describe(cmd);
+		ks_log(KS_LOG_DEBUG, "Destroying command: %s", cmd_str);
+		ks_pool_free(&cmd_str);
+		swclt_cmd_destroy(&cmd);
 	}
 
-	if (status == KS_STATUS_INVALID_ARGUMENT || status == KS_STATUS_HANDLE_INVALID ||status == KS_STATUS_HANDLE_SEQ_MISMATCH || status == KS_STATUS_HANDLE_TYPE_MISMATCH) {
+	if (status == KS_STATUS_INVALID_ARGUMENT) {
 		status = KS_STATUS_SUCCESS; // keep the connection ONLINE
 	}
 
@@ -488,34 +499,38 @@ static ks_status_t do_logical_connect(swclt_conn_t *ctx,
 									  const char *agent,
 									  const char *identity)
 {
-	swclt_cmd_t cmd = CREATE_BLADE_CONNECT_CMD(previous_sessionid, authentication, agent, identity);
-	SWCLT_CMD_TYPE cmd_type;
-	ks_json_t *error = NULL;
+	swclt_cmd_t *cmd = CREATE_BLADE_CONNECT_CMD(ctx->pool, previous_sessionid, authentication, agent, identity);
 	ks_status_t status = KS_STATUS_SUCCESS;
+	ks_json_t *error = NULL;
+	swclt_cmd_future_t *future = NULL;
+	swclt_cmd_reply_t *reply = NULL;
 
 	if (!cmd) {
 		status = KS_STATUS_NO_MEM;
 		goto done;
 	}
 
-	if (status = submit_request(ctx, cmd))
+	if (status = submit_request(ctx, &cmd, &future))
 		goto done;
 
-	if (status = swclt_cmd_type(cmd, &cmd_type)) {
-		ks_log(KS_LOG_ERROR, "Unable to get command type");
+	if (!future) {
+		ks_log(KS_LOG_CRIT, "No blade.connect future received");
 		goto done;
 	}
-	if (cmd_type == SWCLT_CMD_TYPE_ERROR) {
-		if (status = swclt_cmd_error(cmd, &error)) {
-			ks_log(KS_LOG_ERROR, "Unable to get command error");
+	status = swclt_cmd_future_get(future, &reply);
+	swclt_cmd_future_destroy(&future);
+	if (swclt_cmd_reply_ok(reply) != KS_STATUS_SUCCESS) {
+		ks_log(KS_LOG_ERROR, "blade.connect failed");
+		if (reply && reply->type == SWCLT_CMD_TYPE_ERROR) {
+			error = reply->json;
 		}
 		goto done;
 	}
-	
+
 	if (ctx->blade_connect_rpl) {
 		BLADE_CONNECT_RPL_DESTROY(&ctx->blade_connect_rpl);
 	}
-	if (status = swclt_cmd_parse(cmd, ctx->pool,
+	if (status = swclt_cmd_reply_parse(reply, ctx->pool,
 								  (swclt_cmd_parse_cb_t)BLADE_CONNECT_RPL_PARSE, (void **)&ctx->blade_connect_rpl)) {
 		ks_log(KS_LOG_ERROR, "Unable to parse connect reply");
 		goto done;
@@ -534,7 +549,8 @@ done:
 		}
 	}
 
-	ks_handle_destroy(&cmd);
+	swclt_cmd_destroy(&cmd);
+	swclt_cmd_reply_destroy(&reply);
 
 	return status;
 }
@@ -620,7 +636,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	swclt_conn_t *new_conn = ks_pool_alloc(pool, sizeof(swclt_conn_t));
 	new_conn->pool = pool;
 
-	ks_log(KS_LOG_INFO, "Initiating connection to: %s (parsed port: %u) at /%s", ident->host, (unsigned int)ident->portnum, ident->path);
+	ks_log(KS_LOG_INFO, "Initiating connection to: %s (parsed port: %u) at /%s", ident->host, (unsigned int)ident->portnum, ident->path ? ident->path : "");
 
 	new_conn->incoming_cmd_cb = incoming_cmd_cb;
 	new_conn->incoming_cmd_cb_data = incoming_cmd_cb_data;
@@ -639,7 +655,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 
 	/* Create our request hash */
 	if (status = ks_hash_create(&new_conn->outstanding_requests, KS_HASH_MODE_UUID,
-			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_VALUE | KS_HASH_FLAG_FREE_KEY, new_conn->pool))
+			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_KEY, new_conn->pool))
 		goto done;
 
 	ks_mutex_create(&new_conn->failed_mutex, KS_MUTEX_FLAG_DEFAULT, new_conn->pool);
@@ -684,7 +700,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 		ssl);
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cmd_t cmd)
+SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cmd_t *cmd)
 {
 	if (conn) {
 		return submit_result(conn, cmd);
@@ -692,10 +708,10 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cm
 	return KS_STATUS_FAIL;
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t cmd)
+SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t **cmd, swclt_cmd_future_t **future)
 {
 	if (conn) {
-		return submit_request(conn, cmd);
+		return submit_request(conn, cmd, future);
 	}
 	return KS_STATUS_FAIL;
 }

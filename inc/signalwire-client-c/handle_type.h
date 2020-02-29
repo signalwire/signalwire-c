@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,12 +33,9 @@
 
 typedef enum {
 
-	/* CMD - Commands are request/reply wrappers for json rpc */
-    SWCLT_HTYPE_CMD =  KS_HANDLE_MAKE_TYPE(SWCLT_SYS, 1),
-
 	/* SESS	- A session is the highest level construct, and is the
 	 * primary means in which a client ineracts with this sdk. */
-    SWCLT_HTYPE_SESS =  KS_HANDLE_MAKE_TYPE(SWCLT_SYS, 2),
+    SWCLT_HTYPE_SESS =  KS_HANDLE_MAKE_TYPE(SWCLT_SYS, 1),
 
 	/* SUB - A subscription holds the callback state for a subscription
 	 * and is a child of a session. */
@@ -66,8 +63,6 @@ static inline ks_bool_t swclt_htype_valid(swclt_htype_t type)
 static inline const char *swclt_htype_str(swclt_htype_t type)
 {
 	switch(type) {
-	case SWCLT_HTYPE_CMD:
-		return "Command";
 	case SWCLT_HTYPE_SESS:
 		return "Session";
 	case SWCLT_HTYPE_SUB:

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -67,7 +67,8 @@ SWCLT_JSON_PARSE_END()
  * CREATE_BLADE_BROADCAST_CMD_ASYNC - Creates a command with a request
  * in it setup to submit a broadcast method to blade.
  */
-static inline swclt_cmd_t CREATE_BLADE_BROADCAST_CMD_ASYNC(
+static inline swclt_cmd_t *CREATE_BLADE_BROADCAST_CMD_ASYNC(
+	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *protocol,
@@ -78,11 +79,7 @@ static inline swclt_cmd_t CREATE_BLADE_BROADCAST_CMD_ASYNC(
 {
 	ks_json_t *obj = NULL;
 	blade_broadcast_rqu_t broadcast_rqu;
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
-	ks_pool_t *pool;
-
-	if (ks_pool_open(&pool))
-		return cmd;
+	swclt_cmd_t *cmd = NULL;
 
 	/* Fill in the broadcast request then marshal it, it will create copies
 	 * of all the fields so caller doesn't lose ownership here */
@@ -93,7 +90,6 @@ static inline swclt_cmd_t CREATE_BLADE_BROADCAST_CMD_ASYNC(
 	broadcast_rqu.params = (!params || !*params) ? ks_json_create_object() : *params;
 
 	if (!(obj = BLADE_BROADCAST_RQU_MARSHAL(&broadcast_rqu))) {
-		ks_pool_close(&pool);
 
 		/* Since params is last, on error here we can be sure params was
 		 * not freed so do not set the callers params to NULL */
@@ -107,7 +103,6 @@ static inline swclt_cmd_t CREATE_BLADE_BROADCAST_CMD_ASYNC(
 	/* Now give it to the new command */
 	if (swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_BROADCAST_METHOD,
@@ -119,11 +114,11 @@ static inline swclt_cmd_t CREATE_BLADE_BROADCAST_CMD_ASYNC(
 
 done:
 	ks_json_delete(&obj);
-	ks_pool_close(&pool);
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_BROADCAST_CMD(
+static inline swclt_cmd_t *CREATE_BLADE_BROADCAST_CMD(
+	ks_pool_t *pool,
 	const char *protocol,
 	const char *channel,
 	const char *event,
@@ -131,6 +126,7 @@ static inline swclt_cmd_t CREATE_BLADE_BROADCAST_CMD(
 	ks_json_t **params)
 {
 	return CREATE_BLADE_BROADCAST_CMD_ASYNC(
+		pool,
 		NULL,
 		NULL,
 		protocol,

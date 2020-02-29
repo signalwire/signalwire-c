@@ -81,7 +81,7 @@ blade_netcast_rqu_t __netcast_route_remove_request(ks_pool_t *pool, const char *
 	return request;
 }
 
-blade_connect_rpl_t __connect_reply(ks_pool_t *pool)
+blade_connect_rpl_t *__connect_reply(ks_pool_t *pool)
 {
 	ks_json_t *routes = ks_json_create_array();
 	ks_json_t *protocols = ks_json_create_array();
@@ -125,7 +125,7 @@ blade_connect_rpl_t __connect_reply(ks_pool_t *pool)
 		}));
 
 	/* Now compose it altogether in a connect result */
-	blade_connect_rpl_t reply = (blade_connect_rpl_t){
+	blade_connect_rpl_t reply_s = (blade_connect_rpl_t){
             KS_FALSE,
 			*ks_uuid(&g_sessionid),
 			ks_uuid_str(pool, &g_route_nodeid_1),
@@ -136,12 +136,14 @@ blade_connect_rpl_t __connect_reply(ks_pool_t *pool)
 			subscriptions,
 			ks_json_create_array()
 		};
+	blade_connect_rpl_t *reply = ks_pool_alloc(pool, sizeof (*reply));
+	memcpy(reply, &reply_s, sizeof(blade_connect_rpl_t)); // copy to struct allocated off of pool so it can be destroyed
 	return reply;
 }
 
 void test_nodestore_update(ks_pool_t *pool)
 {
-	blade_connect_rpl_t connect_rpl = __connect_reply(pool);
+	blade_connect_rpl_t *connect_rpl = __connect_reply(pool);
 	swclt_store_t store = { 0 };
 	swclt_store_ctx_t *store_ctx;
 	ks_uuid_t new_route_nodeid = { 0 };
@@ -151,7 +153,7 @@ void test_nodestore_update(ks_pool_t *pool)
 	new_route_nodeid_str = ks_uuid_str(pool, &new_route_nodeid);
 
 	REQUIRE(!swclt_store_create(&store));
-	REQUIRE(!swclt_store_populate(store, &connect_rpl));
+	REQUIRE(!swclt_store_populate(store, connect_rpl));
 	REQUIRE(!swclt_store_get(store, &store_ctx));
 
 	/* The store should properly render the types */
@@ -196,6 +198,7 @@ void test_nodestore_update(ks_pool_t *pool)
 
 	swclt_store_put(&store_ctx);
 	ks_handle_destroy(&store);
+	BLADE_CONNECT_RPL_DESTROY(&connect_rpl);
 }
 
 void test_nodestore_protocol_select(ks_pool_t *pool)

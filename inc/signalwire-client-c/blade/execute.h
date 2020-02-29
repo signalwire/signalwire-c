@@ -119,11 +119,8 @@ SWCLT_JSON_PARSE_END()
  * CREATE_BLADE_EXECUTE_CMD_ASYNC - Creates a command which holds
  * and owns the request json for an execute request.
  */
-#define CREATE_BLADE_EXECUTE_CMD_ASYNC(...)	__CREATE_BLADE_EXECUTE_CMD_ASYNC(	\
-	__FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-
-static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
-	const char *file, int line, const char *tag,
+static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD_ASYNC(
+	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *responder,
@@ -131,16 +128,9 @@ static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
 	const char *method,
 	ks_json_t **params)
 {
-	swclt_cmd_t cmd;
+	swclt_cmd_t *cmd = NULL;
 	ks_status_t status;
 	ks_json_t *request;
-	ks_pool_t *pool;
-
-	/* Forward declare the pool we're going to use for allocations relative to
-	 * the command, we will hand this pool to the command and it will use it
-	 * for its allocation */
-	if ((status = ks_pool_open(&pool)))
-		return status;
 
 	request = ks_json_create_object();
 	if (responder) ks_json_add_string_to_object(request, "responder_nodeid", responder);
@@ -153,22 +143,20 @@ static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if ((status = __swclt_cmd_create_ex(
+	if ((status = swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_EXECUTE_METHOD,
 			&request,
 			BLADE_EXECUTE_TTL_MS,
 			BLADE_EXECUTE_FLAGS,
-			ks_uuid_null(), file, line, tag))) {
+			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate execute cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
 		 * took ownership of it */
 		ks_json_delete(&request);
-		ks_pool_close(&pool);
 		return KS_NULL_HANDLE;
 	}
 
@@ -176,13 +164,15 @@ static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_EXECUTE_CMD(
+static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD(
+	ks_pool_t *pool,
     const char *responder,
 	const char *protocol,
 	const char *method,
 	ks_json_t **params)
 {
 	return CREATE_BLADE_EXECUTE_CMD_ASYNC(
+		pool,
 		NULL,
 		NULL,
 		responder,
