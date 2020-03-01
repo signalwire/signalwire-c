@@ -561,9 +561,10 @@ static void __remove_provider_from_protocols(swclt_store_ctx_t *ctx, const char 
 			ks_hash_this(itt, (const void **)&key, NULL, (void **)&protocol);
 
 			itt = ks_hash_next(&itt);
-
-			ks_hash_remove(ctx->protocols, (const void *)key);
-			__invoke_cb_protocol_remove(ctx, protocol->name);
+			char *protocol_name = ks_pstrdup(protocol->name);
+			ks_hash_remove(ctx->protocols, (const void *)key); // now destroy it...
+			__invoke_cb_protocol_remove(ctx, protocol_name);
+			ks_pool_free(&protocol_name);
 		}
 		ks_hash_destroy(&cleanup);
 	}
