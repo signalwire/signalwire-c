@@ -102,7 +102,6 @@ static inline const char * swclt_cmd_type_str(SWCLT_CMD_TYPE type)
 KS_BEGIN_EXTERN_C
 
 SWCLT_DECLARE(ks_status_t) swclt_cmd_set_cb(swclt_cmd_t *cmd, swclt_cmd_cb_t cb, void *cb_data);
-SWCLT_DECLARE(ks_status_t) swclt_cmd_cb(swclt_cmd_t *cmd, swclt_cmd_cb_t *cb, void **cb_data);
 
 SWCLT_DECLARE(ks_status_t) swclt_cmd_future_create(swclt_cmd_future_t **future, swclt_cmd_t *cmd);
 SWCLT_DECLARE(ks_status_t) swclt_cmd_future_get(swclt_cmd_future_t *future, swclt_cmd_reply_t **reply);
@@ -133,14 +132,9 @@ SWCLT_DECLARE(ks_status_t) swclt_cmd_create_frame(
 SWCLT_DECLARE(ks_status_t) swclt_cmd_destroy(swclt_cmd_t **cmd);
 SWCLT_DECLARE(char *) swclt_cmd_describe(swclt_cmd_t *cmd);
 SWCLT_DECLARE(ks_status_t) swclt_cmd_print(swclt_cmd_t *cmd, ks_pool_t *pool, char **string);
-SWCLT_DECLARE(ks_status_t) swclt_cmd_type(swclt_cmd_t *cmd, SWCLT_CMD_TYPE *type);
 SWCLT_DECLARE(ks_status_t) swclt_cmd_set_result(swclt_cmd_t *cmd, ks_json_t **result);
 SWCLT_DECLARE(ks_status_t) swclt_cmd_set_error(swclt_cmd_t *cmd, ks_json_t **result);
-SWCLT_DECLARE(ks_status_t) swclt_cmd_id(swclt_cmd_t *cmd, ks_uuid_t *id);
-SWCLT_DECLARE(ks_status_t) swclt_cmd_ttl(swclt_cmd_t *cmd, uint32_t *response_ttl_ms);
 SWCLT_DECLARE(ks_status_t) swclt_cmd_set_ttl(swclt_cmd_t *cmd, uint32_t response_ttl_ms);
-SWCLT_DECLARE(ks_status_t) swclt_cmd_flags(swclt_cmd_t *cmd, uint32_t *flags);
-SWCLT_DECLARE(ks_status_t) swclt_cmd_method(swclt_cmd_t *cmd, const char **method);
 SWCLT_DECLARE(ks_status_t) swclt_cmd_parse_reply_frame(swclt_cmd_t *cmd, swclt_frame_t *frame);
 
 SWCLT_DECLARE(ks_status_t) swclt_cmd_report_failure_fmt(swclt_cmd_t *cmd, ks_status_t failure_status, const char *failure_fmt, ...);

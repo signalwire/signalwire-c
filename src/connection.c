@@ -180,9 +180,6 @@ static void *ttl_tracker_thread(ks_thread_t *thread, void *data)
 		if (ttl_tracker_next(ttl, &id) == KS_STATUS_SUCCESS) {
 			swclt_cmd_t *cmd;
 			if ((cmd = deregister_cmd(ttl->conn, id))) {
-				swclt_cmd_cb_t cb = { 0 };
-				void *cb_data = NULL;
-				swclt_cmd_cb(cmd, &cb, &cb_data);
 				swclt_cmd_report_failure_fmt(cmd, KS_STATUS_TIMEOUT, "TTL expired for command %s", ks_uuid_thr_str(&id));
 				ks_log(KS_LOG_INFO, "TTL expired for command %s", ks_uuid_thr_str(&id));
 				swclt_cmd_destroy(&cmd);
@@ -237,26 +234,20 @@ static void report_connection_failure(swclt_conn_t *conn)
 	}
 }
 
-static ks_status_t register_cmd(swclt_conn_t *ctx, swclt_cmd_t **cmd)
+static ks_status_t register_cmd(swclt_conn_t *ctx, swclt_cmd_t **cmdP)
 {
 	ks_status_t status;
-	ks_uuid_t id = { 0 };
-	uint32_t ttl_ms = { 0 };
+	swclt_cmd_t *cmd = *cmdP;
 
-	if (status = swclt_cmd_id(*cmd, &id))
-		return status;
-	if (status = swclt_cmd_ttl(*cmd, &ttl_ms))
-		return status;
+	ks_log(KS_LOG_DEBUG, "Tracking command with id: %s and TTL: %d", ks_uuid_thr_str(&cmd->id), cmd->response_ttl_ms);
 
-	ks_log(KS_LOG_DEBUG, "Tracking command with id: %s and TTL: %d", ks_uuid_thr_str(&id), ttl_ms);
-
-	if (!ctx->ttl || (status = ttl_tracker_watch(ctx->ttl, ks_time_now_ms() + (ks_time_t)ttl_ms, id))) {
-		ks_log(KS_LOG_ERROR, "Failed to track TTL for command with id: %s and TTL: %d", ks_uuid_thr_str(&id), ttl_ms);
+	if (!ctx->ttl || (status = ttl_tracker_watch(ctx->ttl, ks_time_now_ms() + (ks_time_t)cmd->response_ttl_ms, cmd->id))) {
+		ks_log(KS_LOG_ERROR, "Failed to track TTL for command with id: %s and TTL: %d", ks_uuid_thr_str(&cmd->id), cmd->response_ttl_ms);
 		report_connection_failure(ctx);
 		return status;
 	}
-	ks_hash_insert(ctx->outstanding_requests, ks_uuid_dup(ctx->pool, &id), *cmd);
-	*cmd = NULL;
+	ks_hash_insert(ctx->outstanding_requests, ks_uuid_dup(ctx->pool, &cmd->id), cmd);
+	*cmdP = NULL;
 
 	return KS_STATUS_SUCCESS;
 }
@@ -324,14 +315,7 @@ static ks_status_t submit_request(swclt_conn_t *ctx, swclt_cmd_t **cmdP, swclt_c
 
 	/* Register this cmd in our outstanding requests if there is a reply */
 	if (!(cmd->flags & SWCLT_CMD_FLAG_NOREPLY)) {
-		swclt_cmd_cb_t cb;
-		void *cb_data;
-		if (status = swclt_cmd_cb(cmd, &cb, &cb_data)) {
-			ks_log(KS_LOG_CRIT, "Failed to get command callback");
-			swclt_cmd_destroy(&cmd);
-			return KS_STATUS_FAIL;
-		}
-		if (!cb && cmd_future) {
+		if (!cmd->cb && cmd_future) {
 			/* set up our own callbacks to wait if none exist */
 			if (status = swclt_cmd_future_create(cmd_future, cmd)) {
 				ks_log(KS_LOG_CRIT, "Failed to create command cmd_future");
@@ -340,7 +324,7 @@ static ks_status_t submit_request(swclt_conn_t *ctx, swclt_cmd_t **cmdP, swclt_c
 			}
 		}
 
-		if ((cb || cmd_future) && (status = register_cmd(ctx, &cmd))) {
+		if ((cmd->cb || cmd_future) && (status = register_cmd(ctx, &cmd))) {
 			ks_log(KS_LOG_WARNING, "Failed to register cmd: %lu", status);
 			swclt_cmd_future_destroy(cmd_future);
 			swclt_cmd_destroy(&cmd);
@@ -415,7 +399,6 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 {
 	ks_json_t *payload = NULL;
 	ks_status_t status = KS_STATUS_SUCCESS;
-	const char *method;
 	ks_uuid_t id;
 	swclt_cmd_t *cmd = NULL;
 
@@ -447,12 +430,6 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 		 */
 		ks_log(KS_LOG_DEBUG, "Could not locate cmd for frame: %s", (*frame)->data);
 		status = KS_STATUS_SUCCESS;
-		goto done;
-	}
-
-	if (status = swclt_cmd_method(cmd, &method)) {
-		ks_log(KS_LOG_WARNING, "Failed to get command method: %lu", status);
-		status = KS_STATUS_SUCCESS; // keep the connection ONLINE
 		goto done;
 	}
 

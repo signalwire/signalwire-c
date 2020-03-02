@@ -511,14 +511,6 @@ SWCLT_DECLARE(ks_status_t) swclt_cmd_create(
 	return swclt_cmd_create_ex(cmd, NULL, NULL, method, request, response_ttl_ms, flags, ks_uuid_null());
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_cmd_cb(swclt_cmd_t *cmd, swclt_cmd_cb_t *cb, void **cb_data)
-{
-	*cb = cmd->cb;
-	*cb_data = cmd->cb_data;
-	return KS_STATUS_SUCCESS;
-}
-
-
 SWCLT_DECLARE(ks_status_t) swclt_cmd_print(swclt_cmd_t *cmd, ks_pool_t *pool, char **string)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
@@ -556,36 +548,6 @@ SWCLT_DECLARE(ks_status_t) swclt_cmd_set_cb(swclt_cmd_t *cmd, swclt_cmd_cb_t cb,
 SWCLT_DECLARE(ks_status_t) swclt_cmd_set_ttl(swclt_cmd_t *cmd, uint32_t response_ttl_ms)
 {
 	cmd->response_ttl_ms = response_ttl_ms;
-	return KS_STATUS_SUCCESS;
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_cmd_ttl(swclt_cmd_t *cmd, uint32_t *response_ttl_ms)
-{
-	*response_ttl_ms = cmd->response_ttl_ms;
-	return KS_STATUS_SUCCESS;
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_cmd_id(swclt_cmd_t *cmd, ks_uuid_t *id)
-{
-	*id = cmd->id;
-	return KS_STATUS_SUCCESS;
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_cmd_flags(swclt_cmd_t *cmd, uint32_t *flags)
-{
-	*flags = cmd->flags;
-	return KS_STATUS_SUCCESS;
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_cmd_method(swclt_cmd_t *cmd, const char **method)
-{
-	*method = cmd->method;
-	return KS_STATUS_SUCCESS;
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_cmd_type(swclt_cmd_t *cmd, SWCLT_CMD_TYPE *type)
-{
-	*type = cmd->type;
 	return KS_STATUS_SUCCESS;
 }
 
