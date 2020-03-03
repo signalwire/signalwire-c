@@ -32,20 +32,13 @@
 
 typedef enum {
 
-	/* SUB - A subscription holds the callback state for a subscription
-	 * and is a child of a session. */
-    SWCLT_HTYPE_SUB =  KS_HANDLE_MAKE_TYPE(SWCLT, 1),
-
 	/* STORE - A node store contains the up to date state of
 	 * provider/protocols/channels and routes  */
-    SWCLT_HTYPE_STORE =  KS_HANDLE_MAKE_TYPE(SWCLT, 2),
+    SWCLT_HTYPE_STORE =  KS_HANDLE_MAKE_TYPE(SWCLT, 1),
 
 	/* HMON - A handle monitoring context, used for state change
 	 * detection on any swclient handle */
-    SWCLT_HTYPE_HMON =  KS_HANDLE_MAKE_TYPE(SWCLT, 3),
-
-	/* TEST - Used for unit testing */
-    SWCLT_HTYPE_TEST =  KS_HANDLE_MAKE_TYPE(SWCLT, 4),
+    SWCLT_HTYPE_HMON =  KS_HANDLE_MAKE_TYPE(SWCLT, 2),
 } swclt_htype_t;
 
 static inline ks_bool_t swclt_htype_valid(swclt_htype_t type)
@@ -57,8 +50,6 @@ static inline ks_bool_t swclt_htype_valid(swclt_htype_t type)
 static inline const char *swclt_htype_str(swclt_htype_t type)
 {
 	switch(type) {
-	case SWCLT_HTYPE_SUB:
-		return "Subscription";
 	case SWCLT_HTYPE_STORE:
 		return "NodeStore";
 	case SWCLT_HTYPE_HMON:

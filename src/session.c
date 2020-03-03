@@ -22,7 +22,6 @@
 
 #include "signalwire-client-c/client.h"
 #include "signalwire-client-c/internal/config.h"
-#include "signalwire-client-c/internal/subscription.h"
 
 typedef struct swclt_metric_reg_s {
 	int interval;
@@ -225,7 +224,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			goto done;
 		}
 
-		status = swclt_sub_invoke(*sub, sess, rqu);
+		status = swclt_sub_invoke(sub, sess, rqu);
 
 		BLADE_BROADCAST_RQU_DESTROY(&rqu);
 		goto done;
@@ -704,32 +703,35 @@ static ks_status_t __unregister_subscription(
 	const char *channel)
 {
 	const char *key = __make_subscription_key(sess, protocol, channel);
-	ks_handle_t *sub = (ks_handle_t *)ks_hash_remove(sess->subscriptions, key);
+	swclt_sub_t *sub = ks_hash_remove(sess->subscriptions, key);
 	ks_pool_free(&key);
 	if (!sub)
 		return KS_STATUS_NOT_FOUND;
 
-	ks_handle_destroy(sub);
-	ks_pool_free(&sub);
+	swclt_sub_destroy(&sub);
 
 	return KS_STATUS_SUCCESS;
 }
 
 static ks_status_t __register_subscription(
 	swclt_sess_t *sess,
-	const char * protocol,
-	const char * channel,
-	swclt_sub_t sub)
+	const char *protocol,
+	const char *channel,
+	swclt_sub_t **sub)
 {
+	ks_mutex_lock(sess->lock);
 	/* unregister if already registered so it does not leak anything, even the handle for the sub
 	 * should be cleaned up to avoid leaking for the duration of the session */
 	__unregister_subscription(sess, protocol, channel);
 
-	/* @todo why duplicate the handle on the heap? can assign value of handle to the void* and not use FREE_VALUE hash flag
-	 * answer: check out the sub, then put it in the hash */
-
 	/* And add it to the hash */
-	return ks_hash_insert(sess->subscriptions, __make_subscription_key(sess, protocol, channel), __dupe_handle(sess, sub));
+	ks_status_t status = ks_hash_insert(sess->subscriptions, __make_subscription_key(sess, protocol, channel), *sub);
+	ks_mutex_unlock(sess->lock);
+
+	if (status == KS_STATUS_SUCCESS) {
+		*sub = NULL; // take ownership
+	}
+	return status;
 }
 
 static ks_status_t __register_pmethod(
@@ -929,22 +931,20 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_register_protocol_method(
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_register_subscription_method(
 	swclt_sess_t *sess,
-	swclt_sub_t *sub,
 	const char *protocol,
 	const char *channel,
 	swclt_sub_cb_t cb,
 	void *cb_data)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
-
-	if (status = swclt_sub_create(sub, protocol, channel, cb, cb_data))
+	swclt_sub_t *sub = NULL;
+	if (status = swclt_sub_create(&sub, sess->pool, protocol, channel, cb, cb_data))
 		return status;
 
 	/* Register this subscription, if request fails we just won't receive the events,
 	 * but registering the callback is fine and can be replaced if client tries again */
-	if (status = __register_subscription(sess, protocol, channel, *sub)) {
-		ks_handle_destroy(sub);
-	}
+	status = __register_subscription(sess, protocol, channel, &sub);
+	swclt_sub_destroy(&sub);
 	return status;
 }
 
@@ -985,7 +985,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
 	const char *channel,
 	swclt_sub_cb_t cb,
 	void *cb_data,
-	swclt_sub_t *sub,
 	swclt_cmd_reply_t **reply)
 {
 	swclt_cmd_future_t *future = NULL;
@@ -995,7 +994,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
 		channel,
 		cb,
 		cb_data,
-		sub,
 		NULL,
 		NULL,
 		&future);
@@ -1012,7 +1010,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 	const char *channel,
 	swclt_sub_cb_t cb,
 	void *cb_data,
-	swclt_sub_t *sub,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
 	swclt_cmd_future_t **future)
@@ -1020,18 +1017,19 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 	ks_status_t status = KS_STATUS_SUCCESS;
 	swclt_cmd_t *cmd = NULL;
 	blade_subscription_rpl_t *subscription_rpl = NULL;
+	swclt_sub_t *sub = NULL;
 
 	/* @todo remove the next 2 calls, and call swclt_sess_register_subscription_method externally, and
 	 * update to allow multiple channels to be subscribed via ks_json_t array of channel name strings
 	 * can also verify that the callbacks are already registered here as a sanity check */
 
 	/* We also will track this subscription with a handle */
-	if (status = swclt_sub_create(sub, protocol, channel, cb, cb_data))
+	if (status = swclt_sub_create(&sub, sess->pool, protocol, channel, cb, cb_data))
 		goto done;
 
 	/* Register this subscription, if request fails we just won't receive the events,
 	 * but registering the callback is fine and can be replaced if client tries again */
-	if (status = __register_subscription(sess, protocol, channel, *sub))
+	if (status = __register_subscription(sess, protocol, channel, &sub))
 		goto done;
 
 	/* Allocate the request */
@@ -1053,11 +1051,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 
 done:
 	swclt_cmd_destroy(&cmd);
-
-	/* Only destroy the subscription if we failed */
-	if (status) {
-		ks_handle_destroy(sub);
-	}
+	swclt_sub_destroy(&sub);
 
 	return status;
 }
@@ -1432,7 +1426,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t *sess, const
 	ks_json_t *result = NULL;
 	const char *protocol = NULL;
 	ks_bool_t instance_found = KS_FALSE;
-	swclt_sub_t sub;
 
 	if (!service) {
 		ks_log(KS_LOG_ERROR, "Missing service for signalwire.setup");
@@ -1504,7 +1497,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t *sess, const
 	}
 
 	// Now that protocol is available, sync subscribe to the notifications channel
-	if (status = swclt_sess_subscription_add(sess, protocol, "notifications", cb, cb_data, &sub, NULL)) {
+	if (status = swclt_sess_subscription_add(sess, protocol, "notifications", cb, cb_data, NULL)) {
 		ks_log(KS_LOG_ERROR, "Setup for '%s' subscription add failed: %d", service, status);
 		goto done;
 	}

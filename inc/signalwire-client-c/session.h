@@ -130,7 +130,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_register_protocol_method(
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_register_subscription_method(
 	swclt_sess_t *sess,
-	swclt_sub_t *sub,
 	const char *protocol,
 	const char *channel,
 	swclt_sub_cb_t cb,
@@ -149,7 +148,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
 	const char *channel,
 	swclt_sub_cb_t cb,
 	void *cb_data,
-	swclt_sub_t *sub,
 	swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
@@ -158,7 +156,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 	const char *channel,
 	swclt_sub_cb_t cb,
 	void *cb_data,
-	swclt_sub_t *sub,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
 	swclt_cmd_future_t **future);
