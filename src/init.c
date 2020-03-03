@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,19 +31,11 @@ SWCLT_DECLARE(ks_status_t) swclt_init(int default_log_level)
 
 	swclt_enable_log_output(default_log_level);
 
-	if (status = swclt_hmgr_init()) {
-		ks_log(KS_LOG_CRIT, "Failed to initialize client manager: %lu", status);
-		ks_shutdown();
-		ks_debug_break();
-		return status;
-	}
-
 	return status;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_shutdown()
 {
-	swclt_hmgr_shutdown();
 	return ks_shutdown();
 }
 

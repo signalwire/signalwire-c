@@ -30,8 +30,69 @@ typedef struct swclt_metric_reg_s {
 	ks_bool_t dirty;
 } swclt_metric_reg_t;
 
-static ks_status_t __context_state_transition(swclt_sess_t *sess, swclt_sess_state_t new_state);
+static ks_status_t __do_connect(swclt_sess_t *sess);
+static ks_status_t __do_disconnect(swclt_sess_t *sess);
 
+static void check_session_state(swclt_sess_t *sess)
+{
+	ks_hash_read_lock(sess->metrics);
+	for (ks_hash_iterator_t *itt = ks_hash_first(sess->metrics, KS_UNLOCKED); itt; itt = ks_hash_next(&itt)) {
+		const char *key = NULL;
+		swclt_metric_reg_t *value = NULL;
+
+		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
+
+		if (ks_time_now() >= value->timeout && value->dirty) {
+			value->timeout = ks_time_now() + (value->interval * KS_USEC_PER_SEC);
+			value->dirty = KS_FALSE;
+
+			swclt_sess_protocol_provider_rank_update_async(sess, key, value->rank, NULL, NULL, NULL);
+		}
+	}
+	ks_hash_read_unlock(sess->metrics);
+
+	ks_cond_lock(sess->monitor_cond);
+	if (sess->disconnect_time > 0 && ks_time_now_sec() >= sess->disconnect_time) {
+		sess->disconnect_time = 0;
+		if (sess->state == SWCLT_STATE_ONLINE) {
+			// Disconnect now and report state change
+			__do_disconnect(sess);
+			sess->state = SWCLT_STATE_OFFLINE;
+			if (sess->state_change_cb) {
+				sess->state_change_cb(sess, sess->state_change_cb_data);
+			}
+		}
+	}
+	if (sess->connect_time > 0 && ks_time_now_sec() >= sess->connect_time) {
+		// Connect and report state change on success
+		if (__do_connect(sess) == KS_STATUS_SUCCESS) {
+			sess->connect_time = 0;
+			if (sess->state_change_cb) {
+				sess->state_change_cb(sess, sess->state_change_cb_data);
+			}
+		} else {
+			// try again in 5 seconds
+			sess->connect_time = ks_time_now_sec() + 5;
+		}
+	}
+	ks_cond_unlock(sess->monitor_cond);
+}
+
+static void *session_monitor_thread(ks_thread_t *thread, void *data)
+{
+	swclt_sess_t *sess = (swclt_sess_t *)data;
+
+	ks_log(KS_LOG_INFO, "Session monitor starting");
+
+	while (ks_thread_stop_requested(sess->monitor_thread) == KS_FALSE) {
+		ks_cond_lock(sess->monitor_cond);
+		ks_cond_timedwait(sess->monitor_cond, 1000);
+		ks_cond_unlock(sess->monitor_cond);
+		check_session_state(sess);
+	}
+	ks_log(KS_LOG_INFO, "Session monitor thread stopping");
+	return NULL;
+}
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sessP)
 {
@@ -39,6 +100,9 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sessP)
 		swclt_sess_t *sess = *sessP;
 		ks_pool_t *pool = sess->pool;
 		*sessP = NULL;
+		ks_thread_request_stop(sess->monitor_thread);
+		ks_cond_broadcast(sess->monitor_cond);
+		ks_thread_join(sess->monitor_thread);
 		swclt_conn_destroy(&sess->conn);
 		ks_hash_destroy(&sess->subscriptions);
 		ks_hash_destroy(&sess->methods);
@@ -82,24 +146,14 @@ static ks_status_t __setup_ssl(swclt_sess_t *sess)
 	return swclt_ssl_create_context(sess->config->private_key_path, sess->config->client_cert_path, sess->config->cert_chain_path, &sess->ssl);
 }
 
-static ks_bool_t __session_check_connected(swclt_sess_t *sess, ks_bool_t leave_locked_on_connected)
+static ks_bool_t __session_check_connected(swclt_sess_t *sess)
 {
-	ks_bool_t connected = KS_FALSE;
-	swclt_sess_state_t state;
+	return sess->state == SWCLT_STATE_ONLINE || sess->state == SWCLT_STATE_RESTORED;
+}
 
-	/* Lock while we touch the internals of the hstate system */
-	ks_mutex_lock(sess->lock);
-
-	state = sess->state;
-	if (sess->pending_state_change_service != SWCLT_STATE_NONE)
-		state = SWCLT_STATE_NONE;
-
-	connected = state == SWCLT_STATE_ONLINE;
-
-	if (!connected || !leave_locked_on_connected)
-		ks_mutex_unlock(sess->lock);
-
-	return connected;
+static ks_bool_t __session_check_restored(swclt_sess_t *sess)
+{
+	return sess->state == SWCLT_STATE_RESTORED;
 }
 
 static ks_status_t __execute_pmethod_cb(
@@ -375,15 +429,11 @@ static ks_status_t __on_connect_reply(swclt_conn_t *conn, ks_json_t *error, cons
 static void __on_conn_failed(swclt_conn_t *conn, void *data)
 {
 	swclt_sess_t *sess = (swclt_sess_t *)data;
-	/* Enqueue a state change on ourselves as well */
-	char *reason = ks_pstrdup(sess->pool, "Connection failed");
-	// TODO degrade session
-	//swclt_hstate_changed(&sess->sess, SWCLT_STATE_DEGRADED, KS_STATUS_FAIL, reason);
-	ks_pool_free(&reason);
-
-	// TODO schedule session reconnect
-	/* Now we, as a session, will want to re-connect so, enqueue a request do to so */
-	//swclt_hstate_initiate_change_in(&sess->sess, SWCLT_STATE_ONLINE, __context_state_transition, 1000, 5000);
+	ks_cond_lock(sess->monitor_cond);
+	sess->disconnect_time = ks_time_now_sec();
+	sess->connect_time = sess->disconnect_time + 5;
+	ks_cond_broadcast(sess->monitor_cond);
+	ks_cond_unlock(sess->monitor_cond);
 }
 
 static ks_status_t __do_connect(swclt_sess_t *sess)
@@ -448,11 +498,14 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 		if (ks_uuid_cmp(&sess->info.sessionid, &sess->info.conn.sessionid)) {
 			ks_log(KS_LOG_WARNING, "New session id created (old: %s, new: %s), all state invalidated",
 				ks_uuid_thr_str(&sess->info.sessionid), ks_uuid_thr_str(&sess->info.conn.sessionid));
-			sess->state = SWCLT_STATE_NORMAL;
+			sess->state = SWCLT_STATE_ONLINE;
+		} else {
+			sess->state = SWCLT_STATE_RESTORED;
 		}
+	} else {
+		sess->state = SWCLT_STATE_ONLINE;
 	}
 
-	/* @@ TODO invalidate all state **/
 	sess->info.sessionid = sess->info.conn.sessionid;
 	sess->info.nodeid = ks_pstrdup(sess->pool, sess->info.conn.nodeid);
 	sess->info.master_nodeid = ks_pstrdup(sess->pool, sess->info.conn.master_nodeid);
@@ -475,44 +528,21 @@ static void __context_describe(swclt_sess_t *sess, char *buffer, ks_size_t buffe
 	}
 }
 
-static ks_status_t __context_state_transition(swclt_sess_t *sess, swclt_sess_state_t new_state)
-{
-	switch (new_state) {
-		case SWCLT_STATE_ONLINE:
-			return __do_connect(sess);
-
-		case SWCLT_STATE_OFFLINE:
-			return __do_disconnect(sess);
-
-		default:
-			ks_debug_break();
-			return KS_STATUS_SUCCESS;
-	}
-}
-
 static ks_status_t __disconnect(swclt_sess_t *sess)
 {
-	/* If we're already degraded null op */
-	// TODO fix this
-	//if (swclt_hstate_get_sess(&sess->sess) == SWCLT_STATE_OFFLINE)
-	//	return KS_STATUS_SUCCESS;
-
-	// TODO fix this
-	/* Request a state transition to offline */
-	//swclt_hstate_initiate_change_now(&sess->sess, SWCLT_STATE_OFFLINE, __context_state_transition, 1000);
+	ks_cond_lock(sess->monitor_cond);
+	sess->disconnect_time = ks_time_now_sec();
+	ks_cond_broadcast(sess->monitor_cond);
+	ks_cond_unlock(sess->monitor_cond);
 	return KS_STATUS_SUCCESS;
 }
 
 static ks_status_t __connect(swclt_sess_t *sess)
 {
-	// TODO fix this
-	/* If we're already ready null op */
-	//if (swclt_hstate_get_sess(&sess->sess) == SWCLT_STATE_ONLINE)
-	//	return KS_STATUS_SUCCESS;
-
-	// TODO fix this
-	/* Right so our state is still degraded, time to connect */
-	//swclt_hstate_initiate_change_now(&sess->sess, SWCLT_STATE_ONLINE, __context_state_transition, 5000);
+	ks_cond_lock(sess->monitor_cond);
+	sess->connect_time = ks_time_now_sec();
+	ks_cond_broadcast(sess->monitor_cond);
+	ks_cond_unlock(sess->monitor_cond);
 	return KS_STATUS_SUCCESS;
 }
 
@@ -578,30 +608,6 @@ static ks_status_t __swclt_sess_metric_current(swclt_sess_t *sess, const char *p
 	ks_hash_read_unlock(sess->metrics);
 
 	return ret;
-}
-
-static void __context_service(swclt_sess_t *sess)
-{
-	ks_hash_read_lock(sess->metrics);
-	for (ks_hash_iterator_t *itt = ks_hash_first(sess->metrics, KS_UNLOCKED); itt; itt = ks_hash_next(&itt)) {
-		const char *key = NULL;
-		swclt_metric_reg_t *value = NULL;
-
-		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
-
-		if (ks_time_now() >= value->timeout && value->dirty) {
-			value->timeout = ks_time_now() + (value->interval * KS_USEC_PER_SEC);
-			value->dirty = KS_FALSE;
-
-			// This won't block - TODO make sure this is what we want
-			swclt_sess_protocol_provider_rank_update_async(sess, key, value->rank, NULL, NULL, NULL);
-		}
-	}
-	ks_hash_read_unlock(sess->metrics);
-
-	// TODO fix this
-	/* Now ask to be serviced again in 1 second */
-	//swclt_hmgr_request_service_in(&sess->sess, 1000);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_create(
@@ -673,7 +679,15 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 
 	ks_mutex_create(&sess->lock, KS_MUTEX_FLAG_DEFAULT, sess->pool);
 
-	/* TODO add state monitoring thread */
+	if (status = ks_cond_create(&sess->monitor_cond, NULL)) {
+		ks_log(KS_LOG_ERROR, "Failed to allocate session monitor condition: %lu", status);
+		goto done;
+	}
+
+	if (status = ks_thread_create(&sess->monitor_thread, session_monitor_thread, NULL, NULL)) {
+		ks_abort_fmt("Failed to allocate session monitor thread: %lu", status);
+		goto done;
+	}
 
 done:
 	if (status) {
@@ -688,14 +702,6 @@ static ks_status_t __nodeid_local(swclt_sess_t *sess, const char *nodeid)
 	ks_status_t status = KS_STATUS_SUCCESS;
 	status = !strcmp(sess->info.nodeid, nodeid) ? KS_STATUS_SUCCESS : KS_STATUS_FAIL;
 	return status;
-}
-
-static ks_handle_t * __dupe_handle(swclt_sess_t *sess, ks_handle_t handle)
-{
-	ks_handle_t *dup = ks_pool_alloc(sess->pool, sizeof(handle));
-	ks_assertd(dup);
-	memcpy(dup, &handle, sizeof(handle));
-	return dup;
 }
 
 static ks_status_t __unregister_subscription(
@@ -785,6 +791,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_set_auth_failed_cb(swclt_sess_t *sess, swc
 	return KS_STATUS_SUCCESS;
 }
 
+SWCLT_DECLARE(ks_status_t) swclt_sess_set_state_change_cb(swclt_sess_t *sess, swclt_sess_state_change_cb_t cb, void *cb_data)
+{
+	sess->state_change_cb = cb;
+	sess->state_change_cb_data = cb_data;
+	return KS_STATUS_SUCCESS;
+}
+
 SWCLT_DECLARE(ks_status_t) swclt_sess_target_set(swclt_sess_t *sess, const char *target)
 {
 	ks_status_t result = KS_STATUS_SUCCESS;
@@ -857,22 +870,20 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_disconnect(swclt_sess_t *sess)
 
 SWCLT_DECLARE(ks_bool_t) swclt_sess_connected(swclt_sess_t *sess)
 {
-	return __session_check_connected(sess, KS_FALSE);
+	ks_bool_t connected;
+	ks_mutex_lock(sess->lock);
+	connected = __session_check_connected(sess);
+	ks_mutex_unlock(sess->lock);
+	return connected;
 }
 
 SWCLT_DECLARE(ks_bool_t) swclt_sess_restored(swclt_sess_t *sess)
 {
-	swclt_sess_state_t state;
-	swclt_sess_state_t last_state;
-
+	ks_bool_t connected;
 	ks_mutex_lock(sess->lock);
-	state = sess->state;
-	last_state = sess->last_state;
-	if (sess->pending_state_change_service != SWCLT_STATE_NONE)
-		state = SWCLT_STATE_NONE;
+	connected = __session_check_restored(sess);
 	ks_mutex_unlock(sess->lock);
-
-	return state == SWCLT_STATE_ONLINE && last_state == SWCLT_STATE_DEGRADED;
+	return connected;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_info(
@@ -882,8 +893,8 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_info(
 	char **nodeid,
 	char **master_nodeid)
 {
-	if (__session_check_connected(sess, KS_TRUE)) {
-
+	ks_mutex_lock(sess->lock);
+	if (__session_check_connected(sess)) {
 		/* Default to our pool if no pool specified */
 		if (!pool)
 			pool = sess->pool;
@@ -895,10 +906,8 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_info(
 			*nodeid = ks_pstrdup(pool, sess->info.nodeid);
 		if (master_nodeid)
 			*master_nodeid = ks_pstrdup(pool, sess->info.master_nodeid);
-
-		/* Now unlock the context */
-		ks_mutex_unlock(sess->lock);
 	}
+	ks_mutex_unlock(sess->lock);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_nodeid(swclt_sess_t *sess, ks_pool_t *pool, char **nodeid)

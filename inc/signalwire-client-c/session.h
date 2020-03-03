@@ -22,19 +22,33 @@
 
 #pragma once
 
+KS_BEGIN_EXTERN_C
+
 typedef struct swclt_sess swclt_sess_t;
 
-typedef void (*swclt_sess_auth_failed_cb_t)(swclt_sess_t *sess);
-
 typedef enum swclt_sess_state {
-	SWCLT_STATE_NONE,
-	SWCLT_STATE_NORMAL,
+	SWCLT_STATE_OFFLINE,
 	SWCLT_STATE_ONLINE,
-	SWCLT_STATE_DEGRADED,
-	SWCLT_STATE_OFFLINE
+	SWCLT_STATE_RESTORED
 } swclt_sess_state_t;
 
-/* Create a structure containing some handy peices of info */
+static inline const char *swclt_sess_state_str(swclt_sess_state_t state)
+{
+	switch (state) {
+		case SWCLT_STATE_OFFLINE:
+			return "None";
+		case SWCLT_STATE_ONLINE:
+			return "Online";
+		case SWCLT_STATE_RESTORED:
+			return "Restored";
+		default:
+			ks_abort_fmt("Invalid session state: %d", state);
+	}
+}
+
+typedef void (*swclt_sess_auth_failed_cb_t)(swclt_sess_t *sess);
+typedef void (*swclt_sess_state_change_cb_t)(swclt_sess_t *sess, void *cb_data);
+
 typedef struct swclt_sess_info_s {
 	/* The info structure from our connection (it itself then contains
 	 * an info structure for the transport) */
@@ -81,21 +95,23 @@ struct swclt_sess {
 	/* Registry for Protocol RPC methods */
 	ks_hash_t *methods;
 
-	/* Setups completed for gandalf provider event channels */
+	/* Setups completed for provider event channels */
 	ks_hash_t *setups;
 
 	/* Registry for metric rank updates for local protocols */
 	ks_hash_t *metrics;
 
-	/* Session online/offline state */
+	/* Optional callback for state changes */
+	swclt_sess_state_change_cb_t state_change_cb;
+	void *state_change_cb_data;
 	swclt_sess_state_t state;
-	swclt_sess_state_t last_state;
-	swclt_sess_state_t pending_state_change_service;
+	ks_time_t disconnect_time;
+	ks_time_t connect_time;
+	ks_cond_t *monitor_cond;
+	ks_thread_t *monitor_thread;
 
 	ks_mutex_t *lock;
 };
-
-KS_BEGIN_EXTERN_C
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 	swclt_sess_t **sess,
@@ -105,6 +121,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sess);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_set_auth_failed_cb(swclt_sess_t *sess, swclt_sess_auth_failed_cb_t cb);
+SWCLT_DECLARE(ks_status_t) swclt_sess_set_state_change_cb(swclt_sess_t *sess, swclt_sess_state_change_cb_t cb, void *cb_data);
 SWCLT_DECLARE(ks_status_t) swclt_sess_target_set(swclt_sess_t *sess, const char *target);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_metric_register(swclt_sess_t *sess, const char *protocol, int interval, int rank);
