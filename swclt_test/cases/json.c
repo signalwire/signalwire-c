@@ -47,7 +47,6 @@ static void test_blade_execute(ks_pool_t *pool)
 	ks_json_t *params = ks_json_create_object();
 	ks_json_add_string_to_object(params, "tag", "hi");
 	swclt_cmd_t *cmd = CREATE_BLADE_EXECUTE_CMD(
-			pool,
 		    "responder_a",
 		   	"test.protocol",
 		   	"test.method",

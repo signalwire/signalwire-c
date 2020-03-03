@@ -49,7 +49,6 @@ SWCLT_JSON_PARSE_END()
  * in it setup to submit a disconnect method to blade.
  */
 static inline swclt_cmd_t *CREATE_BLADE_DISCONNECT_CMD_ASYNC(
-	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data)
 {
@@ -87,7 +86,6 @@ done:
 static inline swclt_cmd_t *CREATE_BLADE_DISCONNECT_CMD(ks_pool_t *pool)
 {
 	return CREATE_BLADE_DISCONNECT_CMD_ASYNC(
-		pool,
 		NULL,
 		NULL);
 }

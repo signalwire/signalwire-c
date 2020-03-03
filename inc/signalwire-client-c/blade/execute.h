@@ -120,7 +120,6 @@ SWCLT_JSON_PARSE_END()
  * and owns the request json for an execute request.
  */
 static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD_ASYNC(
-	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *responder,
@@ -165,14 +164,12 @@ static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD_ASYNC(
 }
 
 static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD(
-	ks_pool_t *pool,
     const char *responder,
 	const char *protocol,
 	const char *method,
 	ks_json_t **params)
 {
 	return CREATE_BLADE_EXECUTE_CMD_ASYNC(
-		pool,
 		NULL,
 		NULL,
 		responder,

@@ -76,7 +76,6 @@ SWCLT_JSON_PARSE_END()
  * in it setup to submit a ping method to blade.
  */
 static inline swclt_cmd_t *CREATE_BLADE_PING_CMD_ASYNC(
-	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	double timestamp,
@@ -115,10 +114,9 @@ done:
 	return cmd;
 }
 
-static inline swclt_cmd_t *CREATE_BLADE_PING_CMD(ks_pool_t *pool, double timestamp, const char *payload)
+static inline swclt_cmd_t *CREATE_BLADE_PING_CMD(double timestamp, const char *payload)
 {
 	return CREATE_BLADE_PING_CMD_ASYNC(
-		pool,
 		NULL,
 		NULL,
 		timestamp,

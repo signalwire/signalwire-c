@@ -86,7 +86,6 @@ SWCLT_JSON_PARSE_END()
  * and owns the request json for a subscription request.
  */
 static inline swclt_cmd_t *CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
-	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *command,
@@ -137,13 +136,11 @@ static inline swclt_cmd_t *CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 }
 
 static inline swclt_cmd_t *CREATE_BLADE_SUBSCRIPTION_CMD(
-	ks_pool_t *pool,
 	const char *command,
 	const char *protocol,
 	const char *channel)
 {
 	return CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
-		pool,
 		NULL,
 		NULL,
 		command,
@@ -153,7 +150,6 @@ static inline swclt_cmd_t *CREATE_BLADE_SUBSCRIPTION_CMD(
 
 /* Creates a subscription request */
 static inline ks_json_t *BLADE_SUBSCRIPTION_RQU(
-	ks_pool_t *pool,
 	const char * const command,
 	const char * const protocol,
 	const char * const channel,
@@ -165,7 +161,6 @@ static inline ks_json_t *BLADE_SUBSCRIPTION_RQU(
 	ks_json_add_string_to_object(request, "protocol", protocol);
 	ks_json_t *channels = ks_json_add_array_to_object(request, "channels");
 	ks_json_add_string_to_array(channels, channel);
-	(void)(pool);  // unused
 	(void)(broadcast_access);  // unused
 	(void)(subscribe_access);  // unused
 	return request;

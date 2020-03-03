@@ -65,7 +65,6 @@ void test_async(ks_pool_t *pool)
 
 	/* Create an async command (bogus command but will generate a reply at least) */
 	REQUIRE(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
-			pool,
 			__on_protocol_result_response,
 			NULL,
 			"a_protocol",
@@ -106,7 +105,6 @@ void test_ttl(ks_pool_t *pool)
 	channels = ks_json_create_array();
 	ks_json_add_item_to_array(channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"b_channel", 0, 0}));
 	REQUIRE(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
-			pool,
 			__on_protocol_timeout_response,
 			NULL,
 			"b_protocol",

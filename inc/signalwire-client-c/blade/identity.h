@@ -59,7 +59,6 @@ SWCLT_JSON_PARSE_END()
  * and owns the request json for an identity request.
  */
 static inline swclt_cmd_t *CREATE_BLADE_IDENTITY_CMD_ASYNC(
-	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *command,
@@ -109,12 +108,10 @@ static inline swclt_cmd_t *CREATE_BLADE_IDENTITY_CMD_ASYNC(
 }
 
 static inline swclt_cmd_t *CREATE_BLADE_IDENTITY_CMD(
-	ks_pool_t *pool,
 	const char *command,
 	const char *identity)
 {
 	return CREATE_BLADE_IDENTITY_CMD_ASYNC(
-		pool,
 		NULL,
 		NULL,
 		command,

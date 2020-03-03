@@ -129,7 +129,6 @@ SWCLT_JSON_PARSE_END()
  * request, also takes owner of the provider data and channels json passed in
  */
 static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
-	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *protocol,
@@ -201,7 +200,6 @@ static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 }
 
 static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD(
-	ks_pool_t *pool,
 	const char *protocol,
 	blade_access_control_t default_method_execute_access,
 	blade_access_control_t default_channel_subscribe_access,
@@ -212,7 +210,6 @@ static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD(
 	ks_json_t **data)
 {
 	return CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
-		pool,
 		NULL,
 		NULL,
 		protocol,
@@ -232,7 +229,6 @@ static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD(
  * request, also takes owner of the provider data and channels json passed in
  */
 static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
-	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *protocol)
@@ -275,10 +271,9 @@ static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
 	return cmd;
 }
 
-static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD(ks_pool_t *pool, const char *protocol)
+static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD(const char *protocol)
 {
 	return CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
-		pool,
 		NULL,
 		NULL,
 		protocol);
@@ -289,7 +284,6 @@ static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD(ks_pool_t *
  * Creates a command which holds and owns the request json for a protocol provider rank update request
  */
 static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC(
-	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *protocol,
@@ -345,12 +339,10 @@ static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC(
 }
 
 static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD(
-	ks_pool_t *pool,
 	const char *protocol,
 	int rank)
 {
 	return CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC(
-		pool,
 		NULL,
 		NULL,
 		protocol,

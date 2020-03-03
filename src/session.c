@@ -1015,7 +1015,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_broadcast(
 
 	/* Create the command */
 	if (!(cmd = CREATE_BLADE_BROADCAST_CMD(
-			ctx->base.pool,
 			protocol,
 			channel,
 			event,
@@ -1092,7 +1091,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 
 	/* Allocate the request */
 	if (!(cmd = CREATE_BLADE_SUBSCRIPTION_CMD(
-			ctx->base.pool,
 			BLADE_SUBSCRIPTION_CMD_ADD,
 			protocol,
 			channel))) {
@@ -1157,7 +1155,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 
 	/* Allocate the request */
 	if (!(cmd = CREATE_BLADE_SUBSCRIPTION_CMD(
-			ctx->base.pool,
 			BLADE_SUBSCRIPTION_CMD_REMOVE,
 			protocol,
 			channel))) {
@@ -1232,7 +1229,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 
 	/* Create the command */
 	if (!(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD(
-			ctx->base.pool,
 			protocol,
 			default_method_execute_access,
 			default_channel_subscribe_access,
@@ -1290,7 +1286,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
 	swclt_cmd_t *cmd = NULL;
 
 	/* Create the command */
-	if (!(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD(ctx->base.pool, protocol))) {
+	if (!(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD(protocol))) {
 		status = KS_STATUS_NO_MEM;
 		goto done;
 	}
@@ -1343,7 +1339,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
 	swclt_cmd_t *cmd = NULL;
 
 	/* Create the command */
-	if (!(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD(ctx->base.pool, protocol, rank))) {
+	if (!(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD(protocol, rank))) {
 		status = KS_STATUS_NO_MEM;
 		goto done;
 	}
@@ -1395,7 +1391,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add_async(
 
 	/* Create the command */
 	if (!(cmd = CREATE_BLADE_IDENTITY_CMD(
-			ctx->base.pool,
 			BLADE_IDENTITY_CMD_ADD,
 			identity))) {
 		status = KS_STATUS_NO_MEM;
@@ -1457,7 +1452,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 
 	/* Create the command */
 	if (!(cmd = CREATE_BLADE_EXECUTE_CMD(
-			ctx->base.pool,
 			responder,
 			protocol,
 			method,

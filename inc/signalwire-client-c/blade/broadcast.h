@@ -68,7 +68,6 @@ SWCLT_JSON_PARSE_END()
  * in it setup to submit a broadcast method to blade.
  */
 static inline swclt_cmd_t *CREATE_BLADE_BROADCAST_CMD_ASYNC(
-	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *protocol,
@@ -118,7 +117,6 @@ done:
 }
 
 static inline swclt_cmd_t *CREATE_BLADE_BROADCAST_CMD(
-	ks_pool_t *pool,
 	const char *protocol,
 	const char *channel,
 	const char *event,
@@ -126,7 +124,6 @@ static inline swclt_cmd_t *CREATE_BLADE_BROADCAST_CMD(
 	ks_json_t **params)
 {
 	return CREATE_BLADE_BROADCAST_CMD_ASYNC(
-		pool,
 		NULL,
 		NULL,
 		protocol,
