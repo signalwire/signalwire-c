@@ -37,8 +37,8 @@ static void future_cmd_cb(swclt_cmd_reply_t *cmd_reply, void *cb_data)
 	swclt_cmd_future_t *future = (swclt_cmd_future_t *)cb_data;
 	ks_cond_lock(future->cond);
 	future->reply = cmd_reply;
-	ks_cond_unlock(future->cond);
 	ks_cond_broadcast(future->cond);
+	ks_cond_unlock(future->cond);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_cmd_future_get(swclt_cmd_future_t *future, swclt_cmd_reply_t **reply)
@@ -47,7 +47,7 @@ SWCLT_DECLARE(ks_status_t) swclt_cmd_future_get(swclt_cmd_future_t *future, swcl
 	if (!future->response_ttl_ms) {
 		return KS_STATUS_FAIL;
 	}
-	ks_time_t expiration_ms = ks_time_now_ms() + future->response_ttl_ms;
+	ks_time_t expiration_ms = ks_time_now_ms() + future->response_ttl_ms + 5000;
 	ks_cond_lock(future->cond);
 	while (!future->reply && expiration_ms > ks_time_now_ms()) {
 		ks_cond_timedwait(future->cond, future->response_ttl_ms);
@@ -187,9 +187,9 @@ static void __report_failure(swclt_cmd_t *cmd, ks_status_t failure_status, const
 	reply->type = SWCLT_CMD_TYPE_FAILURE;
 	reply->failure_status = failure_status;
 	if (ap) {
-		reply->failure_reason = ks_vpprintf(cmd->pool, failure_fmt, *ap);
+		reply->failure_reason = ks_vpprintf(reply->pool, failure_fmt, *ap);
 	} else {
-		reply->failure_reason = ks_pstrdup(cmd->pool, failure_fmt);
+		reply->failure_reason = ks_pstrdup(reply->pool, failure_fmt);
 	}
 
 	ks_log(KS_LOG_WARNING, "Command was failed: %s (%lu)", reply->failure_reason, reply->failure_status);
