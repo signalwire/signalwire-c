@@ -35,7 +35,6 @@
 #include "signalwire-client-c/signalwire/signalwire.h"
 #include "signalwire-client-c/identity.h"
 #include "signalwire-client-c/config.h"
-#include "signalwire-client-c/handle_type.h"
 #include "signalwire-client-c/connection.h"
 #include "signalwire-client-c/subscription.h"
 #include "signalwire-client-c/pmethod.h"

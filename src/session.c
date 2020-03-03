@@ -102,7 +102,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sessP)
 		*sessP = NULL;
 		ks_thread_request_stop(sess->monitor_thread);
 		ks_cond_broadcast(sess->monitor_cond);
-		ks_thread_join(sess->monitor_thread);
+		ks_thread_destroy(&sess->monitor_thread);
 		swclt_conn_destroy(&sess->conn);
 		ks_hash_destroy(&sess->subscriptions);
 		ks_hash_destroy(&sess->methods);
@@ -684,7 +684,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 		goto done;
 	}
 
-	if (status = ks_thread_create(&sess->monitor_thread, session_monitor_thread, NULL, NULL)) {
+	if (status = ks_thread_create(&sess->monitor_thread, session_monitor_thread, sess, NULL)) {
 		ks_abort_fmt("Failed to allocate session monitor thread: %lu", status);
 		goto done;
 	}

@@ -1359,7 +1359,7 @@ SWCLT_DECLARE(char *) swclt_store_describe(swclt_store_t *store)
 SWCLT_DECLARE(ks_status_t) swclt_store_destroy(swclt_store_t **storeP)
 {
 	if (storeP && *storeP) {
-		swclt_store_t *store = store;
+		swclt_store_t *store = *storeP;
 		ks_pool_t *pool = store->pool;
 		*storeP = NULL;
 		ks_hash_destroy(&store->callbacks);
