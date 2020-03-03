@@ -23,7 +23,6 @@
 #include "signalwire-client-c/client.h"
 #include "signalwire-client-c/internal/config.h"
 #include "signalwire-client-c/internal/session.h"
-#include "signalwire-client-c/internal/command.h"
 #include "signalwire-client-c/internal/subscription.h"
 
 typedef struct swclt_metric_reg_s {
@@ -32,7 +31,6 @@ typedef struct swclt_metric_reg_s {
 	int rank;
 	ks_bool_t dirty;
 } swclt_metric_reg_t;
-
 
 static ks_status_t __context_state_transition(swclt_sess_ctx_t *ctx, SWCLT_HSTATE new_state);
 
@@ -95,13 +93,14 @@ static ks_bool_t __session_check_connected(swclt_sess_ctx_t *ctx, ks_bool_t leav
 
 static ks_status_t __execute_pmethod_cb(
 	swclt_sess_ctx_t *ctx,
-	const swclt_cmd_ctx_t *cmd_ctx,
+	swclt_cmd_t *cmd,
    	ks_pool_t *pool,
    	swclt_pmethod_ctx_t *pmethod_ctx,
    	const blade_execute_rqu_t *rqu)
 {
 	const char *err_message = NULL;
 	int err_code = 0;
+	char *cmd_str = swclt_cmd_describe(cmd);
 
 	/* If the context could not be found, set the response appropriately */
 	if (!pmethod_ctx) {
@@ -109,7 +108,7 @@ static ks_status_t __execute_pmethod_cb(
 					pool,
 			   		"Failed to lookup any registered protocol method handlers for protocol: %s command: %s",
 				   	rqu->protocol,
-				   	ks_handle_describe_ctx(cmd_ctx));
+					cmd_str);
 		err_code = -32601;
 	} else {
 		/* Raise the callback, if they respond with a general failure fail for them */
@@ -117,12 +116,12 @@ static ks_status_t __execute_pmethod_cb(
 
 		ks_log(KS_LOG_INFO, "Initiating execute for protocol: %s", rqu->protocol);
 
-		if (cb_result = pmethod_ctx->cb(ctx->base.handle, cmd_ctx->base.handle, rqu, pmethod_ctx->cb_data)) {
+		if (cb_result = pmethod_ctx->cb(ctx->base.handle, cmd, rqu, pmethod_ctx->cb_data)) {
 			err_message = ks_psprintf(
 						pool,
 					   	"Protocol method callback returned status: (%lu) command: %s",
 					   	cb_result,
-					   	ks_handle_describe_ctx(cmd_ctx));
+						cmd_str);
 			err_code = -32603;
 		}
 
@@ -130,14 +129,14 @@ static ks_status_t __execute_pmethod_cb(
 	}
 
 	/* Now verify the command was properly setup for result processing */
-	if (cmd_ctx->type != SWCLT_CMD_TYPE_RESULT && cmd_ctx->type != SWCLT_CMD_TYPE_ERROR) {
+	if (cmd->type != SWCLT_CMD_TYPE_RESULT && cmd->type != SWCLT_CMD_TYPE_ERROR) {
 		ks_debug_break();
 
 		/* Force one for them */
 		err_message = ks_psprintf(
 					pool,
 					"Protocol method failed to set result in command: %s",
-					ks_handle_describe_ctx(cmd_ctx));
+					cmd_str);
 		err_code = -32607;
 	}
 
@@ -154,12 +153,14 @@ static ks_status_t __execute_pmethod_cb(
 						err_code,
 						err_message});
 
-		if (status = swclt_cmd_set_error(cmd_ctx->base.handle, &err)) {
-			ks_log(KS_LOG_WARNING, "Failed to set result in command: %lu", status);
+		if (status = swclt_cmd_set_error(cmd, &err)) {
+			ks_log(KS_LOG_WARNING, "Failed to set result in command: %s, status: %lu", cmd_str, status);
 			ks_json_delete(&err);
 			ks_pool_free(&err_message);
+			ks_pool_free(&cmd_str);
 		}
 
+		ks_pool_free(&cmd_str);
 		return status;
 	}
 
@@ -167,31 +168,24 @@ static ks_status_t __execute_pmethod_cb(
 	return KS_STATUS_SUCCESS;
 }
 
-static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_sess_ctx_t *ctx)
+static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt_sess_ctx_t *ctx)
 {
 	const char * method;
 	ks_status_t status;
 	ks_json_t *request;
 	ks_pool_t *cmd_pool;
-	const swclt_cmd_ctx_t *cmd_ctx;
+	char *cmd_str;
 
-	/* Reserve the cmd while we mess with it */
-	if (status = swclt_cmd_ctx_get(cmd, &cmd_ctx)) {
-		ks_log(KS_LOG_ERROR, "Failed to reserve command for pmethod callback");
-		return status;
-	}
+	cmd_str = swclt_cmd_describe(cmd);
 
-	ks_log(KS_LOG_DEBUG, "Handling incoming command: %s from transport", ks_handle_describe_ctx(cmd_ctx));
-
-	/* Retain thread saftey when messing with cmd internals */
-	swclt_cmd_ctx_lock(cmd_ctx);
+	ks_log(KS_LOG_DEBUG, "Handling incoming command: %s from transport", cmd_str);
 
 	/* Use the commands pool for all allocations */
-	cmd_pool = (ks_pool_t *)cmd_ctx->base.pool;
+	cmd_pool = cmd->pool;
 
 	/* Grab information about the method */
-	method = cmd_ctx->method;
-	request = cmd_ctx->request;
+	method = cmd->method;
+	request = cmd->json;
 
 	/* Keep it locked until we parse the request */
 	if (!strcmp(method, BLADE_BROADCAST_METHOD)) {
@@ -201,11 +195,10 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 		const char *key;
 
 		status = BLADE_BROADCAST_RQU_PARSE(cmd_pool, request, &rqu);
-		swclt_cmd_ctx_unlock(cmd_ctx);
 
 		if (status) {
 			ks_log(KS_LOG_ERROR, "Failed to parse broadcast command: %s (%lu)",
-				ks_handle_describe_ctx(cmd_ctx), status);
+				cmd_str, status);
 			goto done;
 		}
 
@@ -215,7 +208,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 
 		if (!sub) {
 			ks_log(KS_LOG_ERROR, "Could not locate sub for protocol: %s channel: %s command: %s",
-				rqu->protocol, rqu->channel, ks_handle_describe_ctx(cmd_ctx));
+				rqu->protocol, rqu->channel, cmd_str);
 			BLADE_BROADCAST_RQU_DESTROY(&rqu);
 			status = KS_STATUS_NOT_FOUND;
 			goto done;
@@ -230,10 +223,8 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 
 		status = BLADE_DISCONNECT_RQU_PARSE(cmd_pool, request, &rqu);
 
-		swclt_cmd_ctx_unlock(cmd_ctx);
-
 		if (status) {
-			ks_log(KS_LOG_ERROR, "Failed to parse disconnect command: %s (%lu)", ks_handle_describe_ctx(cmd_ctx), status);
+			ks_log(KS_LOG_ERROR, "Failed to parse disconnect command: %s (%lu)", cmd_str, status);
 			goto done;
 		}
 
@@ -246,9 +237,9 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 		if (!status) {
 			/* Now the command is ready to be sent back, enqueue it */
 			if (status = swclt_conn_submit_result(ctx->conn, cmd))
-				ks_log(KS_LOG_ERROR, "Failed to submit reply from disconnect: %lu", status);
+				ks_log(KS_LOG_ERROR, "Failed to submit reply from disconnect %s, status: %lu", cmd_str, status);
 			else
-				ks_log(KS_LOG_INFO, "Sent reply back from disconnect request: %s", ks_handle_describe(cmd));
+				ks_log(KS_LOG_INFO, "Sent reply back from disconnect request: %s", cmd_str);
 		}
 		goto done;
 	} else if (!strcmp(method, BLADE_PING_METHOD)) {
@@ -256,10 +247,8 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 
 		status = BLADE_PING_RQU_PARSE(cmd_pool, request, &rqu);
 
-		swclt_cmd_ctx_unlock(cmd_ctx);
-
 		if (status) {
-			ks_log(KS_LOG_ERROR, "Failed to parse ping command: %s (%lu)", ks_handle_describe_ctx(cmd_ctx), status);
+			ks_log(KS_LOG_ERROR, "Failed to parse ping command: %s (%lu)", cmd_str, status);
 			goto done;
 		}
 
@@ -271,9 +260,9 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 		if (!status) {
 			/* Now the command is ready to be sent back, enqueue it */
 			if (status = swclt_conn_submit_result(ctx->conn, cmd))
-				ks_log(KS_LOG_ERROR, "Failed to submit reply from ping: %lu", status);
+				ks_log(KS_LOG_ERROR, "Failed to submit reply from ping: %s, status: %lu", cmd_str, status);
 			else
-				ks_log(KS_LOG_INFO, "Sent reply back from ping request: %s", ks_handle_describe(cmd));
+				ks_log(KS_LOG_INFO, "Sent reply back from ping request: %s", cmd_str);
 		}
 		goto done;
 	} else if (!strcmp(method, BLADE_NETCAST_METHOD)) {
@@ -281,21 +270,19 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 
 		status = BLADE_NETCAST_RQU_PARSE(cmd_pool, request, &rqu);
 
-		swclt_cmd_ctx_unlock(cmd_ctx);
-
 		if (status) {
-			ks_log(KS_LOG_ERROR, "Failed to parse netcast command: %s (%lu)", ks_handle_describe_ctx(cmd_ctx), status);
+			ks_log(KS_LOG_ERROR, "Failed to parse netcast command: %s (%lu)", cmd_str, status);
 			goto done;
 		}
 
 		if (status = swclt_store_update(ctx->store, rqu)) {
 			ks_log(KS_LOG_WARNING, "Failed to update nodestore from netcast command: %s (%lu)",
-				ks_handle_describe_ctx(cmd_ctx), status);
+				cmd_str, status);
 			BLADE_NETCAST_RQU_DESTROY(&rqu);
 			goto done;
 		}
 
-		ks_log(KS_LOG_INFO, "Updated nodestore with netcast command: %s", ks_handle_describe_ctx(cmd_ctx));
+		ks_log(KS_LOG_INFO, "Updated nodestore with netcast command: %s", cmd_str);
 		BLADE_NETCAST_RQU_DESTROY(&rqu);
 		goto done;
 	} else if (!strcmp(method, BLADE_EXECUTE_METHOD)) {
@@ -303,18 +290,17 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 		const char *key;
 
 		status = BLADE_EXECUTE_RQU_PARSE(cmd_pool, request, &rqu);
-		swclt_cmd_ctx_unlock(cmd_ctx);
 
-		ks_log(KS_LOG_DEBUG, "Dispatching incoming blade execute request: %s to callback", ks_handle_describe(cmd));
+		ks_log(KS_LOG_DEBUG, "Dispatching incoming blade execute request: %s to callback", cmd_str);
 
 		if (status) {
-			ks_log(KS_LOG_WARNING, "Failed to parse execute payload: %s (%lu)", ks_handle_describe_ctx(cmd_ctx), status);
+			ks_log(KS_LOG_WARNING, "Failed to parse execute payload: %s (%lu)", cmd_str, status);
 			goto done;
 		}
 
 		/* Look up the pmethod, and execute it */
 		key = __make_pmethod_key(ctx, rqu->protocol, rqu->method);
-		if (status = __execute_pmethod_cb(ctx, cmd_ctx, cmd_pool, ks_hash_search(ctx->methods, key, KS_UNLOCKED), rqu)) {
+		if (status = __execute_pmethod_cb(ctx, cmd, cmd_pool, ks_hash_search(ctx->methods, key, KS_UNLOCKED), rqu)) {
 			ks_log(KS_LOG_ERROR, "Error executing pmethod: %lu", status);
 		}
 		ks_pool_free(&key);
@@ -323,28 +309,22 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, swclt_
 		BLADE_EXECUTE_RQU_DESTROY(&rqu);
 
 		if (!status) {
-			ks_log(KS_LOG_INFO, "Sending reply back from execute request: %s", ks_handle_describe(cmd));
+			ks_log(KS_LOG_INFO, "Sending reply back from execute request: %s", cmd_str);
 
 			/* Now the command is ready to be sent back, enqueue it */
 			if (status = swclt_conn_submit_result(ctx->conn, cmd))
-				ks_log(KS_LOG_ERROR, "Failed to submit reply from execute: %lu", status);
+				ks_log(KS_LOG_ERROR, "Failed to submit reply from execute: %s, status: %lu", cmd_str, status);
 			else
-				ks_log(KS_LOG_INFO, "Sent reply back from execute request: %s", ks_handle_describe(cmd));
+				ks_log(KS_LOG_INFO, "Sent reply back from execute request: %s", cmd_str);
 		}
 		goto done;
 	} else {
-		swclt_cmd_ctx_unlock(cmd_ctx);
-		ks_log(KS_LOG_WARNING, "Not handling incoming command: %s", ks_handle_describe_ctx(cmd_ctx));
+		ks_log(KS_LOG_WARNING, "Not handling incoming command: %s", cmd_str);
 	}
 
 done:
-	/* Remove our reservation of the command */
-	swclt_cmd_ctx_put(&cmd_ctx);
 
-	/* Done with the command now (NOTE: Commands are children of the connections so
-	 * if we return here without destroying it it will eventually get destroyed when
-	 * the connection dies or the session reconnects) */
-	ks_handle_destroy(&cmd);
+	ks_pool_free(&cmd_str);
 	return status;
 }
 
@@ -596,6 +576,7 @@ static void __context_service(swclt_sess_ctx_t *ctx)
 			value->timeout = ks_time_now() + (value->interval * KS_USEC_PER_SEC);
 			value->dirty = KS_FALSE;
 
+			// This won't block - TODO make sure this is what we want
 			swclt_sess_protocol_provider_rank_update_async(ctx->base.handle, key, value->rank, NULL, NULL, NULL);
 		}
 	}
@@ -987,15 +968,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_nodestore(
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
 
-SWCLT_DECLARE(ks_status_t) __swclt_sess_register_protocol_method(
+SWCLT_DECLARE(ks_status_t) swclt_sess_register_protocol_method(
 	swclt_sess_t sess,
 	const char *protocol,
 	const char *method,
 	swclt_pmethod_cb_t pmethod_cb,
 	void *cb_data)
 {
-	/* @todo consider changing pmethod to a handle, and internally store both the callback and a user data pointer
-	 * however, userdata associated at the time of pmethod registration does not make sense for conceivable use cases */
 	SWCLT_SESS_SCOPE_BEG(sess, ctx, status);
 	status = __register_pmethod(ctx, protocol, method, pmethod_cb, cb_data);
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
@@ -1032,10 +1011,11 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_broadcast(
 	ks_json_t **params)
 {
 	SWCLT_SESS_SCOPE_BEG(sess, ctx, status);
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 
 	/* Create the command */
 	if (!(cmd = CREATE_BLADE_BROADCAST_CMD(
+			ctx->base.pool,
 			protocol,
 			channel,
 			event,
@@ -1046,11 +1026,11 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_broadcast(
 	}
 
 	/* Now submit it */
-	if (status = swclt_conn_submit_request(ctx->conn, cmd))
+	if (status = swclt_conn_submit_request(ctx->conn, &cmd, NULL))
 		goto done;
 
 done:
-	ks_handle_destroy(&cmd);
+	swclt_cmd_destroy(&cmd);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
@@ -1062,18 +1042,24 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
 	swclt_sub_cb_t cb,
 	void *cb_data,
 	swclt_sub_t *sub,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_reply_t **reply)
 {
-	return swclt_sess_subscription_add_async(
+	swclt_cmd_future_t *future = NULL;
+	ks_status_t status = swclt_sess_subscription_add_async(
 		sess,
 		protocol,
 		channel,
 		cb,
 		cb_data,
 		sub,
-		NULL,		/* By passing null here we make this synchronous by implication */
 		NULL,
-		cmdP);
+		NULL,
+		&future);
+	if (status == KS_STATUS_SUCCESS && future) {
+		status = swclt_cmd_future_get(future, reply);
+	}
+	swclt_cmd_future_destroy(&future);
+	return status;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
@@ -1085,10 +1071,10 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 	swclt_sub_t *sub,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_future_t **future)
 {
 	SWCLT_SESS_SCOPE_BEG(sess, ctx, status);
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 	blade_subscription_rpl_t *subscription_rpl = NULL;
 
 	/* @todo remove the next 2 calls, and call swclt_sess_register_subscription_method externally, and
@@ -1106,6 +1092,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 
 	/* Allocate the request */
 	if (!(cmd = CREATE_BLADE_SUBSCRIPTION_CMD(
+			ctx->base.pool,
 			BLADE_SUBSCRIPTION_CMD_ADD,
 			protocol,
 			channel))) {
@@ -1119,20 +1106,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 	}
 
 	/* Now submit the command */
-	if (status = swclt_conn_submit_request(ctx->conn, cmd))
-		goto done;
-
-	/* If not async, and caller didnt pass in a spot for the command, destroy it */
-	if (!cmdP && !response_callback)
-		ks_handle_destroy(&cmd);
-	else {
-		if (cmdP) *cmdP = cmd;
-	}
+	status = swclt_conn_submit_request(ctx->conn, &cmd, future);
 
 done:
+	swclt_cmd_destroy(&cmd);
+
 	/* Only destroy the subscription if we failed */
 	if (status) {
-		ks_handle_destroy(&cmd);
 		ks_handle_destroy(sub);
 	}
 
@@ -1143,15 +1123,21 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove(
 	swclt_sess_t sess,
 	const char *protocol,
 	const char *channel,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_reply_t **reply)
 {
-	return swclt_sess_subscription_remove_async(
+	swclt_cmd_future_t *future = NULL;
+	ks_status_t status = swclt_sess_subscription_remove_async(
 		sess,
 		protocol,
 		channel,
-		NULL,		/* By passing null here we make this synchronous by implication */
 		NULL,
-		cmdP);
+		NULL,
+		&future);
+	if (status == KS_STATUS_SUCCESS && future) {
+		status = swclt_cmd_future_get(future, reply);
+	}
+	swclt_cmd_future_destroy(&future);
+	return status;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
@@ -1160,10 +1146,10 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 	const char *channel,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_future_t **future)
 {
 	SWCLT_SESS_SCOPE_BEG(sess, ctx, status);
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 
 	/* Unregister this subscription if it exists, if not then just continue with subscription removal
 	 * because the callback may have been removed manually */
@@ -1171,6 +1157,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 
 	/* Allocate the request */
 	if (!(cmd = CREATE_BLADE_SUBSCRIPTION_CMD(
+			ctx->base.pool,
 			BLADE_SUBSCRIPTION_CMD_REMOVE,
 			protocol,
 			channel))) {
@@ -1184,19 +1171,11 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 	}
 
 	/* Now submit the command */
-	if (status = swclt_conn_submit_request(ctx->conn, cmd))
+	if (status = swclt_conn_submit_request(ctx->conn, &cmd, future))
 		goto done;
 
-	/* If not async, and caller didnt pass in a spot for the command, destroy it */
-	if (!cmdP && !response_callback)
-		ks_handle_destroy(&cmd);
-	else {
-		if (cmdP) *cmdP = cmd;
-	}
-
 done:
-	if (status)
-		ks_handle_destroy(&cmd);
+	swclt_cmd_destroy(&cmd);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
@@ -1211,9 +1190,10 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
 	ks_json_t **channels,
 	int rank,
 	ks_json_t **data,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_reply_t **reply)
 {
-	return swclt_sess_protocol_provider_add_async(
+	swclt_cmd_future_t *future = NULL;
+	ks_status_t status = swclt_sess_protocol_provider_add_async(
 		sess,
 		protocol,
 		default_method_execute_access,
@@ -1223,9 +1203,14 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
 		channels,
 		rank,
 		data,
-		NULL,		/* By passing null here we make this synchronous by implication */
 		NULL,
-		cmdP);
+		NULL,
+		&future);
+	if (status == KS_STATUS_SUCCESS && future) {
+		status = swclt_cmd_future_get(future, reply);
+	}
+	swclt_cmd_future_destroy(&future);
+	return status;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
@@ -1240,13 +1225,14 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 	ks_json_t **data,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_future_t **future)
 {
 	SWCLT_SESS_SCOPE_BEG(sess, ctx, status);
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 
 	/* Create the command */
 	if (!(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD(
+			ctx->base.pool,
 			protocol,
 			default_method_execute_access,
 			default_channel_subscribe_access,
@@ -1259,30 +1245,17 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 		goto done;
 	}
 
-	/* @todo verify that the subscription callbacks are already registered here as a sanity check
-	 * for any channels that are auto_subscribed */
-
 	/* If the caller wants to do async, set the callback in the cmd */
 	if (response_callback) {
 		if (status = swclt_cmd_set_cb(cmd, response_callback, response_callback_data))
 			goto done;
 	}
 
-	/* Now hand it to the connection to submit it, it will block until the
-	 * reply is received */
-	if (status = swclt_conn_submit_request(ctx->conn, cmd))
+	if (status = swclt_conn_submit_request(ctx->conn, &cmd, future))
 		goto done;
 
-	/* If not async, and caller didnt pass in a spot for the command, destroy it */
-	if (!cmdP && !response_callback)
-		ks_handle_destroy(&cmd);
-	else {
-		if (cmdP) *cmdP = cmd;
-	}
-
 done:
-	if (status)
-		ks_handle_destroy(&cmd);
+	swclt_cmd_destroy(&cmd);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
@@ -1290,14 +1263,20 @@ done:
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove(
 	swclt_sess_t sess,
    	const char * protocol,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_reply_t **reply)
 {
-	return swclt_sess_protocol_provider_remove_async(
+	swclt_cmd_future_t *future = NULL;
+	ks_status_t status = swclt_sess_protocol_provider_remove_async(
 		sess,
 		protocol,
-		NULL,		/* By passing null here we make this synchronous by implication */
 		NULL,
-		cmdP);
+		NULL,
+		&future);
+	if (status == KS_STATUS_SUCCESS && future) {
+		status = swclt_cmd_future_get(future, reply);
+	}
+	swclt_cmd_future_destroy(&future);
+	return status;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
@@ -1305,15 +1284,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
 	const char * protocol,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_future_t **future)
 {
 	SWCLT_SESS_SCOPE_BEG(sess, ctx, status);
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
-
-	/* @todo separate protocol command field parsing into different types based on the command? */
+	swclt_cmd_t *cmd = NULL;
 
 	/* Create the command */
-	if (!(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD(protocol))) {
+	if (!(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD(ctx->base.pool, protocol))) {
 		status = KS_STATUS_NO_MEM;
 		goto done;
 	}
@@ -1324,21 +1301,11 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
 			goto done;
 	}
 
-	/* Now hand it to the connection to submit it, it will block until the
-	 * reply is received */
-	if (status = swclt_conn_submit_request(ctx->conn, cmd))
+	if (status = swclt_conn_submit_request(ctx->conn, &cmd, future))
 		goto done;
 
-	/* If not async, and caller didnt pass in a spot for the command, destroy it */
-	if (!cmdP && !response_callback)
-		ks_handle_destroy(&cmd);
-	else {
-		if (cmdP) *cmdP = cmd;
-	}
-
 done:
-	if (status)
-		ks_handle_destroy(&cmd);
+	swclt_cmd_destroy(&cmd);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
@@ -1347,15 +1314,21 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update(
 	swclt_sess_t sess,
 	const char * protocol,
 	int rank,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_reply_t **reply)
 {
-	return swclt_sess_protocol_provider_rank_update_async(
+	swclt_cmd_future_t *future = NULL;
+	ks_status_t status = swclt_sess_protocol_provider_rank_update_async(
 		sess,
 		protocol,
 		rank,
-		NULL,		/* By passing null here we make this synchronous by implication */
 		NULL,
-		cmdP);
+		NULL,
+		&future);
+	if (status == KS_STATUS_SUCCESS && future) {
+		status = swclt_cmd_future_get(future, reply);
+	}
+	swclt_cmd_future_destroy(&future);
+	return status;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
@@ -1364,13 +1337,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
 	int rank,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_future_t **future)
 {
 	SWCLT_SESS_SCOPE_BEG(sess, ctx, status);
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 
 	/* Create the command */
-	if (!(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD(protocol, rank))) {
+	if (!(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD(ctx->base.pool, protocol, rank))) {
 		status = KS_STATUS_NO_MEM;
 		goto done;
 	}
@@ -1381,21 +1354,11 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
 			goto done;
 	}
 
-	/* Now hand it to the connection to submit it, it will block until the
-	 * reply is received */
-	if (status = swclt_conn_submit_request(ctx->conn, cmd))
+	if (status = swclt_conn_submit_request(ctx->conn, &cmd, future))
 		goto done;
 
-	/* If not async, and caller didnt pass in a spot for the command, destroy it */
-	if (!cmdP && !response_callback)
-		ks_handle_destroy(&cmd);
-	else {
-		if (cmdP) *cmdP = cmd;
-	}
-
 done:
-	if (status)
-		ks_handle_destroy(&cmd);
+	swclt_cmd_destroy(&cmd);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
@@ -1404,14 +1367,20 @@ done:
 SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add(
 	swclt_sess_t sess,
 	const char *identity,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_reply_t **reply)
 {
-	return swclt_sess_identity_add_async(
+	swclt_cmd_future_t *future = NULL;
+	ks_status_t status = swclt_sess_identity_add_async(
 		sess,
 		identity,
-		NULL,		/* By passing null here we make this synchronous by implication */
 		NULL,
-		cmdP);
+		NULL,
+		&future);
+	if (status == KS_STATUS_SUCCESS && future) {
+		status = swclt_cmd_future_get(future, reply);
+	}
+	swclt_cmd_future_destroy(&future);
+	return status;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add_async(
@@ -1419,13 +1388,14 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add_async(
 	const char *identity,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_future_t **future)
 {
 	SWCLT_SESS_SCOPE_BEG(sess, ctx, status);
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 
 	/* Create the command */
 	if (!(cmd = CREATE_BLADE_IDENTITY_CMD(
+			ctx->base.pool,
 			BLADE_IDENTITY_CMD_ADD,
 			identity))) {
 		status = KS_STATUS_NO_MEM;
@@ -1438,21 +1408,11 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add_async(
 			goto done;
 	}
 
-	/* Now hand it to the connection to submit it, it will block until the
-	 * reply is received */
-	if (status = swclt_conn_submit_request(ctx->conn, cmd))
+	if (status = swclt_conn_submit_request(ctx->conn, &cmd, future))
 		goto done;
 
-	/* If not async, and caller didnt pass in a spot for the command, destroy it */
-	if (!cmdP && !response_callback)
-		ks_handle_destroy(&cmd);
-	else {
-		if (cmdP) *cmdP = cmd;
-	}
-
 done:
-	if (status)
-	   	ks_handle_destroy(&cmd);
+	swclt_cmd_destroy(&cmd);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
@@ -1463,17 +1423,23 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute(
 	const char *protocol,
 	const char *method,
 	ks_json_t **params,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_reply_t **reply)
 {
-	return swclt_sess_execute_async(
+	swclt_cmd_future_t *future = NULL;
+	ks_status_t status = swclt_sess_execute_async(
 		sess,
 		responder,
 		protocol,
 		method,
 		params,
-		NULL,		/* By passing null here we make this synchronous by implication */
 		NULL,
-		cmdP);
+		NULL,
+		&future);
+	if (status == KS_STATUS_SUCCESS && future) {
+		status = swclt_cmd_future_get(future, reply);
+	}
+	swclt_cmd_future_destroy(&future);
+	return status;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
@@ -1484,13 +1450,14 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 	ks_json_t **params,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmdP)
+	swclt_cmd_future_t **future)
 {
 	SWCLT_SESS_SCOPE_BEG(sess, ctx, status);
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 
 	/* Create the command */
 	if (!(cmd = CREATE_BLADE_EXECUTE_CMD(
+			ctx->base.pool,
 			responder,
 			protocol,
 			method,
@@ -1505,19 +1472,10 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 			goto done;
 	}
 
-	if (status = swclt_conn_submit_request(ctx->conn, cmd))
-		goto done;
-
-	/* If not async, and caller didnt pass in a spot for the command, destroy it */
-	if (!cmdP && !response_callback)
-		ks_handle_destroy(&cmd);
-	else {
-		if (cmdP) *cmdP = cmd;
-	}
+	status = swclt_conn_submit_request(ctx->conn, &cmd, future);
 
 done:
-	if (status)
-		ks_handle_destroy(&cmd);
+	swclt_cmd_destroy(&cmd);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
 }
@@ -1531,15 +1489,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 	swclt_store_t store;
 	ks_pool_t *pool = NULL;
 	ks_json_t *params = NULL;
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
-	SWCLT_CMD_TYPE cmd_type;
+	swclt_cmd_reply_t *reply = NULL;
 	ks_json_t *result = NULL;
 	const char *protocol = NULL;
 	ks_bool_t instance_found = KS_FALSE;
 	swclt_sub_t sub;
 
 	ks_assert(service);
-	ks_assert(cb);
 
 	// Make sure we are at least connected
 	if (!swclt_sess_connected(sess)) {
@@ -1565,48 +1521,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 									"signalwire",
 									"setup",
 									&params,
-									&cmd)) {
+									&reply)) {
 		ks_log(KS_LOG_ERROR, "Setup for '%s' execute failed: %d", service, status);
 		goto done;
 	}
 
-	// Make sure the command is valid...
-	if (status = swclt_cmd_type(cmd, &cmd_type)) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' command invalid: %d", service, status);
-		goto done;
-	}
-
-	// If we get an error back, bail out
-	if (cmd_type == SWCLT_CMD_TYPE_ERROR) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' response type error", service);
-		// @todo log more details from the error response
-		status = KS_STATUS_FAIL;
-		goto done;
-	}
-
-	// If it's not an error or a result, what is it, did someone forget to set it from the request?
-	if (cmd_type != SWCLT_CMD_TYPE_RESULT) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' response type invalid", service);
-		status = KS_STATUS_FAIL;
-		goto done;
-	}
-
-	// Make sure we actually get a result to look at
-	if (status = swclt_cmd_result(cmd, &result)) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' response has no result: %d", service, status);
-		goto done;
-	}
-
-	// Get the inner result of the execute
-	result = ks_json_get_object_item(result, "result");
-	if (!result) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' response has no result.result", service);
-		status = KS_STATUS_ARG_NULL;
-		goto done;
-	}
-
 	// Get protocol from result, duplicate it so we can destroy the command
-	protocol = ks_json_get_object_string(result, "protocol", NULL);
+	protocol = ks_json_get_object_string(ks_json_get_object_item(reply->json, "result"), "protocol", NULL);
 	if (protocol) protocol = ks_pstrdup(ks_handle_pool(sess), protocol);
 
 	if (!protocol) {
@@ -1615,8 +1536,8 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 		goto done;
 	}
 
-	// Destroy the execute command, taking the result data with it, protocol is duplicated in session pool
-	ks_handle_destroy(&cmd);
+	// Destroy the reply, taking the result data with it, protocol is duplicated in session pool
+	swclt_cmd_reply_destroy(&reply);
 
 	ks_log(KS_LOG_DEBUG, "Setup for '%s' waiting for provider of protocol instance: %s", service, protocol);
 
@@ -1641,46 +1562,15 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const 
 	}
 
 	// Now that protocol is available, sync subscribe to the notifications channel
-	if (status = swclt_sess_subscription_add(sess, protocol, "notifications", cb, cb_data, &sub, &cmd)) {
+	if (status = swclt_sess_subscription_add(sess, protocol, "notifications", cb, cb_data, &sub, NULL)) {
 		ks_log(KS_LOG_ERROR, "Setup for '%s' subscription add failed: %d", service, status);
 		goto done;
 	}
-
-	// Make sure the command is valid...
-	if (status = swclt_cmd_type(cmd, &cmd_type)) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' subscription add command invalid: %d", service, status);
-		goto done;
-	}
-
-	// If we get an error back, bail out
-	if (cmd_type == SWCLT_CMD_TYPE_ERROR) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' subscription add response type error", service);
-		// @todo log more details from the error response
-		status = KS_STATUS_FAIL;
-		goto done;
-	}
-
-	// If it's not an error or a result, what is it, did someone forget to set it from the request?
-	if (cmd_type != SWCLT_CMD_TYPE_RESULT) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' subscription add response type invalid", service);
-		status = KS_STATUS_FAIL;
-		goto done;
-	}
-
-	// Make sure we actually get a result to look at
-	if (status = swclt_cmd_result(cmd, &result)) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s', subscription add response has no result: %d", service, status);
-		goto done;
-	}
-
-	// Destroy the subscription add command
-	ks_handle_destroy(&cmd);
-
 	__register_setup(ctx, service, protocol);
 
 done:
 	if (protocol) ks_pool_free(&protocol);
-	if (ks_handle_valid(cmd)) ks_handle_destroy(&cmd);
+	swclt_cmd_reply_destroy(&reply);
 	if (params) ks_json_delete(&params);
 
 	SWCLT_SESS_SCOPE_END(sess, ctx, status);
@@ -1698,16 +1588,22 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure(swclt_sess_t sess,
 															 const char *local_endpoint,
 															 const char *external_endpoint,
 															 const char *relay_connector_id,
-															 swclt_cmd_t *cmdP)
+															 swclt_cmd_reply_t **reply)
 {
-	return swclt_sess_provisioning_configure_async(sess,
+	swclt_cmd_future_t *future = NULL;
+	ks_status_t status = swclt_sess_provisioning_configure_async(sess,
 												   target,
 												   local_endpoint,
 												   external_endpoint,
 												   relay_connector_id,
-												   NULL,		/* By passing null here we make this synchronous by implication */
 												   NULL,
-												   cmdP);
+												   NULL,
+												   &future);
+	if (status == KS_STATUS_SUCCESS && future) {
+		status = swclt_cmd_future_get(future, reply);
+	}
+	swclt_cmd_future_destroy(&future);
+	return status;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t sess,
@@ -1717,7 +1613,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t 
 																   const char *relay_connector_id,
 																   swclt_cmd_cb_t response_callback,
 																   void *response_callback_data,
-																   swclt_cmd_t *cmdP)
+																	swclt_cmd_future_t **future)
 {
 	SWCLT_SESS_SCOPE_BEG(sess, ctx, status);
 
@@ -1760,7 +1656,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t 
 									  &params,
 									  response_callback,
 									  response_callback_data,
-									  cmdP);
+									  future);
 done:
 	if (protocol) ks_pool_free(&protocol);
 	if (params) ks_json_delete(&params);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,7 @@ typedef struct swclt_ttl_tracker swclt_ttl_tracker_t;
 
 typedef struct swclt_conn swclt_conn_t;
 
-typedef ks_status_t (*swclt_conn_incoming_cmd_cb_t)(swclt_conn_t *conn, swclt_cmd_t cmd, void *cb_data);
+typedef ks_status_t (*swclt_conn_incoming_cmd_cb_t)(swclt_conn_t *conn, swclt_cmd_t *cmd, void *cb_data);
 typedef ks_status_t (*swclt_conn_connect_cb_t)(swclt_conn_t *conn, ks_json_t *error, blade_connect_rpl_t *connect_rpl, void *cb_data);
 typedef ks_status_t (*swclt_conn_failed_cb_t)(swclt_conn_t *conn, void *cb_data);
 
@@ -115,8 +115,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	const char *identity,
 	const SSL_CTX *ssl);
 
-SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t cmd);
-SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cmd_t cmd);
+SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t **cmd, swclt_cmd_future_t **future);
+SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cmd_t *cmd);
 SWCLT_DECLARE(ks_status_t) swclt_conn_info(swclt_conn_t *conn, swclt_conn_info_t *info);
 SWCLT_DECLARE(char *) swclt_conn_describe(swclt_conn_t *conn);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,19 +22,43 @@
 
 #include "swclt_test.h"
 
+static void __on_session_state_provider(swclt_sess_t sess, swclt_hstate_change_t *state_change_info, ks_cond_t *cond)
+{
+	SWCLT_HSTATE old_state = state_change_info->old_state;
+	SWCLT_HSTATE new_state = state_change_info->new_state;
+	if (new_state == SWCLT_HSTATE_ONLINE && old_state == SWCLT_HSTATE_NORMAL) {
+		ks_json_t *channels = ks_json_create_array();
+		swclt_sess_protocol_provider_add(sess,
+										 "test",
+										 BLADE_ACL_SYSTEM, // rpc execute
+										 BLADE_ACL_SYSTEM, // channel subscribe
+										 BLADE_ACL_SYSTEM, // channel broadcast
+										 NULL, // method access overrides
+										 &channels,
+										 3,
+										 NULL,
+										 NULL);
+
+		swclt_sess_metric_register(sess, "test", 30, 9);
+	} else if (new_state == SWCLT_HSTATE_OFFLINE) {
+		// Disconnected
+	}
+
+	/* Notify the waiting test of the state change */
+	ks_cond_broadcast(cond);
+}
+
 static void __on_session_state(swclt_sess_t sess, const swclt_hstate_change_t *state_change_info, ks_cond_t *cond)
 {
 	/* Notify the waiting test of the state change */
-	ks_cond_lock(cond);
 	ks_cond_broadcast(cond);
-	ks_cond_unlock(cond);
 }
 
-static ks_status_t __on_incoming_test_execute_rqu(swclt_sess_t sess, swclt_cmd_t cmd, const blade_execute_rqu_t *rqu, void *data)
+static ks_status_t __on_incoming_test_execute_rqu(swclt_sess_t sess, swclt_cmd_t *cmd, const blade_execute_rqu_t *rqu, void *data)
 {
 	/* Formulate a response */
 	ks_cond_t *cond = (ks_cond_t *)data;
-	ks_pool_t *cmd_pool = ks_handle_pool(cmd);
+	ks_pool_t *cmd_pool = cmd->pool;
 	ks_json_t *result = ks_json_create_object();
 	ks_json_add_string_to_object(result, "reply", "i got it!");
 
@@ -46,18 +70,12 @@ static ks_status_t __on_incoming_test_execute_rqu(swclt_sess_t sess, swclt_cmd_t
 
 	REQUIRE(!swclt_cmd_set_result(cmd, &cmd_result));
 
-	/* Notify the waiting test of the state change */
-	ks_cond_lock(cond);
-	ks_cond_broadcast(cond);
-	ks_cond_unlock(cond);
 	return KS_STATUS_SUCCESS;
 }
 
-static void __on_outgoing_test_execute_rpl(swclt_cmd_t cmd, ks_cond_t *cond)
+static void __on_outgoing_test_execute_rpl(swclt_cmd_reply_t *reply, void *cond)
 {
-	ks_cond_lock(cond);
-	ks_cond_broadcast(cond);
-	ks_cond_unlock(cond);
+	ks_cond_broadcast((ks_cond_t *)cond);
 }
 
 void test_execute(ks_pool_t *pool)
@@ -78,7 +96,7 @@ void test_execute(ks_pool_t *pool)
 
 	/* Get called back when they're connected */
 	REQUIRE(!swclt_hmon_register(&sess1_mon, sess1, __on_session_state, cond));
-	REQUIRE(!swclt_hmon_register(&sess2_mon, sess2, __on_session_state, cond));
+	REQUIRE(!swclt_hmon_register(&sess2_mon, sess2, __on_session_state_provider, cond));
 
 	/* On the second session register a execute handler we'll communicate with */
 	REQUIRE(!swclt_sess_register_protocol_method(sess2, "test", "test.method", __on_incoming_test_execute_rqu, cond));
@@ -87,7 +105,6 @@ void test_execute(ks_pool_t *pool)
 	REQUIRE(!swclt_sess_connect(sess1));
 	REQUIRE(!swclt_sess_connect(sess2));
 
-	/* Wait for the state to change, twice */
 	ks_cond_wait(cond);
 	ks_cond_wait(cond);
 
@@ -97,16 +114,23 @@ void test_execute(ks_pool_t *pool)
 
 	/* Now execute from the first session to the second session */
 	ks_json_t *params = ks_json_create_object();
-	swclt_cmd_t sess1_exec_cmd;
 	REQUIRE(params);
 	ks_json_add_string_to_object(params, "arg", "value");
-	REQUIRE(!swclt_sess_execute_async(sess1, nodeid2, "test", "test.method", &params, (swclt_cmd_cb_t)__on_outgoing_test_execute_rpl, cond, &sess1_exec_cmd));
-	ks_cond_wait(cond);
-	ks_cond_wait(cond);
-	SWCLT_CMD_TYPE type;
-	REQUIRE(!swclt_cmd_type(sess1_exec_cmd, &type));
-	ks_log(KS_LOG_INFO, "Final type is: %s", swclt_cmd_type_str(type));
-	REQUIRE(type == SWCLT_CMD_TYPE_RESULT);
+	swclt_cmd_future_t *future = NULL;
+	REQUIRE(!swclt_sess_execute_async(sess1, nodeid2, "test", "test.method", &params, NULL, NULL, &future));
+	REQUIRE(future);
+	swclt_cmd_reply_t *reply = NULL;
+	REQUIRE(!swclt_cmd_future_get(future, &reply));
+	swclt_cmd_future_destroy(&future);
+	swclt_cmd_reply_destroy(&reply);
+
+	/* repeat, but this time don't wait for any response */
+	params = ks_json_create_object();
+	REQUIRE(params);
+	ks_json_add_string_to_object(params, "arg", "value");
+	REQUIRE(!swclt_sess_execute_async(sess1, nodeid2, "test", "test.method", &params, NULL, NULL, NULL));
+
+	ks_sleep_ms(5000);
 
 	ks_handle_destroy(&sess1_mon);
 	ks_handle_destroy(&sess2_mon);

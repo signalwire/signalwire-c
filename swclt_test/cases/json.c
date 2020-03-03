@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -46,29 +46,25 @@ static void test_blade_execute(ks_pool_t *pool)
 {
 	ks_json_t *params = ks_json_create_object();
 	ks_json_add_string_to_object(params, "tag", "hi");
-	swclt_cmd_t cmd = CREATE_BLADE_EXECUTE_CMD(
+	swclt_cmd_t *cmd = CREATE_BLADE_EXECUTE_CMD(
+			pool,
 		    "responder_a",
 		   	"test.protocol",
 		   	"test.method",
 			&params);
 	REQUIRE(!params);
 
-	ks_json_t *obj;
-	REQUIRE(swclt_cmd_error(cmd, &obj));
-	REQUIRE(swclt_cmd_result(cmd, &obj));
-	REQUIRE(!swclt_cmd_request(cmd, &obj));
-
 	char *desc;
 	REQUIRE(!swclt_cmd_print(cmd, NULL, &desc));
 	ks_log(KS_LOG_INFO, "Created command: %s", desc);
 
-	REQUIRE(!strcmp(ks_json_get_object_string(obj, "responder_nodeid", ""), "responder_a"));
-	REQUIRE(!strcmp(ks_json_get_object_string(obj, "protocol", ""), "test.protocol"));
-	REQUIRE(!strcmp(ks_json_get_object_string(obj, "method", ""), "test.method"));
-	REQUIRE(!strcmp(ks_json_get_object_string(ks_json_get_object_item(obj, "params"), "tag", ""), "hi"));
+	REQUIRE(!strcmp(ks_json_get_object_string(cmd->json, "responder_nodeid", ""), "responder_a"));
+	REQUIRE(!strcmp(ks_json_get_object_string(cmd->json, "protocol", ""), "test.protocol"));
+	REQUIRE(!strcmp(ks_json_get_object_string(cmd->json, "method", ""), "test.method"));
+	REQUIRE(!strcmp(ks_json_get_object_string(ks_json_get_object_item(cmd->json, "params"), "tag", ""), "hi"));
 
 	ks_pool_free(&desc);
-	ks_handle_destroy(&cmd);
+	swclt_cmd_destroy(&cmd);
 }
 
 static void test_blade_channel(ks_pool_t *pool)

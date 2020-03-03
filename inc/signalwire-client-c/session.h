@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -56,14 +56,12 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_info(swclt_sess_t sess, ks_pool_t *pool, k
 SWCLT_DECLARE(ks_status_t) swclt_sess_nodeid(swclt_sess_t sess, ks_pool_t *pool, char **nodeid);
 SWCLT_DECLARE(ks_bool_t) swclt_sess_nodeid_local(swclt_sess_t sess, const char *nodeid);
 
-SWCLT_DECLARE(ks_status_t) __swclt_sess_register_protocol_method(
+SWCLT_DECLARE(ks_status_t) swclt_sess_register_protocol_method(
 	swclt_sess_t sess,
 	const char *protocol,
 	const char *method,
 	swclt_pmethod_cb_t pmethod,
 	void *cb_data);
-#define swclt_sess_register_protocol_method(sess, protocol, method, pmethod, cb_data) \
-	__swclt_sess_register_protocol_method(sess, protocol, method, pmethod, cb_data)
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_register_subscription_method(
 	swclt_sess_t sess,
@@ -87,7 +85,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
 	swclt_sub_cb_t cb,
 	void *cb_data,
 	swclt_sub_t *sub,
-	swclt_cmd_t *cmdP);
+	swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 	swclt_sess_t sess,
@@ -98,13 +96,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 	swclt_sub_t *sub,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmdP);
+	swclt_cmd_future_t **future);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove(
 	swclt_sess_t sess,
 	const char *protocol,
 	const char *channel,
-	swclt_cmd_t *cmdP);
+	swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 	swclt_sess_t sess,
@@ -112,7 +110,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 	const char *channel,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmd);
+	swclt_cmd_future_t **future);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
 	swclt_sess_t sess,
@@ -124,7 +122,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
 	ks_json_t **channels,
 	int rank,
 	ks_json_t **data,
-	swclt_cmd_t *cmdP);
+	swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 	swclt_sess_t sess,
@@ -138,22 +136,22 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 	ks_json_t **data,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmd);
+	swclt_cmd_future_t **future);
 
-SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove(swclt_sess_t sess, const char * protocol, swclt_cmd_t *cmdP);
+SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove(swclt_sess_t sess, const char * protocol, swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
 	swclt_sess_t sess,
 	const char * protocol,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmdP);
+	swclt_cmd_future_t **future);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update(
 	swclt_sess_t sess,
 	const char * protocol,
 	int rank,
-	swclt_cmd_t *cmdP);
+	swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
 	swclt_sess_t sess,
@@ -161,16 +159,16 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
 	int rank,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmd);
+	swclt_cmd_future_t **future);
 
-SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add(swclt_sess_t sess, const char *identity, swclt_cmd_t *cmdP);
+SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add(swclt_sess_t sess, const char *identity, swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add_async(
 	swclt_sess_t sess,
 	const char *identity,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmd);
+	swclt_cmd_future_t **future);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_execute(
 	swclt_sess_t sess,
@@ -178,7 +176,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute(
 	const char *protocol,
 	const char *method,
 	ks_json_t **params,
-   	swclt_cmd_t *cmdP);
+	swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_nodestore(swclt_sess_t sess, swclt_store_t *store);
 
@@ -190,15 +188,12 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 	ks_json_t **params,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
-	swclt_cmd_t *cmdP);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_nodestore(swclt_sess_t sess, swclt_store_t *store);
+	swclt_cmd_future_t **future);
 
 #define swclt_sess_get(sess, contextP)		__ks_handle_get(SWCLT_HTYPE_SESS, sess, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 #define swclt_sess_put(contextP)			__ks_handle_put(SWCLT_HTYPE_SESS, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const char *service, swclt_sub_cb_t cb, void *cb_data);
-
 SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_setup(swclt_sess_t sess, swclt_sub_cb_t cb, void *cb_data);
 													  
 SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure(swclt_sess_t sess,
@@ -206,7 +201,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure(swclt_sess_t sess,
 															 const char *local_endpoint,
 															 const char *external_endpoint,
 															 const char *relay_connector_id,
-															 swclt_cmd_t *cmdP);
+															 swclt_cmd_reply_t **reply);
 SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t sess,
 																   const char *target,
 																   const char *local_endpoint,
@@ -214,7 +209,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t 
 																   const char *relay_connector_id,
 																   swclt_cmd_cb_t response_callback,
 																   void *response_callback_data,
-																   swclt_cmd_t *cmdP);
+																   swclt_cmd_future_t **future);
 
 KS_END_EXTERN_C
 

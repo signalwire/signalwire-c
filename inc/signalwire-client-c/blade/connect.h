@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -129,7 +129,8 @@ SWCLT_JSON_PARSE_END()
  * CREATE_BLADE_CONNECT_CMD_ASYNC - Creates a command which holds
  * and owns the request json for a connect request.
  */
-static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD_ASYNC(
+static inline swclt_cmd_t *CREATE_BLADE_CONNECT_CMD_ASYNC(
+	ks_pool_t *pool,
 	ks_uuid_t previous_sessionid,
 	ks_json_t **authentication,
 	const char *agent,
@@ -138,12 +139,8 @@ static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD_ASYNC(
 	void *cb_data)
 {
 	blade_connect_rqu_t *connect_rqu = NULL;
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 	ks_json_t *obj = NULL;
-	ks_pool_t *pool;
-
-	if (ks_pool_open(&pool))
-		goto done;
 
 	if (BLADE_CONNECT_RQU_ALLOC(pool, &connect_rqu))
 		goto done;
@@ -161,7 +158,6 @@ static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD_ASYNC(
 
 	if (swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_CONNECT_METHOD,
@@ -178,15 +174,15 @@ done:
 
 	BLADE_CONNECT_RQU_DESTROY(&connect_rqu);
 	ks_json_delete(&obj);
-	ks_pool_close(&pool);
 
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD(ks_uuid_t previous_sessionid,
+static inline swclt_cmd_t *CREATE_BLADE_CONNECT_CMD(ks_pool_t *pool,
+												   ks_uuid_t previous_sessionid,
 												   ks_json_t **authentication,
 												   const char *agent,
 												   const char *identity)
 {
-	return CREATE_BLADE_CONNECT_CMD_ASYNC(previous_sessionid, authentication, agent, identity, NULL, NULL);
+	return CREATE_BLADE_CONNECT_CMD_ASYNC(pool, previous_sessionid, authentication, agent, identity, NULL, NULL);
 }

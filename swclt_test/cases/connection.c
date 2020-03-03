@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,41 +26,33 @@
 
 static uint32_t g_protocol_response_cb_called;
 
-static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t cmd, void *cb_data)
+static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, void *cb_data)
 {
 	printf("ON INCOMING COMMAND\n");
-	ks_handle_destroy(&cmd);
 	return KS_STATUS_SUCCESS;
 }
 
-static void __on_protocol_timeout_response(swclt_cmd_t cmd, void *cb_data)
+static void __on_protocol_timeout_response(swclt_cmd_reply_t *reply, void *cb_data)
 {
-	ks_status_t failure_status;
-	const char *failure_message;
-	SWCLT_CMD_TYPE cmd_type;
-	REQUIRE(ks_handle_valid(cmd));
-	REQUIRE(!swclt_cmd_type(cmd, &cmd_type));
-	REQUIRE(cmd_type == SWCLT_CMD_TYPE_FAILURE);
-	REQUIRE(!swclt_cmd_failure_info(cmd, &failure_status, &failure_message));
-	REQUIRE(failure_status == KS_STATUS_TIMEOUT);
-	printf("Validated failure code, message: %s\n", failure_message);
+	REQUIRE(reply);
+	REQUIRE(reply->type == SWCLT_CMD_TYPE_FAILURE);
+	REQUIRE(reply->failure_reason);
+	REQUIRE(reply->failure_status == KS_STATUS_TIMEOUT);
+	printf("Validated failure code, message: %s\n", reply->failure_reason);
+	swclt_cmd_reply_destroy(&reply);
 	g_protocol_response_cb_called++;
 }
 
-static void __on_protocol_result_response(swclt_cmd_t cmd, void *cb_data)
+static void __on_protocol_result_response(swclt_cmd_reply_t *reply, void *cb_data)
 {
-	ks_json_t *result;
-	SWCLT_CMD_TYPE cmd_type;
-	REQUIRE(ks_handle_valid(cmd));
-	REQUIRE(!swclt_cmd_type(cmd, &cmd_type));
-	REQUIRE(cmd_type == SWCLT_CMD_TYPE_RESULT);
-	REQUIRE(!swclt_cmd_result(cmd, &result));
+	REQUIRE(swclt_cmd_reply_ok(reply) == KS_STATUS_SUCCESS);
+	swclt_cmd_reply_destroy(&reply);
 	g_protocol_response_cb_called++;
 }
 
 void test_async(ks_pool_t *pool)
 {
-	swclt_cmd_t cmd;
+	swclt_cmd_t *cmd;
 	SSL_CTX *ssl = create_ssl_context();
 	swclt_conn_t *conn;
 	ks_json_t *channels;
@@ -73,6 +65,7 @@ void test_async(ks_pool_t *pool)
 
 	/* Create an async command (bogus command but will generate a reply at least) */
 	REQUIRE(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
+			pool,
 			__on_protocol_result_response,
 			NULL,
 			"a_protocol",
@@ -85,13 +78,14 @@ void test_async(ks_pool_t *pool)
 			NULL));
 
 	/* And submit it */
-	REQUIRE(!swclt_conn_submit_request(conn, cmd));
+	REQUIRE(!swclt_conn_submit_request(conn, &cmd, NULL));
 
 	/* Wait for it to respond */
 	for (i = 0; i < 5 && g_protocol_response_cb_called == 0; i++) {
 		ks_sleep_ms(1000);
 	}
 	REQUIRE(g_protocol_response_cb_called == 1);
+	swclt_cmd_destroy(&cmd);
 	swclt_conn_destroy(&conn);
 	swclt_ssl_destroy_context(&ssl);
 }
@@ -100,9 +94,8 @@ void test_ttl(ks_pool_t *pool)
 {
 	SSL_CTX *ssl = create_ssl_context();
 	swclt_conn_t *conn;
-	swclt_cmd_t cmd;
+	swclt_cmd_t *cmd;
 	SWCLT_CMD_TYPE cmd_type;
-	swclt_cmd_ctx_t *cmd_ctx;
 	ks_json_t *channels;
 	int i;
 
@@ -113,6 +106,7 @@ void test_ttl(ks_pool_t *pool)
 	channels = ks_json_create_array();
 	ks_json_add_item_to_array(channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"b_channel", 0, 0}));
 	REQUIRE(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
+			pool,
 			__on_protocol_timeout_response,
 			NULL,
 			"b_protocol",
@@ -125,14 +119,12 @@ void test_ttl(ks_pool_t *pool)
 			NULL));
 
 	/* Lock the reader so we never get a response, forcing a timeout */
-	cmd_ctx = cmd_get(cmd);
-	REQUIRE(cmd_ctx->response_ttl_ms == BLADE_PROTOCOL_TTL_MS);
-	REQUIRE(cmd_ctx->flags == BLADE_PROTOCOL_FLAGS);
+	REQUIRE(cmd->response_ttl_ms == BLADE_PROTOCOL_TTL_MS);
+	REQUIRE(cmd->flags == BLADE_PROTOCOL_FLAGS);
 	REQUIRE(!ks_mutex_lock(conn->wss->write_mutex));
-	cmd_put(&cmd_ctx);
 
 	/* And submit it */
-	REQUIRE(!swclt_conn_submit_request(conn, cmd));
+	REQUIRE(!swclt_conn_submit_request(conn, &cmd, NULL));
 
 	/* Wait for it to respond */
 	for (i = 0; i < 7 && g_protocol_response_cb_called == 0; i++) {
@@ -144,6 +136,7 @@ void test_ttl(ks_pool_t *pool)
 	/* Don't forget to unlock the poor websocket reader */
 	REQUIRE(!ks_mutex_unlock(conn->wss->write_mutex));
 
+	swclt_cmd_destroy(&cmd);
 	swclt_conn_destroy(&conn);
 	swclt_ssl_destroy_context(&ssl);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -128,9 +128,8 @@ SWCLT_JSON_PARSE_END()
  * Creates a command which holds and owns the request json for a protocol provider add
  * request, also takes owner of the provider data and channels json passed in
  */
-#define CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(...)	__CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(__FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
-	const char *file, int line, const char *tag,
+static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
+	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *protocol,
@@ -142,14 +141,10 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 	int rank,
 	ks_json_t **data)
 {
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 	ks_status_t status;
 	ks_json_t *params;
 	ks_json_t *request;
-	ks_pool_t *pool;
-
-	if (ks_pool_open(&pool))
-		return cmd;
 
 	if (!(params = BLADE_PROTOCOL_PROVIDER_ADD_PARAM_MARSHAL(&(blade_protocol_provider_add_param_t){
 																 default_method_execute_access,
@@ -163,7 +158,6 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 
 		/* Since provider_data and channels was at the end of the macro declartaion, it will have
 		 * not touched it and we will not indicate we've taken ownership of it */
-		ks_pool_close(&pool);
 		return cmd;
 	}
 											  
@@ -180,28 +174,25 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 
 		/* Since params is allocated in the same pool, nothing to worry about with ownership */
 		ks_json_delete(&params);
-		ks_pool_close(&pool);
 		return cmd;
 	}
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if ((status = __swclt_cmd_create_ex(
+	if ((status = swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_PROTOCOL_METHOD,
 			&request,
 			BLADE_PROTOCOL_TTL_MS,
 			BLADE_PROTOCOL_FLAGS,
-			ks_uuid_null(), file, line, tag))) {
+			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
 		 * took ownership of it */
 		ks_json_delete(&request);
-		ks_pool_close(&pool);
 		return cmd;
 	}
 
@@ -209,7 +200,8 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD(
+static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD(
+	ks_pool_t *pool,
 	const char *protocol,
 	blade_access_control_t default_method_execute_access,
 	blade_access_control_t default_channel_subscribe_access,
@@ -220,6 +212,7 @@ static inline swclt_cmd_t CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD(
 	ks_json_t **data)
 {
 	return CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
+		pool,
 		NULL,
 		NULL,
 		protocol,
@@ -238,20 +231,15 @@ static inline swclt_cmd_t CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD(
  * Creates a command which holds and owns the request json for a protocol provider add
  * request, also takes owner of the provider data and channels json passed in
  */
-#define CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(...)	__CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(__FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
-	const char *file, int line, const char *tag,
+static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
+	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *protocol)
 {
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 	ks_status_t status;
 	ks_json_t *request;
-	ks_pool_t *pool;
-
-	if (ks_pool_open(&pool))
-		return cmd;
 
 	if (!(request = BLADE_PROTOCOL_RQU_MARSHAL(
 			&(blade_protocol_rqu_t){
@@ -261,28 +249,25 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol request");
 
 		/* Since params is allocated in the same pool, nothing to worry about with ownership */
-		ks_pool_close(&pool);
 		return cmd;
 	}
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if ((status = __swclt_cmd_create_ex(
+	if ((status = swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_PROTOCOL_METHOD,
 			&request,
 			BLADE_PROTOCOL_TTL_MS,
 			BLADE_PROTOCOL_FLAGS,
-			ks_uuid_null(), file, line, tag))) {
+			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
 		 * took ownership of it */
 		ks_json_delete(&request);
-		ks_pool_close(&pool);
 		return cmd;
 	}
 
@@ -290,9 +275,10 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD(const char *protocol)
+static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD(ks_pool_t *pool, const char *protocol)
 {
 	return CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD_ASYNC(
+		pool,
 		NULL,
 		NULL,
 		protocol);
@@ -302,29 +288,23 @@ static inline swclt_cmd_t CREATE_BLADE_PROTOCOL_PROVIDER_REMOVE_CMD(const char *
  * CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC
  * Creates a command which holds and owns the request json for a protocol provider rank update request
  */
-#define CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC(...)	__CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC(__FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC(
-	const char *file, int line, const char *tag,
+static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC(
+	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *protocol,
 	int rank)
 {
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 	ks_status_t status;
 	ks_json_t *params;
 	ks_json_t *request;
-	ks_pool_t *pool;
-
-	if (ks_pool_open(&pool))
-		return cmd;
 
 	if (!(params = BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_PARAM_MARSHAL(&(blade_protocol_provider_rank_update_param_t){ rank }))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol request params");
 
 		/* Since provider_data and channels was at the end of the macro declartaion, it will have
 		 * not touched it and we will not indicate we've taken ownership of it */
-		ks_pool_close(&pool);
 		return cmd;
 	}
 											  
@@ -338,28 +318,25 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC
 
 		/* Since params is allocated in the same pool, nothing to worry about with ownership */
 		ks_json_delete(&params);
-		ks_pool_close(&pool);
 		return cmd;
 	}
 
 	/* Now hand it to the command, it will take ownership of it if successful
 	 * and null out our ptr */
-	if ((status = __swclt_cmd_create_ex(
+	if ((status = swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_PROTOCOL_METHOD,
 			&request,
 			BLADE_PROTOCOL_TTL_MS,
 			BLADE_PROTOCOL_FLAGS,
-			ks_uuid_null(), file, line, tag))) {
+			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate protocol cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
 		 * took ownership of it */
 		ks_json_delete(&request);
-		ks_pool_close(&pool);
 		return cmd;
 	}
 
@@ -367,11 +344,13 @@ static inline swclt_cmd_t __CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD(
+static inline swclt_cmd_t *CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD(
+	ks_pool_t *pool,
 	const char *protocol,
 	int rank)
 {
 	return CREATE_BLADE_PROTOCOL_PROVIDER_RANK_UPDATE_CMD_ASYNC(
+		pool,
 		NULL,
 		NULL,
 		protocol,

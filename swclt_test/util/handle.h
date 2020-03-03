@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,6 @@
 #pragma once
 
 /* Load all internals for unit testing */
-#include "signalwire-client-c/internal/command.h"
 #include "signalwire-client-c/internal/session.h"
 #include "signalwire-client-c/internal/subscription.h"
 
@@ -42,6 +41,5 @@ static inline void name##_put(swclt_##name##_ctx_t **ctx)					\
 }
 
 SWCLT_TEST_HANDLE_GET_DEF(sess)
-SWCLT_TEST_HANDLE_GET_DEF(cmd)
 SWCLT_TEST_HANDLE_GET_DEF(sub)
 

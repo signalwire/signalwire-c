@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,7 +33,7 @@ KS_BEGIN_EXTERN_C
 
 typedef ks_status_t (*swclt_pmethod_cb_t)(
 	ks_handle_t sess,
-	swclt_cmd_t cmd,
+	swclt_cmd_t *cmd,
 	const blade_execute_rqu_t *rqu, void *cb_data);
 
 /**

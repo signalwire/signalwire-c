@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -75,18 +75,16 @@ SWCLT_JSON_PARSE_END()
  * CREATE_BLADE_PING_CMD_ASYNC - Creates a command with a request
  * in it setup to submit a ping method to blade.
  */
-static inline swclt_cmd_t CREATE_BLADE_PING_CMD_ASYNC(
+static inline swclt_cmd_t *CREATE_BLADE_PING_CMD_ASYNC(
+	ks_pool_t *pool,
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	double timestamp,
 	const char *payload)
 {
 	ks_json_t *obj = NULL;
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
-	ks_pool_t *pool;
+	swclt_cmd_t *cmd = NULL;
 
-	if (ks_pool_open(&pool))
-		return cmd;
 
 	/* Fill in the ping request then marshal it, it will create copies
 	 * of all the fields so caller doesn't lose ownership here */
@@ -94,7 +92,6 @@ static inline swclt_cmd_t CREATE_BLADE_PING_CMD_ASYNC(
 	if (!(obj = BLADE_PING_RQU_MARSHAL(&(blade_ping_rqu_t){
 						timestamp,
 						payload}))) {
-		ks_pool_close(&pool);
 
 		/* Since params is last, on error here we can be sure params was
 		 * not freed so do not set the callers params to NULL */
@@ -104,7 +101,6 @@ static inline swclt_cmd_t CREATE_BLADE_PING_CMD_ASYNC(
 	/* Now give it to the new command */
 	if (swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_PING_METHOD,
@@ -116,13 +112,13 @@ static inline swclt_cmd_t CREATE_BLADE_PING_CMD_ASYNC(
 
 done:
 	ks_json_delete(&obj);
-	ks_pool_close(&pool);
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_PING_CMD(double timestamp, const char *payload)
+static inline swclt_cmd_t *CREATE_BLADE_PING_CMD(ks_pool_t *pool, double timestamp, const char *payload)
 {
 	return CREATE_BLADE_PING_CMD_ASYNC(
+		pool,
 		NULL,
 		NULL,
 		timestamp,
