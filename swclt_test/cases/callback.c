@@ -41,10 +41,10 @@ void test_callback(ks_pool_t *pool)
 	REQUIRE(!swclt_sess_create(&sess, g_target_ident_str, g_certified_config));
 
 	/* Get the node store */
-	REQUIRE(!swclt_sess_nodestore(sess, &store));
+	REQUIRE(sess->store);
 
 	/* Add a store callback */
-	REQUIRE(!swclt_store_cb_route_add(store, route_add_handler));
+	REQUIRE(!swclt_store_cb_route_add(sess->store, route_add_handler));
 
 	/* Go online */
 	REQUIRE(!swclt_sess_connect(sess));

@@ -51,6 +51,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sessP)
 		if (sess->lock) {
 			ks_mutex_destroy(&sess->lock);
 		}
+		swclt_store_destroy(&sess->store);
 		ks_pool_close(&pool);
 	}
 	return KS_STATUS_SUCCESS;
@@ -911,14 +912,6 @@ SWCLT_DECLARE(ks_bool_t) swclt_sess_nodeid_local(swclt_sess_t *sess, const char 
 	return swclt_sess_connected(sess) && !__nodeid_local(sess, nodeid);
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_sess_nodestore(
-	swclt_sess_t *sess,
-	swclt_store_t *store)
-{
-	*store = sess->store;
-	return KS_STATUS_SUCCESS;
-}
-
 SWCLT_DECLARE(ks_status_t) swclt_sess_register_protocol_method(
 	swclt_sess_t *sess,
 	const char *protocol,
@@ -1419,7 +1412,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t *sess, const
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
 
-	swclt_store_t store;
+	swclt_store_t *store;
 	ks_pool_t *pool = NULL;
 	ks_json_t *params = NULL;
 	swclt_cmd_reply_t *reply = NULL;
@@ -1436,12 +1429,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t *sess, const
 	if (!swclt_sess_connected(sess)) {
 		ks_log(KS_LOG_ERROR, "Setup for '%s' failed because session is not connected", service);
 		status = KS_STATUS_INACTIVE;
-		goto done;
-	}
-
-	// And make sure the nodestore is available
-	if (status = swclt_sess_nodestore(sess, &store)) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' failed because session nodestore is unavailable: %d", service, status);
 		goto done;
 	}
 
@@ -1482,7 +1469,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t *sess, const
 	{
 		int nodestore_attempts = 20;
 		while (!instance_found && nodestore_attempts) {
-			if (!(instance_found = !swclt_store_check_protocol(store, protocol))) {
+			if (!(instance_found = !swclt_store_check_protocol(sess->store, protocol))) {
 				ks_sleep_ms(100);
 				--nodestore_attempts;
 			}
@@ -1552,7 +1539,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t 
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
 
-	swclt_store_t store;
+	swclt_store_t *store;
 	ks_pool_t *pool = NULL;
 	char *protocol = NULL;
 	ks_json_t *params = NULL;
@@ -1565,9 +1552,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t 
 	if (!swclt_sess_connected(sess)) {
 		goto done;
 	}
-
-	if (status = swclt_sess_nodestore(sess, &store))
-		goto done;
 
 	pool = sess->pool;
 

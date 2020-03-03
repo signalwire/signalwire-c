@@ -54,7 +54,7 @@ struct swclt_sess {
 
 	/* The node store, an api to keep the cache in sync with blade, contains
 	 * a lotta info about stuff. */
-	swclt_store_t store;
+	swclt_store_t *store;
 
 	/* Our connection */
 	swclt_conn_t *conn;
@@ -239,8 +239,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute(
 	const char *method,
 	ks_json_t **params,
 	swclt_cmd_reply_t **reply);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_nodestore(swclt_sess_t *sess, swclt_store_t *store);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 	swclt_sess_t *sess,
