@@ -83,7 +83,7 @@ done:
 	return cmd;
 }
 
-static inline swclt_cmd_t *CREATE_BLADE_DISCONNECT_CMD(ks_pool_t *pool)
+static inline swclt_cmd_t *CREATE_BLADE_DISCONNECT_CMD(void)
 {
 	return CREATE_BLADE_DISCONNECT_CMD_ASYNC(
 		NULL,
