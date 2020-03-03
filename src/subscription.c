@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -87,7 +87,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sub_create(
 
 SWCLT_DECLARE(ks_status_t) swclt_sub_invoke(
 	swclt_sub_t sub,
-   	swclt_sess_t sess,
+   	swclt_sess_t *sess,
    	blade_broadcast_rqu_t *broadcast_rqu)
 {
 	SWCLT_SUB_SCOPE_BEG(sub, ctx, status)

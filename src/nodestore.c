@@ -23,15 +23,6 @@
 #include "signalwire-client-c/client.h"
 #include "signalwire-client-c/internal/nodestore.h"
 
-// @todo callbacks should be stored in internal lists of callbacks to support multiple consumers
-// @todo if userdata is added requiring a structure of data, then maybe wrap within a handle as well?
-
-static swclt_sess_t __get_sess_from_store_ctx(swclt_store_ctx_t *ctx)
-{
-	ks_handle_t parent;
-	ks_handle_parent(ctx->base.handle, &parent);
-	return parent;
-}
 
 static ks_status_t __add_cb_route_add(swclt_store_ctx_t *ctx, swclt_store_cb_route_add_t cb)
 {
@@ -54,7 +45,7 @@ static void __invoke_cb_route_add(swclt_store_ctx_t *ctx, const blade_netcast_rq
 
 	if (cb) {
 		ks_log(KS_LOG_DEBUG, "Invoking callback for node store add");
-		cb(__get_sess_from_store_ctx(ctx), rqu, params);
+		cb(ctx->sess, rqu, params);
 	} else {
 		ks_log(KS_LOG_DEBUG, "No callback registered for route add method: %s", BLADE_NETCAST_CMD_ROUTE_ADD);
 	}
@@ -75,7 +66,7 @@ static void __invoke_cb_route_remove(swclt_store_ctx_t *ctx, const blade_netcast
 													   KS_UNLOCKED);
 	ks_hash_read_unlock(ctx->callbacks);
 
-	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+	if (cb) cb(ctx->sess, rqu, params);
 }
 
 static ks_status_t __add_cb_identity_add(swclt_store_ctx_t *ctx, swclt_store_cb_identity_add_t cb)
@@ -99,7 +90,7 @@ static void __invoke_cb_identity_add(swclt_store_ctx_t *ctx, const blade_netcast
 
 	if (cb) {
 		ks_log(KS_LOG_DEBUG, "Invoking callback for node store identity add");
-		cb(__get_sess_from_store_ctx(ctx), rqu, params);
+		cb(ctx->sess, rqu, params);
 	} else {
 		ks_log(KS_LOG_DEBUG, "No callback registered for identity add method: %s", BLADE_NETCAST_CMD_IDENTITY_ADD);
 	}
@@ -120,7 +111,7 @@ static void __invoke_cb_identity_remove(swclt_store_ctx_t *ctx, const blade_netc
 														  KS_UNLOCKED);
 	ks_hash_read_unlock(ctx->callbacks);
 
-	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+	if (cb) cb(ctx->sess, rqu, params);
 }
 
 static ks_status_t __add_cb_protocol_add(swclt_store_ctx_t *ctx, swclt_store_cb_protocol_add_t cb)
@@ -139,7 +130,7 @@ static void __invoke_cb_protocol_add(swclt_store_ctx_t *ctx,
 													   KS_UNLOCKED);
 	ks_hash_read_unlock(ctx->callbacks);
 
-	if (cb) cb(__get_sess_from_store_ctx(ctx), protocol);
+	if (cb) cb(ctx->sess, protocol);
 }
 
 static ks_status_t __add_cb_protocol_remove(swclt_store_ctx_t *ctx, swclt_store_cb_protocol_remove_t cb)
@@ -158,7 +149,7 @@ static void __invoke_cb_protocol_remove(swclt_store_ctx_t *ctx,
 														  KS_UNLOCKED);
 	ks_hash_read_unlock(ctx->callbacks);
 
-	if (cb) cb(__get_sess_from_store_ctx(ctx), protocol);
+	if (cb) cb(ctx->sess, protocol);
 }
 
 static ks_status_t __add_cb_protocol_provider_add(swclt_store_ctx_t *ctx, swclt_store_cb_protocol_provider_add_t cb)
@@ -178,7 +169,7 @@ static void __invoke_cb_protocol_provider_add(swclt_store_ctx_t *ctx,
 																KS_UNLOCKED);
 	ks_hash_read_unlock(ctx->callbacks);
 
-	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+	if (cb) cb(ctx->sess, rqu, params);
 }
 
 static ks_status_t __add_cb_protocol_provider_remove(swclt_store_ctx_t *ctx, swclt_store_cb_protocol_provider_remove_t cb)
@@ -198,7 +189,7 @@ static void __invoke_cb_protocol_provider_remove(swclt_store_ctx_t *ctx,
 																   KS_UNLOCKED);
 	ks_hash_read_unlock(ctx->callbacks);
 
-	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+	if (cb) cb(ctx->sess, rqu, params);
 }
 
 static ks_status_t __add_cb_protocol_provider_rank_update(swclt_store_ctx_t *ctx, swclt_store_cb_protocol_provider_rank_update_t cb)
@@ -218,7 +209,7 @@ static void __invoke_cb_protocol_provider_rank_update(swclt_store_ctx_t *ctx,
 																		KS_UNLOCKED);
 	ks_hash_read_unlock(ctx->callbacks);
 
-	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+	if (cb) cb(ctx->sess, rqu, params);
 }
 
 static ks_status_t __add_cb_protocol_provider_data_update(swclt_store_ctx_t *ctx, swclt_store_cb_protocol_provider_data_update_t cb)
@@ -238,7 +229,7 @@ static void __invoke_cb_protocol_provider_data_update(swclt_store_ctx_t *ctx,
 																		KS_UNLOCKED);
 	ks_hash_read_unlock(ctx->callbacks);
 
-	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+	if (cb) cb(ctx->sess, rqu, params);
 }
 
 static ks_status_t __add_cb_authority_add(swclt_store_ctx_t *ctx, swclt_store_cb_authority_add_t cb)
@@ -262,7 +253,7 @@ static void __invoke_cb_authority_add(swclt_store_ctx_t *ctx, const blade_netcas
 
 	if (cb) {
 		ks_log(KS_LOG_DEBUG, "Invoking callback for node store add");
-		cb(__get_sess_from_store_ctx(ctx), rqu, params);
+		cb(ctx->sess, rqu, params);
 	} else {
 		ks_log(KS_LOG_DEBUG, "No callback registered for authority add method: %s", BLADE_NETCAST_CMD_AUTHORITY_ADD);
 	}
@@ -283,7 +274,7 @@ static void __invoke_cb_authority_remove(swclt_store_ctx_t *ctx, const blade_net
 														   KS_UNLOCKED);
 	ks_hash_read_unlock(ctx->callbacks);
 
-	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+	if (cb) cb(ctx->sess, rqu, params);
 }
 
 static ks_status_t __add_cb_subscription_add(swclt_store_ctx_t *ctx, swclt_store_cb_subscription_add_t cb)
@@ -307,7 +298,7 @@ static void __invoke_cb_subscription_add(swclt_store_ctx_t *ctx, const blade_net
 
 	if (cb) {
 		ks_log(KS_LOG_DEBUG, "Invoking callback for node store add");
-		cb(__get_sess_from_store_ctx(ctx), rqu, params);
+		cb(ctx->sess, rqu, params);
 	} else {
 		ks_log(KS_LOG_DEBUG, "No callback registered for subscription add method: %s", BLADE_NETCAST_CMD_SUBSCRIPTION_ADD);
 	}
@@ -328,7 +319,7 @@ static void __invoke_cb_subscription_remove(swclt_store_ctx_t *ctx, const blade_
 														   KS_UNLOCKED);
 	ks_hash_read_unlock(ctx->callbacks);
 
-	if (cb) cb(__get_sess_from_store_ctx(ctx), rqu, params);
+	if (cb) cb(ctx->sess, rqu, params);
 }
 
 static void __destroy_protocol(void *protocol)

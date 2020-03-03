@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,62 +30,64 @@ typedef ks_handle_t swclt_store_t;
 /* Obfuscate our connection internals */
 typedef struct swclt_store_ctx swclt_store_ctx_t;
 
-typedef void (*swclt_store_cb_protocol_add_t)(swclt_sess_t sess,
+typedef struct swclt_sess swclt_sess_t;
+
+typedef void (*swclt_store_cb_protocol_add_t)(swclt_sess_t *sess,
 											  const char *protocol);
 
-typedef void (*swclt_store_cb_protocol_remove_t)(swclt_sess_t sess,
+typedef void (*swclt_store_cb_protocol_remove_t)(swclt_sess_t *sess,
 												 const char *protocol);
 
-typedef void (*swclt_store_cb_protocol_provider_add_t)(swclt_sess_t sess,
+typedef void (*swclt_store_cb_protocol_provider_add_t)(swclt_sess_t *sess,
 	const blade_netcast_rqu_t *rqu,
 	const blade_netcast_protocol_provider_add_param_t *params);
 
 typedef void (*swclt_store_cb_protocol_provider_remove_t)(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const blade_netcast_rqu_t* rqu,
 	const blade_netcast_protocol_provider_remove_param_t *params);
 
-typedef void (*swclt_store_cb_protocol_provider_rank_update_t)(swclt_sess_t sess,
+typedef void (*swclt_store_cb_protocol_provider_rank_update_t)(swclt_sess_t *sess,
 	const blade_netcast_rqu_t *rqu,
 	const blade_netcast_protocol_provider_rank_update_param_t *params);
 
-typedef void (*swclt_store_cb_protocol_provider_data_update_t)(swclt_sess_t sess,
+typedef void (*swclt_store_cb_protocol_provider_data_update_t)(swclt_sess_t *sess,
 	const blade_netcast_rqu_t *rqu,
 	const blade_netcast_protocol_provider_data_update_param_t *params);
 
-typedef void (*swclt_store_cb_route_add_t)(swclt_sess_t sess,
+typedef void (*swclt_store_cb_route_add_t)(swclt_sess_t *sess,
 	const blade_netcast_rqu_t *rqu,
 	const blade_netcast_route_add_param_t *params);
 
 typedef void (*swclt_store_cb_route_remove_t)(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const blade_netcast_rqu_t* rqu,
 	const blade_netcast_route_remove_param_t *params);
 
-typedef void (*swclt_store_cb_authority_add_t)(swclt_sess_t sess,
+typedef void (*swclt_store_cb_authority_add_t)(swclt_sess_t *sess,
 	const blade_netcast_rqu_t *rqu,
 	const blade_netcast_authority_add_param_t *params);
 
 typedef void (*swclt_store_cb_authority_remove_t)(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const blade_netcast_rqu_t* rqu,
 	const blade_netcast_authority_remove_param_t *params);
 
-typedef void (*swclt_store_cb_subscription_add_t)(swclt_sess_t sess,
+typedef void (*swclt_store_cb_subscription_add_t)(swclt_sess_t *sess,
 	const blade_netcast_rqu_t *rqu,
 	const blade_netcast_subscription_add_param_t *params);
 
 typedef void (*swclt_store_cb_subscription_remove_t)(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const blade_netcast_rqu_t* rqu,
 	const blade_netcast_subscription_remove_param_t *params);
 
-typedef void (*swclt_store_cb_identity_add_t)(swclt_sess_t sess,
+typedef void (*swclt_store_cb_identity_add_t)(swclt_sess_t *sess,
 	const blade_netcast_rqu_t *rqu,
 	const blade_netcast_identity_add_param_t *params);
 
 typedef void (*swclt_store_cb_identity_remove_t)(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const blade_netcast_rqu_t* rqu,
 	const blade_netcast_identity_remove_param_t *params);
 

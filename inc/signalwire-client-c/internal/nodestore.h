@@ -24,6 +24,8 @@
 
 KS_BEGIN_EXTERN_C
 
+typedef struct swclt_sess swclt_sess_t;
+
 struct swclt_store_ctx {
 	swclt_handle_base_t base;
 
@@ -54,6 +56,8 @@ struct swclt_store_ctx {
 
 	/* Hash of protocols available to uncertified clients only, keyed by protocol name */
 	ks_hash_t *protocols_uncertified;
+
+	swclt_sess_t *sess;
 };
 
 /* Define helper macros to eliminate boiler code in handle wrapped apis */

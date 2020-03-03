@@ -23,7 +23,6 @@
 #pragma once
 
 /* Load all internals for unit testing */
-#include "signalwire-client-c/internal/session.h"
 #include "signalwire-client-c/internal/subscription.h"
 
 /* Create uber handle shortcuts for testing */
@@ -40,6 +39,5 @@ static inline void name##_put(swclt_##name##_ctx_t **ctx)					\
 	REQUIRE(!swclt_##name##_put(ctx));										\
 }
 
-SWCLT_TEST_HANDLE_GET_DEF(sess)
 SWCLT_TEST_HANDLE_GET_DEF(sub)
 

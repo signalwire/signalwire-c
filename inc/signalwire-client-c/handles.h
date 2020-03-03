@@ -24,7 +24,6 @@
 
 KS_BEGIN_EXTERN_C
 
-typedef ks_handle_t swclt_sess_t;
 typedef ks_handle_t swclt_cfg_t;
 
 KS_END_EXTERN_C

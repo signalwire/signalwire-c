@@ -22,49 +22,114 @@
 
 #pragma once
 
+typedef struct swclt_sess swclt_sess_t;
+
+typedef void (*swclt_sess_auth_failed_cb_t)(swclt_sess_t *sess);
+
+typedef enum swclt_sess_state {
+	SWCLT_STATE_NONE,
+	SWCLT_STATE_NORMAL,
+	SWCLT_STATE_ONLINE,
+	SWCLT_STATE_DEGRADED,
+	SWCLT_STATE_OFFLINE
+} swclt_sess_state_t;
+
+/* Create a structure containing some handy peices of info */
+typedef struct swclt_sess_info_s {
+	/* The info structure from our connection (it itself then contains
+	 * an info structure for the transport) */
+	swclt_conn_info_t conn;
+
+	/* Copied from the connect result in the connection info, used
+	 * as a shortcut for convenience */
+	ks_uuid_t sessionid;
+	const char *nodeid;
+	const char *master_nodeid;
+} swclt_sess_info_t;
+
+/* Ths client session context represents a sessions state */
+struct swclt_sess {
+	/* The pool that manages all the allocations */
+	ks_pool_t *pool;
+
+	/* The node store, an api to keep the cache in sync with blade, contains
+	 * a lotta info about stuff. */
+	swclt_store_t store;
+
+	/* Our connection */
+	swclt_conn_t *conn;
+
+	/* The extracted identity info */
+	swclt_ident_t ident;
+
+	/* Our info structure */
+	swclt_sess_info_t info;
+
+	SSL_CTX *ssl;
+
+	/* Our config handed to us by the client */
+	swclt_config_t *config;
+
+	/* Optional callback for authentication failure */
+	swclt_sess_auth_failed_cb_t auth_failed_cb;
+
+	/* We keep track of subscriptions in a hash here, each call to subscribe
+	 * from the client will add an entry in this hash. The hash points to the
+	 * subscription handle which will contain the users callback */
+	ks_hash_t *subscriptions;
+
+	/* Registry for Protocol RPC methods */
+	ks_hash_t *methods;
+
+	/* Setups completed for gandalf provider event channels */
+	ks_hash_t *setups;
+
+	/* Registry for metric rank updates for local protocols */
+	ks_hash_t *metrics;
+
+	/* Session online/offline state */
+	swclt_sess_state_t state;
+	swclt_sess_state_t last_state;
+	swclt_sess_state_t pending_state_change_service;
+
+	ks_mutex_t *lock;
+};
+
 KS_BEGIN_EXTERN_C
 
-/* Obfuscate our session internals */
-typedef struct swclt_sess_ctx swclt_sess_ctx_t;
-
-typedef void (*swclt_sess_auth_failed_cb_t)(swclt_sess_t sess);
-
-SWCLT_DECLARE(ks_status_t) __swclt_sess_create(
-	swclt_sess_t *sess,
+SWCLT_DECLARE(ks_status_t) swclt_sess_create(
+	swclt_sess_t **sess,
 	const char *identity_uri,
-	swclt_config_t *config,
-   	const char *file,
-   	int line,
-   	const char *tag);
+	swclt_config_t *config);
 
-#define swclt_sess_create(sess, ident, cfg) __swclt_sess_create(sess, ident, cfg, __FILE__, __LINE__, __PRETTY_FUNCTION__)
+SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sess);
 
-SWCLT_DECLARE(ks_status_t) swclt_sess_set_auth_failed_cb(swclt_sess_t sess, swclt_sess_auth_failed_cb_t cb);
-SWCLT_DECLARE(ks_status_t) swclt_sess_target_set(swclt_sess_t sess, const char *target);
+SWCLT_DECLARE(ks_status_t) swclt_sess_set_auth_failed_cb(swclt_sess_t *sess, swclt_sess_auth_failed_cb_t cb);
+SWCLT_DECLARE(ks_status_t) swclt_sess_target_set(swclt_sess_t *sess, const char *target);
 
-SWCLT_DECLARE(ks_status_t) swclt_sess_metric_register(swclt_sess_t sess, const char *protocol, int interval, int rank);
-SWCLT_DECLARE(ks_status_t) swclt_sess_metric_update(swclt_sess_t sess, const char *protocol, int rank);
-SWCLT_DECLARE(ks_status_t) swclt_sess_metric_current(swclt_sess_t sess, const char *protocol, int *rank);
+SWCLT_DECLARE(ks_status_t) swclt_sess_metric_register(swclt_sess_t *sess, const char *protocol, int interval, int rank);
+SWCLT_DECLARE(ks_status_t) swclt_sess_metric_update(swclt_sess_t *sess, const char *protocol, int rank);
+SWCLT_DECLARE(ks_status_t) swclt_sess_metric_current(swclt_sess_t *sess, const char *protocol, int *rank);
 
-SWCLT_DECLARE(ks_bool_t) swclt_sess_has_authentication(swclt_sess_t sess);
-SWCLT_DECLARE(ks_status_t) swclt_sess_rescan_env_config(swclt_sess_t sess);
-SWCLT_DECLARE(ks_status_t) swclt_sess_connect(swclt_sess_t sess);
-SWCLT_DECLARE(ks_status_t) swclt_sess_disconnect(swclt_sess_t sess);
-SWCLT_DECLARE(ks_bool_t) swclt_sess_connected(swclt_sess_t sess);
-SWCLT_DECLARE(ks_bool_t) swclt_sess_restored(swclt_sess_t sess);
-SWCLT_DECLARE(ks_status_t) swclt_sess_info(swclt_sess_t sess, ks_pool_t *pool, ks_uuid_t *sessionid, char **nodeid, char **master_nodeid);
-SWCLT_DECLARE(ks_status_t) swclt_sess_nodeid(swclt_sess_t sess, ks_pool_t *pool, char **nodeid);
-SWCLT_DECLARE(ks_bool_t) swclt_sess_nodeid_local(swclt_sess_t sess, const char *nodeid);
+SWCLT_DECLARE(ks_bool_t) swclt_sess_has_authentication(swclt_sess_t *sess);
+SWCLT_DECLARE(ks_status_t) swclt_sess_rescan_env_config(swclt_sess_t *sess);
+SWCLT_DECLARE(ks_status_t) swclt_sess_connect(swclt_sess_t *sess);
+SWCLT_DECLARE(ks_status_t) swclt_sess_disconnect(swclt_sess_t *sess);
+SWCLT_DECLARE(ks_bool_t) swclt_sess_connected(swclt_sess_t *sess);
+SWCLT_DECLARE(ks_bool_t) swclt_sess_restored(swclt_sess_t *sess);
+SWCLT_DECLARE(ks_status_t) swclt_sess_info(swclt_sess_t *sess, ks_pool_t *pool, ks_uuid_t *sessionid, char **nodeid, char **master_nodeid);
+SWCLT_DECLARE(ks_status_t) swclt_sess_nodeid(swclt_sess_t *sess, ks_pool_t *pool, char **nodeid);
+SWCLT_DECLARE(ks_bool_t) swclt_sess_nodeid_local(swclt_sess_t *sess, const char *nodeid);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_register_protocol_method(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char *protocol,
 	const char *method,
 	swclt_pmethod_cb_t pmethod,
 	void *cb_data);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_register_subscription_method(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	swclt_sub_t *sub,
 	const char *protocol,
 	const char *channel,
@@ -72,14 +137,14 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_register_subscription_method(
 	void *cb_data);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_broadcast(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char *protocol,
 	const char *channel,
 	const char *event,
 	ks_json_t **params);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char *protocol,
 	const char *channel,
 	swclt_sub_cb_t cb,
@@ -88,7 +153,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
 	swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char *protocol,
 	const char *channel,
 	swclt_sub_cb_t cb,
@@ -99,13 +164,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 	swclt_cmd_future_t **future);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char *protocol,
 	const char *channel,
 	swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char *protocol,
 	const char *channel,
 	swclt_cmd_cb_t response_callback,
@@ -113,7 +178,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 	swclt_cmd_future_t **future);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char * protocol,
 	blade_access_control_t default_method_execute_access,
 	blade_access_control_t default_channel_subscribe_access,
@@ -125,7 +190,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
 	swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char * protocol,
 	blade_access_control_t default_method_execute_access,
 	blade_access_control_t default_channel_subscribe_access,
@@ -138,50 +203,50 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 	void *response_callback_data,
 	swclt_cmd_future_t **future);
 
-SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove(swclt_sess_t sess, const char * protocol, swclt_cmd_reply_t **reply);
+SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove(swclt_sess_t *sess, const char * protocol, swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char * protocol,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
 	swclt_cmd_future_t **future);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char * protocol,
 	int rank,
 	swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char * protocol,
 	int rank,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
 	swclt_cmd_future_t **future);
 
-SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add(swclt_sess_t sess, const char *identity, swclt_cmd_reply_t **reply);
+SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add(swclt_sess_t *sess, const char *identity, swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add_async(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char *identity,
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
 	swclt_cmd_future_t **future);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_execute(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char *responder,
 	const char *protocol,
 	const char *method,
 	ks_json_t **params,
 	swclt_cmd_reply_t **reply);
 
-SWCLT_DECLARE(ks_status_t) swclt_sess_nodestore(swclt_sess_t sess, swclt_store_t *store);
+SWCLT_DECLARE(ks_status_t) swclt_sess_nodestore(swclt_sess_t *sess, swclt_store_t *store);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
-	swclt_sess_t sess,
+	swclt_sess_t *sess,
 	const char *responder,
 	const char *protocol,
 	const char *method,
@@ -190,19 +255,16 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 	void *response_callback_data,
 	swclt_cmd_future_t **future);
 
-#define swclt_sess_get(sess, contextP)		__ks_handle_get(SWCLT_HTYPE_SESS, sess, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)
-#define swclt_sess_put(contextP)			__ks_handle_put(SWCLT_HTYPE_SESS, (ks_handle_base_t**)contextP, __FILE__, __LINE__, __PRETTY_FUNCTION__)
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t sess, const char *service, swclt_sub_cb_t cb, void *cb_data);
-SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_setup(swclt_sess_t sess, swclt_sub_cb_t cb, void *cb_data);
+SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t *sess, const char *service, swclt_sub_cb_t cb, void *cb_data);
+SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_setup(swclt_sess_t *sess, swclt_sub_cb_t cb, void *cb_data);
 													  
-SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure(swclt_sess_t sess,
+SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure(swclt_sess_t *sess,
 															 const char *target,
 															 const char *local_endpoint,
 															 const char *external_endpoint,
 															 const char *relay_connector_id,
 															 swclt_cmd_reply_t **reply);
-SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t sess,
+SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t *sess,
 																   const char *target,
 																   const char *local_endpoint,
 																   const char *external_endpoint,

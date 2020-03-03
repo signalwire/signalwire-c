@@ -29,13 +29,8 @@
  * but for now we only use one, KS_HANDLE_GROUP_SWCLT. */
 
 #define KS_HANDLE_GROUP_SWCLT KS_HANDLE_USER_GROUP_START
-#define KS_HANDLE_GROUP_SWCLT_SYS (KS_HANDLE_USER_GROUP_START + 1)
 
 typedef enum {
-
-	/* SESS	- A session is the highest level construct, and is the
-	 * primary means in which a client ineracts with this sdk. */
-    SWCLT_HTYPE_SESS =  KS_HANDLE_MAKE_TYPE(SWCLT_SYS, 1),
 
 	/* SUB - A subscription holds the callback state for a subscription
 	 * and is a child of a session. */
@@ -56,15 +51,12 @@ typedef enum {
 static inline ks_bool_t swclt_htype_valid(swclt_htype_t type)
 {
 	/* The type is valid if its group is our group */
-	return KS_HANDLE_GROUP_FROM_TYPE(type) == KS_HANDLE_GROUP_SWCLT ||
-		KS_HANDLE_GROUP_FROM_TYPE(type) == KS_HANDLE_GROUP_SWCLT_SYS;
+	return KS_HANDLE_GROUP_FROM_TYPE(type) == KS_HANDLE_GROUP_SWCLT;
 }
 
 static inline const char *swclt_htype_str(swclt_htype_t type)
 {
 	switch(type) {
-	case SWCLT_HTYPE_SESS:
-		return "Session";
 	case SWCLT_HTYPE_SUB:
 		return "Subscription";
 	case SWCLT_HTYPE_STORE:

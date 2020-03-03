@@ -219,8 +219,6 @@ static void __service_handle_type(swclt_htype_t type)
 
 static void __service_handles()
 {
-	/* Now loop through all handles and service them */
-    __service_handle_type(SWCLT_HTYPE_SESS);
 }
 
 static ks_status_t __manager_loop()

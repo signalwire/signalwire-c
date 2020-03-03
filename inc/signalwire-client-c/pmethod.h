@@ -31,8 +31,10 @@
 
 KS_BEGIN_EXTERN_C
 
+typedef struct swclt_sess swclt_sess_t;
+
 typedef ks_status_t (*swclt_pmethod_cb_t)(
-	ks_handle_t sess,
+	swclt_sess_t *sess,
 	swclt_cmd_t *cmd,
 	const blade_execute_rqu_t *rqu, void *cb_data);
 

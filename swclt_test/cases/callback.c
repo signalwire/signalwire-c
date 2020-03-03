@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,15 +23,14 @@
 
 static ks_bool_t g_called = KS_FALSE;
 
-void route_add_handler(swclt_sess_t sess, const blade_netcast_rqu_t *rqu, const blade_netcast_route_add_param_t *params)
+void route_add_handler(swclt_sess_t *sess, const blade_netcast_rqu_t *rqu, const blade_netcast_route_add_param_t *params)
 {
 	g_called = KS_TRUE;
 }
 
 void test_callback(ks_pool_t *pool)
 {
-	swclt_sess_t sess;
-	swclt_sess_ctx_t *sess_ctx;
+	swclt_sess_t *sess;
 	swclt_store_t store;
 
 	/* Load the config we expect session to load */
@@ -62,5 +61,5 @@ void test_callback(ks_pool_t *pool)
 	REQUIRE(g_called);
 
 	/* Ok we're done */
-	ks_handle_destroy(&sess);
+	swclt_sess_destroy(&sess);
 }
