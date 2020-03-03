@@ -42,7 +42,7 @@ static inline const char *swclt_sess_state_str(swclt_sess_state_t state)
 		case SWCLT_STATE_RESTORED:
 			return "Restored";
 		default:
-			ks_abort_fmt("Invalid session state: %d", state);
+			return "";
 	}
 }
 

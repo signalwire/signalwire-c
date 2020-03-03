@@ -164,8 +164,8 @@ SWCLT_DECLARE(char *) swclt_cmd_describe(swclt_cmd_t *cmd)
 		}
 
 		default:
-			ks_abort_fmt("Unexpected command type: %lu", cmd->type);
-			str = ks_pstrdup(cmd->pool, "");
+			str = ks_pstrdup(cmd->pool, "<Invalid SWCLT_CMD_TYPE>");
+			break;
 	}
 	return str;
 }
@@ -526,8 +526,8 @@ SWCLT_DECLARE(ks_status_t) swclt_cmd_print(swclt_cmd_t *cmd, ks_pool_t *pool, ch
 		status = __print_error(cmd, pool, string);
 		break;
 	default:
-		//status = KS_STATUS_INVALID_ARGUMENT;
-		ks_abort_fmt("Unexpected command context type: %lu", cmd->type);
+		status = KS_STATUS_INVALID_ARGUMENT;
+		*string = NULL;
 		break;
 	}
 

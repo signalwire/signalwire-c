@@ -685,7 +685,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 	}
 
 	if (status = ks_thread_create(&sess->monitor_thread, session_monitor_thread, sess, NULL)) {
-		ks_abort_fmt("Failed to allocate session monitor thread: %lu", status);
+		ks_log(KS_LOG_CRIT, "Failed to allocate session monitor thread: %lu", status);
 		goto done;
 	}
 
