@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -57,4 +57,3 @@ typedef struct test_entry_s {
 
 /* Load some utils */
 #include "util/ssl.h"
-#include "util/handle.h"

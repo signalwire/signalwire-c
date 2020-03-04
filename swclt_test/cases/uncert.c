@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,25 +22,21 @@
 
 #include "swclt_test.h"
 
-static SWCLT_HSTATE g_last_state_change;
+static swclt_sess_state_t g_last_state_change;
 static ks_cond_t *g_cond;
 
-static void __on_sess_hmon_event(swclt_sess_t sess, swclt_hstate_change_t *state_change_info, const char *cb_data)
+static void __on_sess_state_event(swclt_sess_t *sess, void *cb_data)
 {
-	REQUIRE(!strcmp(cb_data, "bobo"));
+	REQUIRE(!strcmp((char *)cb_data, "bobo"));
 	ks_cond_lock(g_cond);
-	g_last_state_change = state_change_info->new_state;
+	g_last_state_change = sess->state;
 	ks_cond_broadcast(g_cond);
 	ks_cond_unlock(g_cond);
 }
 
-typedef void(*swclt_hstate_change_cb_t)(swclt_handle_base_t *ctx, swclt_hstate_change_t *state_change_request);
-
 void test_uncert_exp(ks_pool_t *pool)
 {
-	swclt_sess_t sess;
-	swclt_sess_ctx_t *sess_ctx;
-	swclt_hmon_t hmon;
+	swclt_sess_t *sess;
 
 	REQUIRE(!ks_cond_create(&g_cond, NULL));
 
@@ -50,17 +46,7 @@ void test_uncert_exp(ks_pool_t *pool)
 	REQUIRE(!swclt_sess_create(&sess, g_target_ident_str, g_uncertified_config));
 
 	/* Register a monitor to get to know when session comes online successfully */
-	REQUIRE(!swclt_hmon_register(&hmon, sess, __on_sess_hmon_event, "bobo"));
-
-	{
-		ks_handle_t next = 0;
-		uint32_t count = 0;
-
-		while (KS_STATUS_SUCCESS == ks_handle_enum_type(SWCLT_HTYPE_HMON, &next))
-			count++;
-
-		REQUIRE(count == 1);
-	}
+	REQUIRE(!swclt_sess_set_state_change_cb(sess, __on_sess_state_event, "bobo"));
 
 	ks_cond_lock(g_cond);
 
@@ -70,7 +56,7 @@ void test_uncert_exp(ks_pool_t *pool)
 	ks_cond_wait(g_cond);
 
 	/* Should be online */
-	REQUIRE(g_last_state_change == SWCLT_HSTATE_ONLINE);
+	REQUIRE(g_last_state_change == SWCLT_STATE_ONLINE);
 
 	/* Now disconnect the session */
 	REQUIRE(!swclt_sess_disconnect(sess));
@@ -78,21 +64,16 @@ void test_uncert_exp(ks_pool_t *pool)
 	/* Should be offline now */
 	ks_cond_wait(g_cond);
 
-	REQUIRE(g_last_state_change == SWCLT_HSTATE_OFFLINE);
+	REQUIRE(g_last_state_change == SWCLT_STATE_OFFLINE);
 
-	/* Now delete the monitor */
-	ks_handle_destroy(&hmon);
 
 	ks_cond_unlock(g_cond);
 
 	/* Go online again */
 	REQUIRE(!swclt_sess_connect(sess));
 
-	/* Wait for its low level handle state to be back to OK */
-	while (swclt_hstate_check(sess, NULL))
-		ks_sleep(1000);
+	swclt_sess_destroy(&sess);
 
 	/* Ok we're done */
 	ks_cond_destroy(&g_cond);
-	ks_handle_destroy(&sess);
 }

@@ -22,11 +22,10 @@
 
 #include "swclt_test.h"
 
-static void __on_session_state_provider(swclt_sess_t sess, swclt_hstate_change_t *state_change_info, ks_cond_t *cond)
+static void __on_session_state_provider(swclt_sess_t *sess, void *condV)
 {
-	SWCLT_HSTATE old_state = state_change_info->old_state;
-	SWCLT_HSTATE new_state = state_change_info->new_state;
-	if (new_state == SWCLT_HSTATE_ONLINE && old_state == SWCLT_HSTATE_NORMAL) {
+	ks_cond_t *cond = (ks_cond_t *)condV;
+	if (sess->state == SWCLT_STATE_ONLINE) {
 		ks_json_t *channels = ks_json_create_array();
 		swclt_sess_protocol_provider_add(sess,
 										 "test",
@@ -40,7 +39,7 @@ static void __on_session_state_provider(swclt_sess_t sess, swclt_hstate_change_t
 										 NULL);
 
 		swclt_sess_metric_register(sess, "test", 30, 9);
-	} else if (new_state == SWCLT_HSTATE_OFFLINE) {
+	} else if (sess->state == SWCLT_STATE_OFFLINE) {
 		// Disconnected
 	}
 
@@ -48,13 +47,14 @@ static void __on_session_state_provider(swclt_sess_t sess, swclt_hstate_change_t
 	ks_cond_broadcast(cond);
 }
 
-static void __on_session_state(swclt_sess_t sess, const swclt_hstate_change_t *state_change_info, ks_cond_t *cond)
+static void __on_session_state(swclt_sess_t *sess, void *condV)
 {
 	/* Notify the waiting test of the state change */
+	ks_cond_t *cond = (ks_cond_t *)condV;
 	ks_cond_broadcast(cond);
 }
 
-static ks_status_t __on_incoming_test_execute_rqu(swclt_sess_t sess, swclt_cmd_t *cmd, const blade_execute_rqu_t *rqu, void *data)
+static ks_status_t __on_incoming_test_execute_rqu(swclt_sess_t *sess, swclt_cmd_t *cmd, const blade_execute_rqu_t *rqu, void *data)
 {
 	/* Formulate a response */
 	ks_cond_t *cond = (ks_cond_t *)data;
@@ -80,10 +80,8 @@ static void __on_outgoing_test_execute_rpl(swclt_cmd_reply_t *reply, void *cond)
 
 void test_execute(ks_pool_t *pool)
 {
-	swclt_sess_t sess1, sess2;
-	swclt_cfg_t cfg;
+	swclt_sess_t *sess1 = NULL, *sess2 = NULL;
 	char *nodeid1, *nodeid2;
-	swclt_hmon_t sess1_mon, sess2_mon;
 	ks_cond_t *cond;
 	const char *ident;
 
@@ -95,8 +93,8 @@ void test_execute(ks_pool_t *pool)
 	REQUIRE(!swclt_sess_create(&sess2, g_target_ident_str, g_certified_config));
 
 	/* Get called back when they're connected */
-	REQUIRE(!swclt_hmon_register(&sess1_mon, sess1, __on_session_state, cond));
-	REQUIRE(!swclt_hmon_register(&sess2_mon, sess2, __on_session_state_provider, cond));
+	REQUIRE(!swclt_sess_set_state_change_cb(sess1, __on_session_state, cond));
+	REQUIRE(!swclt_sess_set_state_change_cb(sess2, __on_session_state_provider, cond));
 
 	/* On the second session register a execute handler we'll communicate with */
 	REQUIRE(!swclt_sess_register_protocol_method(sess2, "test", "test.method", __on_incoming_test_execute_rqu, cond));
@@ -132,11 +130,7 @@ void test_execute(ks_pool_t *pool)
 
 	ks_sleep_ms(5000);
 
-	ks_handle_destroy(&sess1_mon);
-	ks_handle_destroy(&sess2_mon);
-
-	ks_handle_destroy(&sess1);
-	ks_handle_destroy(&sess2);
-	ks_handle_destroy(&cfg);
+	swclt_sess_destroy(&sess1);
+	swclt_sess_destroy(&sess2);
 	ks_cond_destroy(&cond);
 }

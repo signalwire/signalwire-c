@@ -100,7 +100,7 @@ static inline swclt_cmd_t *CREATE_BLADE_IDENTITY_CMD_ASYNC(
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
 		 * took ownership of it */
 		ks_json_delete(&request);
-		return KS_NULL_HANDLE;
+		return NULL;
 	}
 
 	/* Phew, successfully allocated the command */

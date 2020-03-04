@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,6 @@
  */
 
 #include "swclt_test.h"
-#include "signalwire-client-c/internal/nodestore.h"
 
 ks_uuid_t g_route_nodeid_1, g_route_nodeid_2, g_sessionid;
 
@@ -144,8 +143,7 @@ blade_connect_rpl_t *__connect_reply(ks_pool_t *pool)
 void test_nodestore_update(ks_pool_t *pool)
 {
 	blade_connect_rpl_t *connect_rpl = __connect_reply(pool);
-	swclt_store_t store = { 0 };
-	swclt_store_ctx_t *store_ctx;
+	swclt_store_t *store = NULL;
 	ks_uuid_t new_route_nodeid = { 0 };
 	const char *new_route_nodeid_str;
 
@@ -154,27 +152,26 @@ void test_nodestore_update(ks_pool_t *pool)
 
 	REQUIRE(!swclt_store_create(&store));
 	REQUIRE(!swclt_store_populate(store, connect_rpl));
-	REQUIRE(!swclt_store_get(store, &store_ctx));
 
 	/* The store should properly render the types */
-	REQUIRE(ks_hash_count(store_ctx->protocols) == 2);
-	REQUIRE(ks_hash_count(store_ctx->subscriptions) == 1);
-	REQUIRE(ks_hash_count(store_ctx->routes) == 2);
-	REQUIRE(ks_hash_count(store_ctx->authorities) == 0);
+	REQUIRE(ks_hash_count(store->protocols) == 2);
+	REQUIRE(ks_hash_count(store->subscriptions) == 1);
+	REQUIRE(ks_hash_count(store->routes) == 2);
+	REQUIRE(ks_hash_count(store->authorities) == 0);
 
 	/* Now update with a new node */
 	blade_netcast_rqu_t netcast_rqu = __netcast_route_add_request(pool, new_route_nodeid_str, KS_TRUE);
 	REQUIRE(!swclt_store_update(store, &netcast_rqu));
-	REQUIRE(ks_hash_count(store_ctx->routes) == 3);
-	REQUIRE(((blade_node_t *)ks_hash_search(store_ctx->routes, new_route_nodeid_str, KS_UNLOCKED))->certified == KS_TRUE);
+	REQUIRE(ks_hash_count(store->routes) == 3);
+	REQUIRE(((blade_node_t *)ks_hash_search(store->routes, new_route_nodeid_str, KS_UNLOCKED))->certified == KS_TRUE);
 	ks_json_delete(&netcast_rqu.params);
 
 	/* And a new provider with a new provider + channel */
 	netcast_rqu = __netcast_protocol_provider_add_request(pool, "bobo_protocol_new", new_route_nodeid, "bobo_channel_new");
 	REQUIRE(!swclt_store_update(store, &netcast_rqu));
-	REQUIRE(ks_hash_count(store_ctx->protocols) == 3);
+	REQUIRE(ks_hash_count(store->protocols) == 3);
 	{
-		blade_protocol_t *protocol = (blade_protocol_t *)ks_hash_search(store_ctx->protocols, "bobo_protocol_new", KS_UNLOCKED);
+		blade_protocol_t *protocol = (blade_protocol_t *)ks_hash_search(store->protocols, "bobo_protocol_new", KS_UNLOCKED);
 		REQUIRE(!strcmp(protocol->name, "bobo_protocol_new"));
 
 		/* Should have one channel in it called something silly */
@@ -192,12 +189,11 @@ void test_nodestore_update(ks_pool_t *pool)
 	/* And remove it, should also remove the protocol */
 	netcast_rqu = __netcast_route_remove_request(pool, new_route_nodeid_str);
 	REQUIRE(!swclt_store_update(store, &netcast_rqu));
-	REQUIRE(ks_hash_count(store_ctx->routes) == 2);
-	REQUIRE(ks_hash_count(store_ctx->protocols) == 2);
+	REQUIRE(ks_hash_count(store->routes) == 2);
+	REQUIRE(ks_hash_count(store->protocols) == 2);
 	ks_json_delete(&netcast_rqu.params);
 
-	swclt_store_put(&store_ctx);
-	ks_handle_destroy(&store);
+	swclt_store_destroy(&store);
 	BLADE_CONNECT_RPL_DESTROY(&connect_rpl);
 }
 

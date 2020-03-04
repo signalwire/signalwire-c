@@ -208,15 +208,16 @@ static void ttl_tracker_destroy(swclt_ttl_tracker_t **ttl)
 	}
 }
 
-static void ttl_tracker_create(ks_pool_t *pool, swclt_ttl_tracker_t **ttl, swclt_conn_t *ctx)
+static ks_status_t ttl_tracker_create(ks_pool_t *pool, swclt_ttl_tracker_t **ttl, swclt_conn_t *ctx)
 {
 	ks_status_t status;
 	*ttl = ks_pool_alloc(pool, sizeof(swclt_ttl_tracker_t));
 	ks_cond_create(&(*ttl)->cond, pool);
 	(*ttl)->conn = ctx;
 	if (status = ks_thread_create(&(*ttl)->thread, ttl_tracker_thread, *ttl, NULL)) {
-		ks_abort_fmt("Failed to allocate connection TTL thread: %lu", status);
+		ks_log(KS_LOG_CRIT, "Failed to allocate connection TTL thread: %lu", status);
 	}
+	return status;
 }
 
 static void report_connection_failure(swclt_conn_t *conn)
@@ -569,7 +570,8 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 		return status;
 
 	/* Create TTL tracking thread */
-	ttl_tracker_create(ctx->pool, &ctx->ttl, ctx);
+	if (status = ttl_tracker_create(ctx->pool, &ctx->ttl, ctx))
+		return status;
 
 	/* Now perform a logical connect to blade with the connect request */
 	if (status = do_logical_connect(ctx, previous_sessionid, authentication, agent, identity))

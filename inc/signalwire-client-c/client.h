@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,10 +27,6 @@
 
 #include "signalwire-client-c/export.h"
 #include "signalwire-client-c/init.h"
-#include "signalwire-client-c/handles.h"
-#include "signalwire-client-c/handle_state.h"
-#include "signalwire-client-c/handle_base.h"
-
 #include "signalwire-client-c/transport/frame.h"
 #include "signalwire-client-c/command.h"
 #include "signalwire-client-c/transport/websocket.h"
@@ -39,15 +35,11 @@
 #include "signalwire-client-c/signalwire/signalwire.h"
 #include "signalwire-client-c/identity.h"
 #include "signalwire-client-c/config.h"
-#include "signalwire-client-c/handle_type.h"
 #include "signalwire-client-c/connection.h"
 #include "signalwire-client-c/subscription.h"
 #include "signalwire-client-c/pmethod.h"
 #include "signalwire-client-c/nodestore.h"
 #include "signalwire-client-c/session.h"
-
-#include "signalwire-client-c/handle_manager.h"
-#include "signalwire-client-c/handle_monitor.h"
 
 /* Utility */
 #include "signalwire-client-c/ssl.h"
