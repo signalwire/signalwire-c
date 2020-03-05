@@ -421,7 +421,7 @@ static ks_status_t __do_disconnect(swclt_sess_t *sess)
 	swclt_conn_t *conn = sess->conn;
 	sess->conn = NULL;
 	ks_rwl_write_unlock(sess->rwlock);
-	swclt_conn_destroy(&sess->conn);
+	swclt_conn_destroy(&conn);
 	return KS_STATUS_SUCCESS;
 }
 
