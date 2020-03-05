@@ -21,14 +21,12 @@
  */
 #include "swclt_test.h"
 
-static swclt_sess_state_t g_last_state_change;
 static ks_cond_t *g_cond;
 
 static void __on_sess_state_event(swclt_sess_t *sess, void *cb_data)
 {
 	REQUIRE(!strcmp((char *)cb_data, "bobo"));
 	ks_cond_lock(g_cond);
-	g_last_state_change = sess->state;
 	ks_cond_broadcast(g_cond);
 	ks_cond_unlock(g_cond);
 }
@@ -53,24 +51,29 @@ void test_session(ks_pool_t *pool)
 
 	/* Now take the session onine */
 	REQUIRE(!swclt_sess_connect(sess));
-
-	ks_cond_wait(g_cond);
-
-	/* Should be online */
-	REQUIRE(g_last_state_change == SWCLT_STATE_ONLINE);
+	int i = 5;
+	while (i-- > 0 && !swclt_sess_connected(sess)) {
+		ks_cond_timedwait(g_cond, 1000);
+	}
+	REQUIRE(swclt_sess_connected(sess));
 
 	/* Now disconnect the session */
 	REQUIRE(!swclt_sess_disconnect(sess));
-
-	/* Should be offline now */
-	ks_cond_wait(g_cond);
-
-	REQUIRE(g_last_state_change == SWCLT_STATE_OFFLINE);
-
-	ks_cond_unlock(g_cond);
+	i = 5;
+	while (i-- > 0 && swclt_sess_connected(sess)) {
+		ks_cond_timedwait(g_cond, 1000);
+	}
+	REQUIRE(!swclt_sess_connected(sess));
 
 	/* Go online again */
 	REQUIRE(!swclt_sess_connect(sess));
+	i = 5;
+	while (i-- > 0 && !swclt_sess_connected(sess)) {
+		ks_cond_timedwait(g_cond, 1000);
+	}
+	REQUIRE(swclt_sess_connected(sess));
+
+	ks_cond_unlock(g_cond);
 
 	swclt_sess_destroy(&sess);
 

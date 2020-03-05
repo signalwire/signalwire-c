@@ -34,11 +34,11 @@ typedef struct swclt_ttl_node {
 } swclt_ttl_node_t;
 
 struct swclt_ttl_tracker {
-	swclt_ttl_node_t heap[TTL_HEAP_MAX_SIZE]; // min heap of TTLs to expire
 	int count;
 	ks_cond_t *cond;
 	ks_thread_t *thread;
 	swclt_conn_t *conn;
+	swclt_ttl_node_t heap[TTL_HEAP_MAX_SIZE]; // min heap of TTLs to expire
 };
 
 #define TTL_HEAP_ROOT 0
@@ -202,7 +202,10 @@ static void ttl_tracker_destroy(swclt_ttl_tracker_t **ttl)
 		ks_cond_lock((*ttl)->cond);
 		ks_cond_broadcast((*ttl)->cond);
 		ks_cond_unlock((*ttl)->cond);
-		ks_thread_destroy(&(*ttl)->thread);
+		if ((*ttl)->thread) {
+			ks_thread_join((*ttl)->thread);
+			ks_thread_destroy(&(*ttl)->thread);
+		}
 		ks_cond_destroy(&(*ttl)->cond);
 		ks_pool_free(ttl);
 	}
@@ -214,7 +217,7 @@ static ks_status_t ttl_tracker_create(ks_pool_t *pool, swclt_ttl_tracker_t **ttl
 	*ttl = ks_pool_alloc(pool, sizeof(swclt_ttl_tracker_t));
 	ks_cond_create(&(*ttl)->cond, pool);
 	(*ttl)->conn = ctx;
-	if (status = ks_thread_create(&(*ttl)->thread, ttl_tracker_thread, *ttl, NULL)) {
+	if (status = ks_thread_create_tag(&(*ttl)->thread, ttl_tracker_thread, *ttl, NULL, "swclt-ttl-tracker")) {
 		ks_log(KS_LOG_CRIT, "Failed to allocate connection TTL thread: %lu", status);
 	}
 	return status;
@@ -563,7 +566,7 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 	ks_log(KS_LOG_INFO, "Connecting to %s:%d/%s", ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path);
 
 	/* Create our websocket transport */
-	if (status = swclt_wss_connect(ctx->pool, &ctx->wss,
+	if (status = swclt_wss_connect(&ctx->wss,
 			(swclt_wss_incoming_frame_cb_t)on_incoming_frame, ctx,
 			(swclt_wss_failed_cb_t)on_wss_failed, ctx,
 			ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path, ctx->info.wss.connect_timeout_ms, ctx->info.wss.ssl))
@@ -583,6 +586,7 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn)
 {
 	if (conn && *conn) {
+		ks_pool_t *pool = (*conn)->pool;
 		if ((*conn)->blade_connect_rpl) {
 			BLADE_CONNECT_RPL_DESTROY(&(*conn)->blade_connect_rpl);
 		}
@@ -591,11 +595,11 @@ SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn)
 		ks_hash_destroy(&(*conn)->outstanding_requests);
 		ks_mutex_destroy(&(*conn)->failed_mutex);
 		ks_pool_free(conn);
+		ks_pool_close(&pool);
 	}
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
-	ks_pool_t *pool,
 	swclt_conn_t **conn,
 	swclt_conn_incoming_cmd_cb_t incoming_cmd_cb,
 	void *incoming_cmd_cb_data,
@@ -611,7 +615,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	const SSL_CTX *ssl)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
-
+	ks_pool_t *pool = NULL;
+	ks_pool_open(&pool);
 	swclt_conn_t *new_conn = ks_pool_alloc(pool, sizeof(swclt_conn_t));
 	new_conn->pool = pool;
 
@@ -652,7 +657,6 @@ done:
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
-	ks_pool_t *pool,
 	swclt_conn_t **conn,
 	swclt_conn_incoming_cmd_cb_t incoming_cmd_cb,
 	void *incoming_cmd_cb_data,
@@ -663,7 +667,6 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 	const SSL_CTX *ssl)
 {
 	return swclt_conn_connect_ex(
-		pool,
 		conn,
 		incoming_cmd_cb,
 		incoming_cmd_cb_data,

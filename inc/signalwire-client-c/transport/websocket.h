@@ -84,7 +84,6 @@ struct swclt_wss {
 };
 
 SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
-	ks_pool_t *pool,
 	swclt_wss_t **wss,
 	swclt_wss_incoming_frame_cb_t incoming_frame_cb,
 	void *incoming_frame_cb_data,

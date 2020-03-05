@@ -89,7 +89,6 @@ struct swclt_conn {
 
 SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn);
 SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
-	ks_pool_t *pool,
 	swclt_conn_t **conn,
 	swclt_conn_incoming_cmd_cb_t incoming_command_callback,
 	void *incoming_command_cb_data,
@@ -100,7 +99,6 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 	const SSL_CTX *ssl);
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
-	ks_pool_t *pool,
 	swclt_conn_t **conn,
 	swclt_conn_incoming_cmd_cb_t incoming_command_callback,
 	void *incoming_command_cb_data,
