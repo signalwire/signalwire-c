@@ -51,7 +51,6 @@ static void check_session_state(swclt_sess_t *sess)
 	}
 	ks_hash_read_unlock(sess->metrics);
 
-	ks_cond_lock(sess->monitor_cond);
 	if (sess->disconnect_time > 0 && ks_time_now_sec() >= sess->disconnect_time) {
 		sess->disconnect_time = 0;
 		if (sess->state == SWCLT_STATE_ONLINE) {
@@ -75,7 +74,6 @@ static void check_session_state(swclt_sess_t *sess)
 			sess->connect_time = ks_time_now_sec() + 5;
 		}
 	}
-	ks_cond_unlock(sess->monitor_cond);
 }
 
 static void *session_monitor_thread(ks_thread_t *thread, void *data)
@@ -83,13 +81,15 @@ static void *session_monitor_thread(ks_thread_t *thread, void *data)
 	swclt_sess_t *sess = (swclt_sess_t *)data;
 
 	ks_log(KS_LOG_INFO, "Session monitor starting");
-
-	while (ks_thread_stop_requested(sess->monitor_thread) == KS_FALSE) {
+	while (ks_thread_stop_requested(thread) == KS_FALSE) {
 		ks_cond_lock(sess->monitor_cond);
 		ks_cond_timedwait(sess->monitor_cond, 1000);
 		ks_cond_unlock(sess->monitor_cond);
-		check_session_state(sess);
+		if (ks_thread_stop_requested(thread) == KS_FALSE) {
+			check_session_state(sess);
+		}
 	}
+
 	ks_log(KS_LOG_INFO, "Session monitor thread stopping");
 	return NULL;
 }
@@ -100,10 +100,25 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sessP)
 		swclt_sess_t *sess = *sessP;
 		ks_pool_t *pool = sess->pool;
 		*sessP = NULL;
-		ks_thread_request_stop(sess->monitor_thread);
-		ks_cond_broadcast(sess->monitor_cond);
-		ks_thread_destroy(&sess->monitor_thread);
+		if (sess->monitor_thread) {
+			if (ks_thread_request_stop(sess->monitor_thread) != KS_STATUS_SUCCESS) {
+				ks_log(KS_LOG_ERROR, "Failed to stop session monitor thread.  Leaking data and moving on.");
+				return KS_STATUS_FAIL;
+			}
+			ks_cond_lock(sess->monitor_cond);
+			ks_cond_broadcast(sess->monitor_cond);
+			ks_cond_unlock(sess->monitor_cond);
+			ks_thread_join(sess->monitor_thread);
+			ks_thread_destroy(&sess->monitor_thread);
+		}
+		sess->monitor_thread = NULL;
+
 		swclt_conn_destroy(&sess->conn);
+
+		// wait for all readers to finish
+		ks_rwl_write_lock(sess->rwlock);
+
+		// now destroy everything
 		ks_hash_destroy(&sess->subscriptions);
 		ks_hash_destroy(&sess->methods);
 		ks_hash_destroy(&sess->setups);
@@ -112,10 +127,8 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sessP)
 			swclt_ssl_destroy_context(&sess->ssl);
 		}
 		swclt_ident_destroy(&sess->ident);
-		if (sess->lock) {
-			ks_mutex_destroy(&sess->lock);
-		}
 		swclt_store_destroy(&sess->store);
+		ks_rwl_destroy(&sess->rwlock);
 		ks_pool_close(&pool);
 	}
 	return KS_STATUS_SUCCESS;
@@ -301,7 +314,10 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 
 		if (!status) {
 			/* Now the command is ready to be sent back, enqueue it */
-			if (status = swclt_conn_submit_result(sess->conn, cmd))
+			ks_rwl_read_lock(sess->rwlock);
+			status = swclt_conn_submit_result(sess->conn, cmd);
+			ks_rwl_read_unlock(sess->rwlock);
+			if (status)
 				ks_log(KS_LOG_ERROR, "Failed to submit reply from disconnect %s, status: %lu", cmd_str, status);
 			else
 				ks_log(KS_LOG_INFO, "Sent reply back from disconnect request: %s", cmd_str);
@@ -324,7 +340,10 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 
 		if (!status) {
 			/* Now the command is ready to be sent back, enqueue it */
-			if (status = swclt_conn_submit_result(sess->conn, cmd))
+			ks_rwl_read_lock(sess->rwlock);
+			status = swclt_conn_submit_result(sess->conn, cmd);
+			ks_rwl_read_unlock(sess->rwlock);
+			if (status)
 				ks_log(KS_LOG_ERROR, "Failed to submit reply from ping: %s, status: %lu", cmd_str, status);
 			else
 				ks_log(KS_LOG_INFO, "Sent reply back from ping request: %s", cmd_str);
@@ -377,7 +396,10 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			ks_log(KS_LOG_INFO, "Sending reply back from execute request: %s", cmd_str);
 
 			/* Now the command is ready to be sent back, enqueue it */
-			if (status = swclt_conn_submit_result(sess->conn, cmd))
+			ks_rwl_read_lock(sess->rwlock);
+			status = swclt_conn_submit_result(sess->conn, cmd);
+			ks_rwl_read_unlock(sess->rwlock);
+			if (status)
 				ks_log(KS_LOG_ERROR, "Failed to submit reply from execute: %s, status: %lu", cmd_str, status);
 			else
 				ks_log(KS_LOG_INFO, "Sent reply back from execute request: %s", cmd_str);
@@ -395,7 +417,11 @@ done:
 
 static ks_status_t __do_disconnect(swclt_sess_t *sess)
 {
-	swclt_conn_destroy(&sess->conn);
+	ks_rwl_write_lock(sess->rwlock);
+	swclt_conn_t *conn = sess->conn;
+	sess->conn = NULL;
+	ks_rwl_write_unlock(sess->rwlock);
+	swclt_conn_destroy(&conn);
 	return KS_STATUS_SUCCESS;
 }
 
@@ -452,8 +478,7 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 	ks_log(KS_LOG_INFO, "Session is performing connect");
 
 	/* Delete the previous connection if present */
-	swclt_conn_destroy(&sess->conn);
-	sess->conn = 0;
+	__do_disconnect(sess);
 
 	/* Re-allocate a new ssl context */
 	if (status = __setup_ssl(sess)) {
@@ -467,10 +492,11 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 		authentication = ks_json_parse(sess->config->authentication);
 	}
 
+	swclt_conn_t *new_conn = NULL;
+
 	/* Create a connection and have it call us back anytime a new read is detected */
 	if (status = swclt_conn_connect_ex(
-			sess->pool,
-			&sess->conn,
+			&new_conn,
 			(swclt_conn_incoming_cmd_cb_t)__on_incoming_cmd,
 			sess,
 			(swclt_conn_connect_cb_t)__on_connect_reply,
@@ -487,12 +513,9 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 		return status;
 	}
 
-	if (status = swclt_conn_info(sess->conn, &sess->info.conn)) {
-		ks_debug_break();	/* unexpected */
-		swclt_conn_destroy(&sess->conn);
-		return status;
-	}
+	swclt_conn_info(new_conn, &sess->info.conn);
 
+	ks_rwl_write_lock(sess->rwlock);
 	/* If we got a new session id, stash it */
 	if (!ks_uuid_is_null(&sess->info.sessionid)) {
 		if (ks_uuid_cmp(&sess->info.sessionid, &sess->info.conn.sessionid)) {
@@ -509,6 +532,8 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 	sess->info.sessionid = sess->info.conn.sessionid;
 	sess->info.nodeid = ks_pstrdup(sess->pool, sess->info.conn.nodeid);
 	sess->info.master_nodeid = ks_pstrdup(sess->pool, sess->info.conn.master_nodeid);
+	sess->conn = new_conn;
+	ks_rwl_write_unlock(sess->rwlock);
 
 	ks_log(KS_LOG_INFO, "Successfully established sessionid: %s", ks_uuid_thr_str(&sess->info.sessionid));
 	ks_log(KS_LOG_INFO, "   nodeid: %s", sess->info.nodeid);
@@ -677,14 +702,14 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 		goto done;
 	}
 
-	ks_mutex_create(&sess->lock, KS_MUTEX_FLAG_DEFAULT, sess->pool);
+	ks_rwl_create(&sess->rwlock, sess->pool);
 
 	if (status = ks_cond_create(&sess->monitor_cond, NULL)) {
 		ks_log(KS_LOG_ERROR, "Failed to allocate session monitor condition: %lu", status);
 		goto done;
 	}
 
-	if (status = ks_thread_create(&sess->monitor_thread, session_monitor_thread, sess, NULL)) {
+	if (status = ks_thread_create_tag(&sess->monitor_thread, session_monitor_thread, sess, NULL, "swclt-session-monitor")) {
 		ks_log(KS_LOG_CRIT, "Failed to allocate session monitor thread: %lu", status);
 		goto done;
 	}
@@ -700,7 +725,9 @@ done:
 static ks_status_t __nodeid_local(swclt_sess_t *sess, const char *nodeid)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
+	ks_rwl_read_lock(sess->rwlock);
 	status = !strcmp(sess->info.nodeid, nodeid) ? KS_STATUS_SUCCESS : KS_STATUS_FAIL;
+	ks_rwl_read_unlock(sess->rwlock);
 	return status;
 }
 
@@ -726,14 +753,14 @@ static ks_status_t __register_subscription(
 	const char *channel,
 	swclt_sub_t **sub)
 {
-	ks_mutex_lock(sess->lock);
+	ks_rwl_read_lock(sess->rwlock);
 	/* unregister if already registered so it does not leak anything, even the handle for the sub
 	 * should be cleaned up to avoid leaking for the duration of the session */
 	__unregister_subscription(sess, protocol, channel);
 
 	/* And add it to the hash */
 	ks_status_t status = ks_hash_insert(sess->subscriptions, __make_subscription_key(sess, protocol, channel), *sub);
-	ks_mutex_unlock(sess->lock);
+	ks_rwl_read_unlock(sess->rwlock);
 
 	if (status == KS_STATUS_SUCCESS) {
 		*sub = NULL; // take ownership
@@ -871,18 +898,18 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_disconnect(swclt_sess_t *sess)
 SWCLT_DECLARE(ks_bool_t) swclt_sess_connected(swclt_sess_t *sess)
 {
 	ks_bool_t connected;
-	ks_mutex_lock(sess->lock);
+	ks_rwl_read_lock(sess->rwlock);
 	connected = __session_check_connected(sess);
-	ks_mutex_unlock(sess->lock);
+	ks_rwl_read_unlock(sess->rwlock);
 	return connected;
 }
 
 SWCLT_DECLARE(ks_bool_t) swclt_sess_restored(swclt_sess_t *sess)
 {
 	ks_bool_t connected;
-	ks_mutex_lock(sess->lock);
+	ks_rwl_read_lock(sess->rwlock);
 	connected = __session_check_restored(sess);
-	ks_mutex_unlock(sess->lock);
+	ks_rwl_read_unlock(sess->rwlock);
 	return connected;
 }
 
@@ -893,7 +920,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_info(
 	char **nodeid,
 	char **master_nodeid)
 {
-	ks_mutex_lock(sess->lock);
+	ks_rwl_read_lock(sess->rwlock);
 	if (__session_check_connected(sess)) {
 		/* Default to our pool if no pool specified */
 		if (!pool)
@@ -907,12 +934,14 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_info(
 		if (master_nodeid)
 			*master_nodeid = ks_pstrdup(pool, sess->info.master_nodeid);
 	}
-	ks_mutex_unlock(sess->lock);
+	ks_rwl_read_unlock(sess->rwlock);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_nodeid(swclt_sess_t *sess, ks_pool_t *pool, char **nodeid)
 {
+	ks_rwl_read_lock(sess->rwlock);
 	*nodeid = ks_pstrdup(pool, sess->info.nodeid);
+	ks_rwl_read_unlock(sess->rwlock);
 	return KS_STATUS_SUCCESS;
 }
 
@@ -972,8 +1001,9 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_broadcast(
 	}
 
 	/* Now submit it */
-	if (status = swclt_conn_submit_request(sess->conn, &cmd, NULL))
-		goto done;
+	ks_rwl_read_lock(sess->rwlock);
+	status = swclt_conn_submit_request(sess->conn, &cmd, NULL);
+	ks_rwl_read_unlock(sess->rwlock);
 
 done:
 	swclt_cmd_destroy(&cmd);
@@ -1049,7 +1079,9 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
 	}
 
 	/* Now submit the command */
+	ks_rwl_read_lock(sess->rwlock);
 	status = swclt_conn_submit_request(sess->conn, &cmd, future);
+	ks_rwl_read_unlock(sess->rwlock);
 
 done:
 	swclt_cmd_destroy(&cmd);
@@ -1109,8 +1141,9 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
 	}
 
 	/* Now submit the command */
-	if (status = swclt_conn_submit_request(sess->conn, &cmd, future))
-		goto done;
+	ks_rwl_read_lock(sess->rwlock);
+	status = swclt_conn_submit_request(sess->conn, &cmd, future);
+	ks_rwl_read_unlock(sess->rwlock);
 
 done:
 	swclt_cmd_destroy(&cmd);
@@ -1188,8 +1221,9 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
 			goto done;
 	}
 
-	if (status = swclt_conn_submit_request(sess->conn, &cmd, future))
-		goto done;
+	ks_rwl_read_lock(sess->rwlock);
+	status = swclt_conn_submit_request(sess->conn, &cmd, future);
+	ks_rwl_read_unlock(sess->rwlock);
 
 done:
 	swclt_cmd_destroy(&cmd);
@@ -1238,8 +1272,9 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
 			goto done;
 	}
 
-	if (status = swclt_conn_submit_request(sess->conn, &cmd, future))
-		goto done;
+	ks_rwl_read_lock(sess->rwlock);
+	status = swclt_conn_submit_request(sess->conn, &cmd, future);
+	ks_rwl_read_unlock(sess->rwlock);
 
 done:
 	swclt_cmd_destroy(&cmd);
@@ -1291,8 +1326,9 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
 			goto done;
 	}
 
-	if (status = swclt_conn_submit_request(sess->conn, &cmd, future))
-		goto done;
+	ks_rwl_read_lock(sess->rwlock);
+	status = swclt_conn_submit_request(sess->conn, &cmd, future);
+	ks_rwl_read_unlock(sess->rwlock);
 
 done:
 	swclt_cmd_destroy(&cmd);
@@ -1344,8 +1380,9 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add_async(
 			goto done;
 	}
 
-	if (status = swclt_conn_submit_request(sess->conn, &cmd, future))
-		goto done;
+	ks_rwl_read_lock(sess->rwlock);
+	status = swclt_conn_submit_request(sess->conn, &cmd, future);
+	ks_rwl_read_unlock(sess->rwlock);
 
 done:
 	swclt_cmd_destroy(&cmd);
@@ -1407,7 +1444,9 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 			goto done;
 	}
 
+	ks_rwl_read_lock(sess->rwlock);
 	status = swclt_conn_submit_request(sess->conn, &cmd, future);
+	ks_rwl_read_unlock(sess->rwlock);
 
 done:
 	swclt_cmd_destroy(&cmd);

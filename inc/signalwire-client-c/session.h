@@ -110,7 +110,7 @@ struct swclt_sess {
 	ks_cond_t *monitor_cond;
 	ks_thread_t *monitor_thread;
 
-	ks_mutex_t *lock;
+	ks_rwl_t *rwlock;
 };
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_create(

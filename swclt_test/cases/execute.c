@@ -44,14 +44,18 @@ static void __on_session_state_provider(swclt_sess_t *sess, void *condV)
 	}
 
 	/* Notify the waiting test of the state change */
+	ks_cond_lock(cond);
 	ks_cond_broadcast(cond);
+	ks_cond_unlock(cond);
 }
 
 static void __on_session_state(swclt_sess_t *sess, void *condV)
 {
 	/* Notify the waiting test of the state change */
 	ks_cond_t *cond = (ks_cond_t *)condV;
+	ks_cond_lock(cond);
 	ks_cond_broadcast(cond);
+	ks_cond_unlock(cond);
 }
 
 static ks_status_t __on_incoming_test_execute_rqu(swclt_sess_t *sess, swclt_cmd_t *cmd, const blade_execute_rqu_t *rqu, void *data)
@@ -103,8 +107,14 @@ void test_execute(ks_pool_t *pool)
 	REQUIRE(!swclt_sess_connect(sess1));
 	REQUIRE(!swclt_sess_connect(sess2));
 
-	ks_cond_wait(cond);
-	ks_cond_wait(cond);
+	int i = 15;
+	while (i-- > 0 && (!swclt_sess_connected(sess1) || !swclt_sess_connected(sess2))) {
+		ks_cond_timedwait(cond, 1000);
+	}
+	REQUIRE(swclt_sess_connected(sess1));
+	REQUIRE(swclt_sess_connected(sess2));
+
+	ks_cond_unlock(cond);
 
 	/* Load our nodeids for both */
 	REQUIRE(!swclt_sess_info(sess1, pool, NULL, &nodeid1, NULL));

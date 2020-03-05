@@ -230,7 +230,7 @@ static void *__reader(ks_thread_t *thread, void *data)
 
 static ks_status_t __start_reader(swclt_wss_t *ctx)
 {
-	return ks_thread_create_tag(&ctx->reader_thread, __reader, ctx, ctx->pool, "SWClient WSS Reader");
+	return ks_thread_create_tag(&ctx->reader_thread, __reader, ctx, ctx->pool, "swclt-wss-reader");
 }
 
 
@@ -285,8 +285,14 @@ static ks_status_t __connect_socket(swclt_wss_t *ctx)
 
 done:
 	if (status) {
+		if (ctx->reader_thread) {
+			ks_thread_request_stop(ctx->reader_thread);
+		}
 		ks_socket_close(&ctx->socket);
-		ks_thread_destroy(&ctx->reader_thread);
+		if (ctx->reader_thread) {
+			ks_thread_join(ctx->reader_thread);
+			ks_thread_destroy(&ctx->reader_thread);
+		}
 		kws_destroy(&ctx->wss);
 	}
 
@@ -296,19 +302,30 @@ done:
 SWCLT_DECLARE(void) swclt_wss_destroy(swclt_wss_t **wss)
 {
 	if (wss && *wss) {
+		ks_pool_t *pool = (*wss)->pool;
 		ks_log(KS_LOG_INFO, "Shutting down websocket");
-		ks_thread_destroy(&(*wss)->reader_thread);
-		ks_thread_destroy(&(*wss)->reader_thread);
-		ks_mutex_destroy(&(*wss)->write_mutex);
-		ks_mutex_destroy(&(*wss)->read_mutex);
+		if ((*wss)->reader_thread) {
+			ks_thread_request_stop((*wss)->reader_thread);
+		}
+		ks_socket_close(&(*wss)->socket);
+		if ((*wss)->reader_thread) {
+			ks_thread_join((*wss)->reader_thread);
+			ks_thread_destroy(&(*wss)->reader_thread);
+		}
+		if ((*wss)->write_mutex) {
+			ks_mutex_destroy(&(*wss)->write_mutex);
+		}
+		if (&(*wss)->read_mutex) {
+			ks_mutex_destroy(&(*wss)->read_mutex);
+		}
 		ks_pool_free(&(*wss)->read_frame);
 		kws_destroy(&(*wss)->wss);
 		ks_pool_free(wss);
+		ks_pool_close(&pool);
 	}
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
-	ks_pool_t *pool,
 	swclt_wss_t **wss,
 	swclt_wss_incoming_frame_cb_t incoming_frame_cb,
 	void *incoming_frame_cb_data,
@@ -321,6 +338,8 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	const SSL_CTX *ssl)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
+	ks_pool_t *pool = NULL;
+	ks_pool_open(&pool);
 	swclt_wss_t *new_wss = ks_pool_alloc(pool, sizeof(swclt_wss_t));
 	new_wss->pool = pool;
 
