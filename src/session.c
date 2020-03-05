@@ -478,11 +478,7 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 	ks_log(KS_LOG_INFO, "Session is performing connect");
 
 	/* Delete the previous connection if present */
-	ks_rwl_write_lock(sess->rwlock);
-	if (sess->conn) {
-		sess->conn = NULL;
-	}
-	ks_rwl_write_unlock(sess->rwlock);
+	__do_disconnect(sess);
 
 	/* Re-allocate a new ssl context */
 	if (status = __setup_ssl(sess)) {
