@@ -399,32 +399,41 @@ static ks_status_t on_incoming_request(swclt_conn_t *ctx, ks_json_t *payload, sw
 	return KS_STATUS_SUCCESS;
 }
 
-static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, swclt_conn_t *ctx)
+typedef struct incoming_frame_job {
+	swclt_conn_t *ctx;
+	swclt_frame_t *frame;
+} incoming_frame_job_t;
+
+static void *on_incoming_frame_job(ks_thread_t *thread, void *data)
 {
+	incoming_frame_job_t *job = (incoming_frame_job_t *)data;
 	ks_json_t *payload = NULL;
 	ks_status_t status = KS_STATUS_SUCCESS;
 	ks_uuid_t id;
 	swclt_cmd_t *cmd = NULL;
+	swclt_frame_t *frame = job->frame;
+	swclt_conn_t *ctx = job->ctx;
 
-	ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", (*frame)->data);
+	free(job);
+
+	ks_log(KS_LOG_DEBUG, "Handling incoming frame: %s", frame->data);
 
 	/* Parse the json out of the frame to figure out what it is */
-	if (status = swclt_frame_to_json(*frame, &payload)) {
+	if (swclt_frame_to_json(frame, &payload) != KS_STATUS_SUCCESS) {
 		ks_log(KS_LOG_ERROR, "Failed to get frame json: %lu", status);
 		goto done;
 	}
 
 	/* If it's a request, we need to raise this directly with the callback */
 	if (ks_json_get_object_item(payload, "params")) {
-		status = on_incoming_request(ctx, payload, frame);
+		on_incoming_request(ctx, payload, &frame);
 		goto done;
 	}
 
 	/* Must be a reply, look up our outstanding request */
 	id = ks_uuid_from_str(ks_json_get_object_string(payload, "id", ""));
 	if (ks_uuid_is_null(&id)) {
-		ks_log(KS_LOG_WARNING, "Received invalid payload, missing id: %s", (*frame)->data);
-		status = KS_STATUS_INVALID_ARGUMENT;
+		ks_log(KS_LOG_WARNING, "Received invalid payload, missing id: %s", frame->data);
 		goto done;
 	}
 
@@ -432,21 +441,19 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 		/* Command probably timed out or we don't care about the reply, or a node sent bad data - 
 		   this is completely fine and should not cause us to tear down the connection.
 		 */
-		ks_log(KS_LOG_DEBUG, "Could not locate cmd for frame: %s", (*frame)->data);
-		status = KS_STATUS_SUCCESS;
+		ks_log(KS_LOG_DEBUG, "Could not locate cmd for frame: %s", frame->data);
 		goto done;
 	}
 
 	/* Great, feed it the reply */
-	if (status = swclt_cmd_parse_reply_frame(cmd, *frame)) {
+	if (status = swclt_cmd_parse_reply_frame(cmd, frame)) {
 		ks_log(KS_LOG_ERROR, "Failed to parse command reply: %lu", status);
-		status = KS_STATUS_SUCCESS; // keep the connection ONLINE
 		goto done;
 	}
 
 done:
 
-	ks_pool_free(frame);
+	ks_pool_free(&frame);
 
 	if (payload) {
 		ks_json_delete(&payload);
@@ -459,11 +466,20 @@ done:
 		swclt_cmd_destroy(&cmd);
 	}
 
-	if (status == KS_STATUS_INVALID_ARGUMENT) {
-		status = KS_STATUS_SUCCESS; // keep the connection ONLINE
-	}
+	return NULL;
+}
 
-	return status;
+static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, swclt_conn_t *ctx)
+{
+	if (frame && *frame) {
+		incoming_frame_job_t *job = malloc(sizeof(incoming_frame_job_t));
+		job->ctx = ctx;
+		job->frame = *frame;
+		*frame = NULL; // take ownership of frame
+		ks_thread_pool_add_job(ctx->incoming_frame_pool, on_incoming_frame_job, job);
+		return KS_STATUS_SUCCESS;
+	}
+	return KS_STATUS_FAIL;
 }
 
 SWCLT_DECLARE(char *) swclt_conn_describe(swclt_conn_t *ctx)
@@ -592,6 +608,9 @@ SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn)
 		}
 		ttl_tracker_destroy(&(*conn)->ttl);
 		swclt_wss_destroy(&(*conn)->wss);
+		if ((*conn)->incoming_frame_pool) {
+			ks_thread_pool_destroy(&(*conn)->incoming_frame_pool);
+		}
 		ks_hash_destroy(&(*conn)->outstanding_requests);
 		ks_mutex_destroy(&(*conn)->failed_mutex);
 		ks_pool_free(conn);
@@ -643,6 +662,11 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 		goto done;
 
 	ks_mutex_create(&new_conn->failed_mutex, KS_MUTEX_FLAG_DEFAULT, new_conn->pool);
+
+	/* create thread pool to process incoming frames from websocket */
+	if (status = ks_thread_pool_create(&new_conn->incoming_frame_pool, 1, 64, KS_THREAD_DEFAULT_STACK,
+		KS_PRI_NORMAL, 30))
+		goto done;
 
 	/* Connect our websocket */
 	if (status = connect_wss(new_conn, previous_sessionid, authentication, agent, identity))
