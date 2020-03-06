@@ -82,9 +82,9 @@ static ks_status_t __read_frame(swclt_wss_t *ctx, swclt_frame_t **frameP, kws_op
 	ks_ssize_t len;
 	ks_status_t status;
 
-	/* Allocate a new frame if needed */
+	/* Allocate a new frame off the global pool if needed */
 	if (!*frameP) {
-		if (status = swclt_frame_alloc(&frame, ctx->pool)) {
+		if (status = swclt_frame_alloc(&frame, NULL)) {
 			return status;
 		}
 	} else {
@@ -182,13 +182,10 @@ static ks_status_t __reader_loop(swclt_wss_t *ctx)
 				// Notify the consumer there is a new frame
 				if (status = ctx->incoming_frame_cb(ctx, &ctx->read_frame, ctx->incoming_frame_cb_data)) {
 					ks_log(KS_LOG_WARNING, "Callback from incoming frame returned: %d, exiting", status);
-					// Done with the frame, callback is responsible for freeing it
-					ctx->read_frame = NULL;
+					ks_pool_free(&ctx->read_frame);
 					return status;
 				}
-
-				// Done with the frame, callback is responsible for freeing it
-				ctx->read_frame = NULL;
+				ks_pool_free(&ctx->read_frame);
 				break;
 			}
 		} else {

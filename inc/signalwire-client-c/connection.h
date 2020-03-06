@@ -85,6 +85,9 @@ struct swclt_conn {
 
 	/* TTLs to expire */
 	swclt_ttl_tracker_t *ttl;
+
+	/* pool to process incoming websocket frames */
+	ks_thread_pool_t *incoming_frame_pool;
 };
 
 SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn);
