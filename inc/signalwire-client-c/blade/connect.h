@@ -43,6 +43,7 @@ typedef struct blade_connect_rqu_s {
 	ks_json_t *authentication;
 	const char *agent;
 	const char *identity;
+	ks_json_t *network;
 } blade_connect_rqu_t;
 
 SWCLT_JSON_MARSHAL_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
@@ -51,6 +52,7 @@ SWCLT_JSON_MARSHAL_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
 	SWCLT_JSON_MARSHAL_ITEM_OPT(authentication)
 	SWCLT_JSON_MARSHAL_STRING_OPT(agent)
 	SWCLT_JSON_MARSHAL_STRING_OPT(identity)
+	SWCLT_JSON_MARSHAL_ITEM_OPT(network)
 SWCLT_JSON_MARSHAL_END()
 
 SWCLT_JSON_DESTROY_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
@@ -58,6 +60,7 @@ SWCLT_JSON_DESTROY_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
 	SWCLT_JSON_DESTROY_UUID(sessionid)
 	SWCLT_JSON_DESTROY_STRING(agent)
 	SWCLT_JSON_DESTROY_STRING(identity)
+	SWCLT_JSON_DESTROY_ITEM(network)
 SWCLT_JSON_DESTROY_END()
 
 SWCLT_JSON_ALLOC_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
@@ -70,6 +73,7 @@ SWCLT_JSON_PARSE_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
 	SWCLT_JSON_PARSE_ITEM_OPT(authentication)
 	SWCLT_JSON_PARSE_STRING_OPT(agent)
 	SWCLT_JSON_PARSE_STRING_OPT(identity)
+	SWCLT_JSON_PARSE_ITEM_OPT(network)
 SWCLT_JSON_PARSE_END()
 
 /* Define our reply structure */
@@ -135,6 +139,7 @@ static inline swclt_cmd_t *CREATE_BLADE_CONNECT_CMD_ASYNC(
 	ks_json_t **authentication,
 	const char *agent,
 	const char *identity,
+	ks_json_t *network,
 	swclt_cmd_cb_t cb,
 	void *cb_data)
 {
@@ -148,6 +153,7 @@ static inline swclt_cmd_t *CREATE_BLADE_CONNECT_CMD_ASYNC(
 	connect_rqu->sessionid = previous_sessionid;
 	connect_rqu->agent = agent;
 	connect_rqu->identity = identity;
+	connect_rqu->network = ks_json_duplicate(network, KS_TRUE);
 	if (authentication && *authentication) {
 		connect_rqu->authentication = *authentication;
 		*authentication = NULL;
@@ -182,7 +188,8 @@ static inline swclt_cmd_t *CREATE_BLADE_CONNECT_CMD(ks_pool_t *pool,
 												   ks_uuid_t previous_sessionid,
 												   ks_json_t **authentication,
 												   const char *agent,
-												   const char *identity)
+												   const char *identity,
+												   ks_json_t *network)
 {
-	return CREATE_BLADE_CONNECT_CMD_ASYNC(pool, previous_sessionid, authentication, agent, identity, NULL, NULL);
+	return CREATE_BLADE_CONNECT_CMD_ASYNC(pool, previous_sessionid, authentication, agent, identity, network, NULL, NULL);
 }

@@ -31,6 +31,7 @@ typedef struct swclt_config_s {
 	const char *authentication;
 	const char *agent;
 	const char *identity;
+	ks_json_t *network;
 } swclt_config_t;
 
 KS_END_EXTERN_C
