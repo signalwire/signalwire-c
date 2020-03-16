@@ -285,7 +285,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 		ks_pool_free(&key);
 
 		if (!sub) {
-			ks_log(KS_LOG_ERROR, "Could not locate sub for protocol: %s channel: %s command: %s",
+			ks_log(KS_LOG_WARNING, "Could not locate sub for protocol: %s channel: %s command: %s",
 				rqu->protocol, rqu->channel, cmd_str);
 			BLADE_BROADCAST_RQU_DESTROY(&rqu);
 			status = KS_STATUS_NOT_FOUND;
