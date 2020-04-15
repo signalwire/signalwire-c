@@ -23,7 +23,7 @@
 
 #define SWCLT_BLADE_VERSION_MAJOR		2
 #define SWCLT_BLADE_VERSION_MINOR		4
-#define SWCLT_BLADE_VERSION_REVISION	0
+#define SWCLT_BLADE_VERSION_REVISION	1
 
 /* Define the default time to live amount for all blade commands */
 #define BLADE_DEFAULT_CMD_TTL_MS		5000

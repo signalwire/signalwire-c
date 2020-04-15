@@ -46,4 +46,22 @@ SWCLT_DECLARE(ks_status_t) swclt_config_set_agent(swclt_config_t *config, const 
 SWCLT_DECLARE(const char *) swclt_config_get_identity(swclt_config_t *config);
 SWCLT_DECLARE(ks_status_t) swclt_config_set_identity(swclt_config_t *config, const char *value);
 
+SWCLT_DECLARE(ks_status_t) swclt_config_set_default_network(swclt_config_t *config, ks_bool_t allData);
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_route_data(swclt_config_t *config);
+SWCLT_DECLARE(void) swclt_config_set_network_route_data(swclt_config_t *config, ks_bool_t value);
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_route_add(swclt_config_t *config);
+SWCLT_DECLARE(void) swclt_config_set_network_route_add(swclt_config_t *config, ks_bool_t value);
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_route_remove(swclt_config_t *config);
+SWCLT_DECLARE(void) swclt_config_set_network_route_remove(swclt_config_t *config, ks_bool_t value);
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_authority_data(swclt_config_t *config);
+SWCLT_DECLARE(void) swclt_config_set_network_authority_data(swclt_config_t *config, ks_bool_t value);
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_authority_add(swclt_config_t *config);
+SWCLT_DECLARE(void) swclt_config_set_network_authority_add(swclt_config_t *config, ks_bool_t value);
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_authority_remove(swclt_config_t *config);
+SWCLT_DECLARE(void) swclt_config_set_network_authority_remove(swclt_config_t *config, ks_bool_t value);
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_filtered_protocols(swclt_config_t *config);
+SWCLT_DECLARE(void) swclt_config_set_network_filtered_protocols(swclt_config_t *config, ks_bool_t value);
+SWCLT_DECLARE(void) swclt_config_add_network_protocol(swclt_config_t *config, const char *value);
+SWCLT_DECLARE(void) swclt_config_remove_network_protocol(swclt_config_t *config, const char *value);
+
 KS_END_EXTERN_C

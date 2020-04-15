@@ -99,6 +99,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 	ks_json_t **authentication,
 	const char *agent,
 	const char *identity,
+	ks_json_t *network,
 	const SSL_CTX *ssl);
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
@@ -114,6 +115,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	ks_json_t **authentication,
 	const char *agent,
 	const char *identity,
+	ks_json_t *network,
 	const SSL_CTX *ssl);
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t **cmd, swclt_cmd_future_t **future);

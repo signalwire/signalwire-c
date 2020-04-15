@@ -45,6 +45,8 @@ SWCLT_DECLARE(ks_status_t) swclt_config_destroy(swclt_config_t **config)
 	ks_assert(config);
 	ks_assert(*config);
 
+	if ((*config)->network) ks_json_delete(&(*config)->network);
+
 	pool = ks_pool_get(*config);
 	ks_pool_close(&pool);
 
@@ -53,10 +55,25 @@ SWCLT_DECLARE(ks_status_t) swclt_config_destroy(swclt_config_t **config)
 	return ret;
 }
 
+SWCLT_DECLARE(ks_status_t) swclt_config_set_default_network(swclt_config_t *config, ks_bool_t allData)
+{
+	if (config->network) ks_json_delete(&config->network);
+	config->network = ks_json_create_object();
+	ks_json_add_bool_to_object(config->network, "route_data", allData);
+	ks_json_add_bool_to_object(config->network, "route_add", allData);
+	ks_json_add_bool_to_object(config->network, "route_remove", allData);
+	ks_json_add_bool_to_object(config->network, "authority_data", allData);
+	ks_json_add_bool_to_object(config->network, "authority_add", allData);
+	ks_json_add_bool_to_object(config->network, "authority_remove", allData);
+	ks_json_add_bool_to_object(config->network, "filtered_protocols", !allData);
+	ks_json_add_array_to_object(config->network, "protocols");
+}
+
 SWCLT_DECLARE(ks_status_t) swclt_config_load_from_json(swclt_config_t *config, ks_json_t *json)
 {
 	ks_status_t ret = KS_STATUS_SUCCESS;
 	const char *val = NULL;
+	ks_json_t *network = NULL;
 
 	if ((val = ks_json_get_object_string(json, "private_key_path", NULL))) {
 		swclt_config_set_private_key_path(config, val);
@@ -82,6 +99,14 @@ SWCLT_DECLARE(ks_status_t) swclt_config_load_from_json(swclt_config_t *config, k
 		swclt_config_set_identity(config, val);
 	}
 	
+	if ((network = ks_json_get_object_item(json, "network"))) {
+		if (config->network) ks_json_delete(&config->network);
+		config->network = ks_json_duplicate(network, KS_TRUE);
+		if (ks_json_get_object_item(config->network, "protocols") == NULL) ks_json_add_array_to_object(config->network, "protocols");
+	} else {
+		swclt_config_set_default_network(config, KS_TRUE);
+	}
+	
 	return ret;
 }
 
@@ -89,6 +114,8 @@ SWCLT_DECLARE(ks_status_t) swclt_config_load_from_env(swclt_config_t *config)
 {
 	ks_status_t ret = KS_STATUS_SUCCESS;
 	const char *val = NULL;
+	char protocolKey[256];
+	int protocolCount = 0;
 
 	if ((val = getenv("SW_PRIVATE_KEY_PATH"))) {
 		swclt_config_set_private_key_path(config, val);
@@ -114,6 +141,51 @@ SWCLT_DECLARE(ks_status_t) swclt_config_load_from_env(swclt_config_t *config)
 		swclt_config_set_identity(config, val);
 	}
 
+	if ((val = getenv("SW_NETWORK_ROUTE_DATA"))) {
+		swclt_config_set_network_route_data(config, val[0] == '1' || val[0] == 't' || val[0] == 'T');
+	}
+
+	if ((val = getenv("SW_NETWORK_ROUTE_ADD"))) {
+		swclt_config_set_network_route_add(config, val[0] == '1' || val[0] == 't' || val[0] == 'T');
+	}
+
+	if ((val = getenv("SW_NETWORK_ROUTE_REMOVE"))) {
+		swclt_config_set_network_route_remove(config, val[0] == '1' || val[0] == 't' || val[0] == 'T');
+	}
+
+	if ((val = getenv("SW_NETWORK_AUTHORITY_DATA"))) {
+		swclt_config_set_network_authority_data(config, val[0] == '1' || val[0] == 't' || val[0] == 'T');
+	}
+
+	if ((val = getenv("SW_NETWORK_AUTHORITY_ADD"))) {
+		swclt_config_set_network_authority_add(config, val[0] == '1' || val[0] == 't' || val[0] == 'T');
+	}
+
+	if ((val = getenv("SW_NETWORK_AUTHORITY_REMOVE"))) {
+		swclt_config_set_network_authority_remove(config, val[0] == '1' || val[0] == 't' || val[0] == 'T');
+	}
+
+	if ((val = getenv("SW_NETWORK_FILTERED_PROTOCOLS"))) {
+		swclt_config_set_network_filtered_protocols(config, val[0] == '1' || val[0] == 't' || val[0] == 'T');
+	}
+
+	if (!config->network) {
+		swclt_config_set_default_network(config, KS_TRUE);
+	} else {
+		ks_json_t *protocols = NULL;
+		while (1) {
+			ks_snprintf(protocolKey, sizeof(protocolKey), "SW_NETWORK_PROTOCOL_%d", protocolCount);
+			++protocolCount;
+			if (!(val = getenv(protocolKey)) || !val[0]) break;
+			if (!protocols) {
+				protocols = ks_json_get_object_item(config->network, "protocols");
+				if (!protocols) protocols = ks_json_add_array_to_object(config->network, "protocols");
+			}
+			ks_json_add_string_to_array(protocols, val);
+		}
+	}
+
+	
 	return ret;
 }
 
@@ -218,5 +290,136 @@ SWCLT_DECLARE(ks_status_t) swclt_config_set_identity(swclt_config_t *config, con
 	if (value) config->identity = ks_pstrdup(ks_pool_get(config), value);
 
 	return KS_STATUS_SUCCESS;
+}
+
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_route_data(swclt_config_t *config)
+{
+	ks_assert(config);
+
+	return ks_json_get_object_bool(config->network, "route_data", KS_FALSE);
+}
+
+SWCLT_DECLARE(void) swclt_config_set_network_route_data(swclt_config_t *config, ks_bool_t value)
+{
+	ks_assert(config);
+
+	ks_json_add_bool_to_object(config->network, "route_data", value);
+}
+
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_route_add(swclt_config_t *config)
+{
+	ks_assert(config);
+
+	return ks_json_get_object_bool(config->network, "route_add", KS_FALSE);
+}
+
+SWCLT_DECLARE(void) swclt_config_set_network_route_add(swclt_config_t *config, ks_bool_t value)
+{
+	ks_assert(config);
+
+	ks_json_add_bool_to_object(config->network, "route_add", value);
+}
+
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_route_remove(swclt_config_t *config)
+{
+	ks_assert(config);
+
+	return ks_json_get_object_bool(config->network, "route_remove", KS_FALSE);
+}
+
+SWCLT_DECLARE(void) swclt_config_set_network_route_remove(swclt_config_t *config, ks_bool_t value)
+{
+	ks_assert(config);
+
+	ks_json_add_bool_to_object(config->network, "route_remove", value);
+}
+
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_authority_data(swclt_config_t *config)
+{
+	ks_assert(config);
+
+	return ks_json_get_object_bool(config->network, "authority_data", KS_FALSE);
+}
+
+SWCLT_DECLARE(void) swclt_config_set_network_authority_data(swclt_config_t *config, ks_bool_t value)
+{
+	ks_assert(config);
+
+	ks_json_add_bool_to_object(config->network, "authority_data", value);
+}
+
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_authority_add(swclt_config_t *config)
+{
+	ks_assert(config);
+
+	return ks_json_get_object_bool(config->network, "authority_add", KS_FALSE);
+}
+
+SWCLT_DECLARE(void) swclt_config_set_network_authority_add(swclt_config_t *config, ks_bool_t value)
+{
+	ks_assert(config);
+
+	ks_json_add_bool_to_object(config->network, "authority_add", value);
+}
+
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_authority_remove(swclt_config_t *config)
+{
+	ks_assert(config);
+
+	return ks_json_get_object_bool(config->network, "authority_remove", KS_FALSE);
+}
+
+SWCLT_DECLARE(void) swclt_config_set_network_authority_remove(swclt_config_t *config, ks_bool_t value)
+{
+	ks_assert(config);
+
+	ks_json_add_bool_to_object(config->network, "authority_remove", value);
+}
+
+SWCLT_DECLARE(ks_bool_t) swclt_config_get_network_filtered_protocols(swclt_config_t *config)
+{
+	ks_assert(config);
+
+	return ks_json_get_object_bool(config->network, "filtered_protocols", KS_FALSE);
+}
+
+SWCLT_DECLARE(void) swclt_config_set_network_filtered_protocols(swclt_config_t *config, ks_bool_t value)
+{
+	ks_assert(config);
+
+	ks_json_add_bool_to_object(config->network, "filtered_protocols", value);
+}
+
+SWCLT_DECLARE(void) swclt_config_add_network_protocol(swclt_config_t *config, const char *value)
+{
+	ks_json_t *protocols = NULL;
+	ks_assert(config);
+
+	if (!(protocols = ks_json_get_object_item(config->network, "protocols"))) {
+		protocols = ks_json_add_array_to_object(config->network, "protocols");
+	}
+
+	for (int index = 0; index < ks_json_get_array_size(protocols); ++index) {
+		if (!strcmp(ks_json_get_array_string(protocols, index, NULL), value)) return;
+	}
+
+	ks_json_add_string_to_array(protocols, value);
+}
+
+SWCLT_DECLARE(void) swclt_config_remove_network_protocol(swclt_config_t *config, const char *value)
+{
+	ks_json_t *protocols = NULL;
+	ks_assert(config);
+
+	if (!(protocols = ks_json_get_object_item(config->network, "protocols"))) {
+		protocols = ks_json_add_array_to_object(config->network, "protocols");
+	}
+
+	for (int index = 0; index < ks_json_get_array_size(protocols); ++index) {
+		if (!strcmp(ks_json_get_array_string(protocols, index, NULL), value)) {
+			ks_json_delete_item_from_array(protocols, index);
+			return;
+		}
+	}
 }
 
