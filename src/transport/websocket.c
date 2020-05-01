@@ -410,6 +410,9 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_write(swclt_wss_t *wss, char *data)
 		ks_log(KS_LOG_WARNING, "Short write to websocket.  wrote = %ul, len = %ul", wrote, len);
 		status = KS_STATUS_FAIL;
 		wss->failed = 1;
+		if (wss->failed_cb) {
+			wss->failed_cb(wss, wss->failed_cb_data);
+		}
 	} else {
 		ks_log(KS_LOG_DEBUG, "Wrote frame: %s", data);
 		status = KS_STATUS_SUCCESS;
