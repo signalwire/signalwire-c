@@ -392,7 +392,8 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_get_info(swclt_wss_t *wss, swclt_wss_info_t
 
 SWCLT_DECLARE(ks_status_t) swclt_wss_write(swclt_wss_t *wss, char *data)
 {
-	ks_size_t len, wrote;
+	ks_size_t len;
+	ks_ssize_t wrote;
 	ks_status_t status;
 
 	/* Ensure we have valid state */
@@ -406,10 +407,13 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_write(swclt_wss_t *wss, char *data)
 	wrote = kws_write_frame(wss->wss, WSOC_TEXT, data, len);
 	ks_mutex_unlock(wss->write_mutex);
 
-	if (len != wrote) {
-		ks_log(KS_LOG_WARNING, "Short write to websocket.  wrote = %ul, len = %ul", wrote, len);
+	if (wrote < 0 || len != (ks_size_t)wrote) {
+		ks_log(KS_LOG_WARNING, "Short write to websocket.  wrote = %d, len = %u", wrote, len);
 		status = KS_STATUS_FAIL;
 		wss->failed = 1;
+		if (wss->failed_cb) {
+			wss->failed_cb(wss, wss->failed_cb_data);
+		}
 	} else {
 		ks_log(KS_LOG_DEBUG, "Wrote frame: %s", data);
 		status = KS_STATUS_SUCCESS;
