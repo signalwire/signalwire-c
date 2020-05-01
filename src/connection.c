@@ -240,7 +240,7 @@ static void report_connection_failure(swclt_conn_t *conn)
 
 static ks_status_t register_cmd(swclt_conn_t *ctx, swclt_cmd_t **cmdP)
 {
-	ks_status_t status;
+	ks_status_t status = KS_STATUS_FAIL;
 	swclt_cmd_t *cmd = *cmdP;
 
 	ks_log(KS_LOG_DEBUG, "Tracking command with id: %s and TTL: %d", ks_uuid_thr_str(&cmd->id), cmd->response_ttl_ms);
@@ -324,6 +324,7 @@ static ks_status_t submit_request(swclt_conn_t *ctx, swclt_cmd_t **cmdP, swclt_c
 			if (status = swclt_cmd_future_create(cmd_future, cmd)) {
 				ks_log(KS_LOG_CRIT, "Failed to create command cmd_future");
 				swclt_cmd_destroy(&cmd);
+				ks_pool_free(&data);
 				return KS_STATUS_FAIL;
 			}
 		}
@@ -332,6 +333,7 @@ static ks_status_t submit_request(swclt_conn_t *ctx, swclt_cmd_t **cmdP, swclt_c
 			ks_log(KS_LOG_WARNING, "Failed to register cmd: %lu", status);
 			swclt_cmd_future_destroy(cmd_future);
 			swclt_cmd_destroy(&cmd);
+			ks_pool_free(&data);
 			return status;
 		}
 	}
