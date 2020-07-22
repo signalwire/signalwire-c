@@ -25,6 +25,11 @@ set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH "0")
 
+# Configure the version header file 
+configure_file (
+  "${CMAKE_CURRENT_LIST_DIR}/inc/signalwire-client-c/version.h.in"
+  "${CMAKE_CURRENT_LIST_DIR}/inc/signalwire-client-c/version.h"  )
+
 include(cmake/FindLibKS.cmake)
 include(${LIBKS_CMAKE_DIR}/ksutil.cmake)
 ksutil_setup_platform()

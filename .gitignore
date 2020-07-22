@@ -24,3 +24,4 @@ CPackConfig.cmake
 CPackSourceConfig.cmake
 changelog.Debian.gz
 libsignalwire_client.so.1
+inc/signalwire-client-c/version.h
