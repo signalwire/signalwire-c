@@ -27,7 +27,6 @@ DECLARE_TEST(execute);
 DECLARE_TEST(connection);
 DECLARE_TEST(session);
 DECLARE_TEST(nodestore);
-DECLARE_TEST(callback);
 DECLARE_TEST(uncert_exp);
 
 test_entry_t g_test_methods[] = {
@@ -37,7 +36,6 @@ test_entry_t g_test_methods[] = {
 	TEST_ENTRY(connection),
 	TEST_ENTRY(session),
 	TEST_ENTRY(nodestore),
-	TEST_ENTRY(callback),
 	TEST_ENTRY(uncert_exp),
 };
 

@@ -115,6 +115,15 @@ static ks_status_t ttl_heap_insert(swclt_ttl_tracker_t *ttl, ks_time_t expiry, k
 	return KS_STATUS_SUCCESS;
 }
 
+static int ttl_tracker_size(swclt_ttl_tracker_t *ttl)
+{
+	int count;
+	ks_cond_lock(ttl->cond);
+	count = ttl->count;
+	ks_cond_unlock(ttl->cond);
+	return count;
+}
+
 static ks_status_t ttl_tracker_watch(swclt_ttl_tracker_t *ttl, ks_time_t expiry, ks_uuid_t id)
 {
 	ks_cond_lock(ttl->cond);
@@ -471,6 +480,38 @@ done:
 	return NULL;
 }
 
+static void check_connection_stats(swclt_wss_t *wss, swclt_conn_t *ctx)
+{
+	ks_time_t now = ks_time_now() / 1000;
+	if (now > ctx->last_stats_update + 10000) {
+		swclt_wss_stats_t wss_stats = { 0 };
+		swclt_wss_get_stats(wss, &wss_stats);
+		if (ctx->last_stats_update > 0) {
+			int64_t read_frames_delta = wss_stats.read_frames - ctx->last_stats.read_frames;
+			int64_t write_frames_delta = wss_stats.write_frames - ctx->last_stats.write_frames;
+			double elapsed_sec = (double)(now - ctx->last_stats_update) / 1000.0;
+			double read_frames_per_sec = elapsed_sec > 0.0 ? (double)read_frames_delta / elapsed_sec : 0.0;
+			double write_frames_per_sec = elapsed_sec > 0.0 ? (double)write_frames_delta / elapsed_sec : 0.0;
+			ks_log(KS_LOG_INFO,
+				"LOG_FIELDS["
+				"@#sw_conn_read_frames=%ld,"
+				"@#sw_conn_read_frames_per_sec=%f,"
+				"@#sw_conn_write_frames=%ld,"
+				"@#sw_conn_write_frames_per_sec=%f,"
+				"@#sw_conn_ttl_heap_size=%d,"
+				"@#sw_conn_read_frames_queued=%d] SignalWire Client Connection Stats",
+				wss_stats.read_frames,
+				read_frames_per_sec,
+				wss_stats.write_frames,
+				write_frames_per_sec,
+				ttl_tracker_size(ctx->ttl),
+				(int)ks_thread_pool_backlog(ctx->incoming_frame_pool));
+		}
+		ctx->last_stats = wss_stats;
+		ctx->last_stats_update = now;
+	}
+}
+
 static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, swclt_conn_t *ctx)
 {
 	if (frame && *frame) {
@@ -479,6 +520,7 @@ static ks_status_t on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, sw
 		job->frame = *frame;
 		*frame = NULL; // take ownership of frame
 		ks_thread_pool_add_job(ctx->incoming_frame_pool, on_incoming_frame_job, job);
+		check_connection_stats(wss, ctx);
 		return KS_STATUS_SUCCESS;
 	}
 	return KS_STATUS_FAIL;

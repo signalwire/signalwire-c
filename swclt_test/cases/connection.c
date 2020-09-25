@@ -119,7 +119,7 @@ void test_ttl(ks_pool_t *pool)
 	/* Lock the reader so we never get a response, forcing a timeout */
 	REQUIRE(cmd->response_ttl_ms == BLADE_PROTOCOL_TTL_MS);
 	REQUIRE(cmd->flags == BLADE_PROTOCOL_FLAGS);
-	REQUIRE(!ks_mutex_lock(conn->wss->write_mutex));
+	REQUIRE(!ks_mutex_lock(conn->wss->wss_mutex));
 
 	/* And submit it */
 	REQUIRE(!swclt_conn_submit_request(conn, &cmd, NULL));
@@ -132,7 +132,7 @@ void test_ttl(ks_pool_t *pool)
 	REQUIRE(g_protocol_response_cb_called == 1);
 
 	/* Don't forget to unlock the poor websocket reader */
-	REQUIRE(!ks_mutex_unlock(conn->wss->write_mutex));
+	REQUIRE(!ks_mutex_unlock(conn->wss->wss_mutex));
 
 	swclt_cmd_destroy(&cmd);
 	swclt_conn_destroy(&conn);
