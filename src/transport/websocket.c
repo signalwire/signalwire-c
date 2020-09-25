@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,9 +30,12 @@ static ks_status_t __write_raw(swclt_wss_t *ctx, kws_opcode_t opcode, const void
 
 	ks_log(KS_LOG_DEBUG, "Writing frame of size: %lu opcode: %lu\n", len, opcode);
 
-	ks_mutex_lock(ctx->write_mutex);
+	ks_mutex_lock(ctx->wss_mutex);
 	wrote = kws_write_frame(ctx->wss, opcode, data, len);
-	ks_mutex_unlock(ctx->write_mutex);
+	if (wrote > 0) {
+		ctx->stats.write_frames++;
+	}
+	ks_mutex_unlock(ctx->wss_mutex);
 
 	if (wrote != len) {
 		ks_log(KS_LOG_WARNING, "Failed to write frame\n");
@@ -51,13 +54,17 @@ static ks_status_t __write_ping(swclt_wss_t *ctx)
 static ks_status_t __write_pong(swclt_wss_t *ctx, swclt_frame_t *frame)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
+	ks_ssize_t wrote;
 
-	ks_mutex_lock(ctx->write_mutex);
-	if (kws_write_frame(ctx->wss, WSOC_PONG, frame->data, frame->len) != frame->len) {
-		ks_log(KS_LOG_WARNING, "Failed to write frame");
+	ks_mutex_lock(ctx->wss_mutex);
+	if ((wrote = kws_write_frame(ctx->wss, WSOC_PONG, frame->data, frame->len)) != frame->len) {
+		ks_log(KS_LOG_WARNING, "Failed to write pong");
 		status = KS_STATUS_FAIL;
 	}
-	ks_mutex_unlock(ctx->write_mutex);
+	if (wrote > 0) {
+		ctx->stats.write_frames++;
+	}
+	ks_mutex_unlock(ctx->wss_mutex);
 	return status;
 }
 
@@ -94,7 +101,7 @@ static ks_status_t __read_frame(swclt_wss_t *ctx, swclt_frame_t **frameP, kws_op
 		*frameP = NULL;
 	}
 
-	ks_mutex_lock(ctx->write_mutex);
+	ks_mutex_lock(ctx->wss_mutex);
 
 	/* kws will actually retain ownership of its buffer so, we'll want to make a copy
 	 * into our frame */
@@ -105,6 +112,7 @@ static ks_status_t __read_frame(swclt_wss_t *ctx, swclt_frame_t **frameP, kws_op
 		status = KS_STATUS_NO_MEM;
 		goto done;
 	}
+	ctx->stats.read_frames++;
 
 	ks_log(KS_LOG_DEBUG, "Copying frame of length: %lu of opcode: %lu", (size_t)len, opcode);
 
@@ -114,7 +122,7 @@ static ks_status_t __read_frame(swclt_wss_t *ctx, swclt_frame_t **frameP, kws_op
 	}
 
 done:
-	ks_mutex_unlock(ctx->write_mutex);
+	ks_mutex_unlock(ctx->wss_mutex);
 
 	if (status) {
 		ks_pool_free(&frame);
@@ -309,11 +317,8 @@ SWCLT_DECLARE(void) swclt_wss_destroy(swclt_wss_t **wss)
 			ks_thread_join((*wss)->reader_thread);
 			ks_thread_destroy(&(*wss)->reader_thread);
 		}
-		if ((*wss)->write_mutex) {
-			ks_mutex_destroy(&(*wss)->write_mutex);
-		}
-		if (&(*wss)->read_mutex) {
-			ks_mutex_destroy(&(*wss)->read_mutex);
+		if ((*wss)->wss_mutex) {
+			ks_mutex_destroy(&(*wss)->wss_mutex);
 		}
 		ks_pool_free(&(*wss)->read_frame);
 		kws_destroy(&(*wss)->wss);
@@ -361,10 +366,7 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 
 	ks_log(KS_LOG_DEBUG, "Successfully resolved address");
 
-	if (status = ks_mutex_create(&new_wss->write_mutex, KS_MUTEX_FLAG_DEFAULT, new_wss->pool))
-		goto done;
-
-	if (status = ks_mutex_create(&new_wss->read_mutex, KS_MUTEX_FLAG_DEFAULT, new_wss->pool))
+	if (status = ks_mutex_create(&new_wss->wss_mutex, KS_MUTEX_FLAG_DEFAULT, new_wss->pool))
 		goto done;
 
 	for (uint32_t tryCount = 0; tryCount < 2; tryCount++) {
@@ -390,6 +392,13 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_get_info(swclt_wss_t *wss, swclt_wss_info_t
 	memcpy(info, &wss->info, sizeof(wss->info));
 }
 
+SWCLT_DECLARE(void) swclt_wss_get_stats(swclt_wss_t *ctx, swclt_wss_stats_t *stats)
+{
+	ks_mutex_lock(ctx->wss_mutex);
+	memcpy(stats, &ctx->stats, sizeof(ctx->stats));
+	ks_mutex_unlock(ctx->wss_mutex);
+}
+
 SWCLT_DECLARE(ks_status_t) swclt_wss_write(swclt_wss_t *wss, char *data)
 {
 	ks_size_t len;
@@ -403,9 +412,12 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_write(swclt_wss_t *wss, char *data)
 
 	len = strlen(data);
 
-	ks_mutex_lock(wss->write_mutex);
+	ks_mutex_lock(wss->wss_mutex);
 	wrote = kws_write_frame(wss->wss, WSOC_TEXT, data, len);
-	ks_mutex_unlock(wss->write_mutex);
+	if (wrote > 0) {
+		wss->stats.write_frames++;
+	}
+	ks_mutex_unlock(wss->wss_mutex);
 
 	if (wrote < 0 || len != (ks_size_t)wrote) {
 		ks_log(KS_LOG_WARNING, "Short write to websocket.  wrote = %d, len = %u", wrote, len);

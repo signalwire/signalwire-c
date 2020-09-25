@@ -88,6 +88,10 @@ struct swclt_conn {
 
 	/* pool to process incoming websocket frames */
 	ks_thread_pool_t *incoming_frame_pool;
+
+	/* when last stats were published */
+	ks_time_t last_stats_update;
+	swclt_wss_stats_t last_stats;
 };
 
 SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn);

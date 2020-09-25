@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -39,6 +39,11 @@ typedef struct swclt_wss_info_s {
 	SSL_CTX *ssl;					/* ssl context handed to us at first connect attempt */
 } swclt_wss_info_t;
 
+typedef struct swclt_wss_stats {
+	int64_t read_frames;
+	int64_t write_frames;
+} swclt_wss_stats_t;
+
 struct swclt_wss {
 
 	ks_pool_t *pool;
@@ -76,11 +81,8 @@ struct swclt_wss {
 	ks_status_t reader_status;
 	ks_thread_t *reader_thread;
 
-	/* To maintain state, we lock with mutexes. We have two here
-	 * the read_mutex is locked anytime someone is reading from
-	 * the websocket, and the write_mutex is locked anytime
-	 * someone is writing to the websocket */
-	ks_mutex_t *read_mutex, *write_mutex;
+	ks_mutex_t *wss_mutex;
+	swclt_wss_stats_t stats;
 };
 
 SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
@@ -100,6 +102,7 @@ SWCLT_DECLARE(void) swclt_wss_destroy(swclt_wss_t **wss);
 SWCLT_DECLARE(ks_status_t) swclt_wss_write(swclt_wss_t *wss, char *data);
 SWCLT_DECLARE(ks_status_t) swclt_wss_get_info(swclt_wss_t *wss, swclt_wss_info_t *info);
 SWCLT_DECLARE(char *) swclt_wss_describe(swclt_wss_t *ctx);
+SWCLT_DECLARE(void) swclt_wss_get_stats(swclt_wss_t *ctx, swclt_wss_stats_t *stats);
 
 KS_END_EXTERN_C
 
