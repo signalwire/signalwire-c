@@ -15,24 +15,22 @@ steps:
       - sed -i '/cotire/d' ./swclt_test/CMakeLists.txt
       - mkdir -p scan-build
       - scan-build-4.0 -o ./scan-build/ cmake .
-      - echo "#!/bin/bash\nscan-build-4.0 -o ./scan-build/ make -j`nproc --all` |& tee ./scan-build-result.txt\nexitstatus=\${PIPESTATUS[0]}\necho \$exitstatus > ./scan-build-status.txt\n" > scan.sh
+      - echo '#!/bin/bash\nscan-build-4.0 -o ./scan-build/ make -j`nproc --all` |& tee ./scan-build-result.txt\nexitstatus=$${PIPESTATUS[0]}\necho $$exitstatus > ./scan-build-status.txt\n' > scan.sh
       - chmod +x scan.sh
       - ./scan.sh
       - exitstatus=`cat ./scan-build-status.txt`
       - echo "*** Exit status is $exitstatus"
 
     - name: notify
-      image: signalwire/scan-build-notify
+      image: signalwire/drone-notify
       pull: true
       environment:
-        GITHUB_CI_APP_PEM:
-          from_secret: github_ci_app_pem
-        SSH_KEY:
-          from_secret: ssh_key
         SLACK_WEBHOOK_URL:
           from_secret: slack_webhook_url
+        ENV_FILE:
+          from_secret: notify_env
       commands:
-      - /root/notify.sh
+      - /root/scan-build-notify.sh
       
 trigger:
   branch:
@@ -44,6 +42,6 @@ trigger:
   - push
 ---
 kind: signature
-hmac: 745d50e22397b686f5ea525d4e0118588b0070209257738fde371d0962a0756a
+hmac: 088f9c09ab42cfd913a9575b9f5e835d909e7ac59cc612f93957ef7fa330c6f4
 
 ...
