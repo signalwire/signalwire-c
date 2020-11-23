@@ -117,7 +117,7 @@ static ks_status_t __read_frame(swclt_wss_t *ctx, swclt_frame_t **frameP, kws_op
 	ks_log(KS_LOG_DEBUG, "Copying frame of length: %lu of opcode: %lu", (size_t)len, opcode);
 
 	/* Stash it in the frame */
-	if (status = swclt_frame_copy_data(frame, ctx->pool, data, (size_t)len, opcode)) {
+	if (status = swclt_frame_copy_data(frame, NULL, data, (size_t)len, opcode)) {
 		goto done;
 	}
 
@@ -390,6 +390,7 @@ done:
 SWCLT_DECLARE(ks_status_t) swclt_wss_get_info(swclt_wss_t *wss, swclt_wss_info_t *info)
 {
 	memcpy(info, &wss->info, sizeof(wss->info));
+	return KS_STATUS_SUCCESS;
 }
 
 SWCLT_DECLARE(void) swclt_wss_get_stats(swclt_wss_t *ctx, swclt_wss_stats_t *stats)

@@ -49,6 +49,7 @@ static ks_status_t __copy_data(swclt_frame_t *frame, ks_pool_t *pool, void *data
 			if (!(frame->data = ks_pool_resize(frame->data, len + 1)))
 				return KS_STATUS_NO_MEM;
 		} else {
+			if (!pool) pool = ks_pool_get(frame);
 			if (!(frame->data = ks_pool_alloc(pool, len + 1)))
 				return KS_STATUS_NO_MEM;
 		}
