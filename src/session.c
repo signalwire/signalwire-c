@@ -1462,7 +1462,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t *sess, const
 	ks_status_t status = KS_STATUS_SUCCESS;
 
 	swclt_store_t *store;
-	ks_pool_t *pool = NULL;
 	ks_json_t *params = NULL;
 	swclt_cmd_reply_t *reply = NULL;
 	ks_json_t *result = NULL;
@@ -1480,8 +1479,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t *sess, const
 		status = KS_STATUS_INACTIVE;
 		goto done;
 	}
-
-	pool = sess->pool;
 
 	params = ks_json_create_object();
 	ks_json_add_string_to_object(params, "service", service);
