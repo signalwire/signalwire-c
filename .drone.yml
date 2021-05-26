@@ -4,18 +4,18 @@ name: default
 
 steps:
     - name: scan-build
-      image: debian:stretch
+      image: debian:buster
       pull: true
       commands:     
-      - apt-get update && apt-get install -yq git build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-4.0
-      - apt-get install -yq cmake uuid-dev libssl1.0-dev      
+      - apt-get update && apt-get install -yq git build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-7
+      - apt-get install -yq cmake uuid-dev libssl-dev
       - git clone https://github.com/signalwire/libks libks
       - cd libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
       - sed -i '/cotire/d' ./CMakeLists.txt
       - sed -i '/cotire/d' ./swclt_test/CMakeLists.txt
       - mkdir -p scan-build
-      - scan-build-4.0 -o ./scan-build/ cmake .
-      - echo '#!/bin/bash\nscan-build-4.0 -o ./scan-build/ make -j`nproc --all` |& tee ./scan-build-result.txt\nexitstatus=$${PIPESTATUS[0]}\necho $$exitstatus > ./scan-build-status.txt\n' > scan.sh
+      - scan-build-7 -o ./scan-build/ cmake .
+      - echo '#!/bin/bash\nscan-build-7 -o ./scan-build/ make -j`nproc --all` |& tee ./scan-build-result.txt\nexitstatus=$${PIPESTATUS[0]}\necho $$exitstatus > ./scan-build-status.txt\n' > scan.sh
       - chmod +x scan.sh
       - ./scan.sh
       - exitstatus=`cat ./scan-build-status.txt`
@@ -42,6 +42,6 @@ trigger:
   - push
 ---
 kind: signature
-hmac: 088f9c09ab42cfd913a9575b9f5e835d909e7ac59cc612f93957ef7fa330c6f4
+hmac: e77a1f7426f3f6439b5a9d2e7db230042c93b0e72e9750a57653d7d6d25e316f
 
 ...
