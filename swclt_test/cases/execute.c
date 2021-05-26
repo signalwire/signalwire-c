@@ -62,7 +62,6 @@ static ks_status_t __on_incoming_test_execute_rqu(swclt_sess_t *sess, swclt_cmd_
 {
 	/* Formulate a response */
 	ks_cond_t *cond = (ks_cond_t *)data;
-	ks_pool_t *cmd_pool = cmd->pool;
 	ks_json_t *result = ks_json_create_object();
 	ks_json_add_string_to_object(result, "reply", "i got it!");
 
