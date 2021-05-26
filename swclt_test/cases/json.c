@@ -30,7 +30,7 @@ static blade_netcast_rqu_t __netcast_protocol_provider_add_request(ks_pool_t *po
 	request.netcaster_nodeid = ks_uuid_null_thr_str();
 
 	/* Fill in the params too */
-	blade_netcast_protocol_provider_add_param_t params;
+	blade_netcast_protocol_provider_add_param_t params = {0};
 	params.protocol = protocol;
 	params.nodeid = ks_uuid_str(NULL, &nodeid);
 	params.channels = ks_json_create_array_inline(1,
