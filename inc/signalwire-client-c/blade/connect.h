@@ -175,10 +175,13 @@ static inline swclt_cmd_t *CREATE_BLADE_CONNECT_CMD_ASYNC(
 
 done:
 	// These are not owned by the request, don't destroy them
-	connect_rqu->agent = NULL;
-	connect_rqu->identity = NULL;
+	if (connect_rqu) {
+		connect_rqu->agent = NULL;
+		connect_rqu->identity = NULL;
 
-	BLADE_CONNECT_RQU_DESTROY(&connect_rqu);
+		BLADE_CONNECT_RQU_DESTROY(&connect_rqu);
+	}
+
 	ks_json_delete(&obj);
 
 	return cmd;

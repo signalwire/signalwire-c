@@ -4,40 +4,39 @@ name: default
 
 steps:
     - name: scan-build
-      image: debian:stretch
+      image: debian:buster
       pull: true
       commands:     
-      - apt-get update && apt-get install -yq git build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-4.0
-      - apt-get install -yq cmake uuid-dev libssl1.0-dev      
+      - apt-get update && apt-get install -yq git build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-7
+      - apt-get install -yq cmake uuid-dev libssl-dev
       - git clone https://github.com/signalwire/libks libks
       - cd libks && git checkout v2.0 && git pull
       - cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
       - sed -i '/cotire/d' ./CMakeLists.txt
       - sed -i '/cotire/d' ./swclt_test/CMakeLists.txt
       - mkdir -p scan-build
-      - scan-build-4.0 -o ./scan-build/ cmake .
-      - echo "#!/bin/bash\nscan-build-4.0 -o ./scan-build/ make -j`nproc --all` |& tee ./scan-build-result.txt\nexitstatus=\${PIPESTATUS[0]}\necho \$exitstatus > ./scan-build-status.txt\n" > scan.sh
+      - scan-build-7 -o ./scan-build/ cmake .
+      - echo '#!/bin/bash\nscan-build-7 -o ./scan-build/ make -j`nproc --all` |& tee ./scan-build-result.txt\nexitstatus=$${PIPESTATUS[0]}\necho $$exitstatus > ./scan-build-status.txt\n' > scan.sh
       - chmod +x scan.sh
       - ./scan.sh
       - exitstatus=`cat ./scan-build-status.txt`
       - echo "*** Exit status is $exitstatus"
 
     - name: notify
-      image: signalwire/scan-build-notify
+      image: signalwire/drone-notify
       pull: true
       environment:
-        GITHUB_CI_APP_PEM:
-          from_secret: github_ci_app_pem
-        SSH_KEY:
-          from_secret: ssh_key
         SLACK_WEBHOOK_URL:
           from_secret: slack_webhook_url
+        ENV_FILE:
+          from_secret: notify_env
       commands:
-      - /root/notify.sh
+      - /root/scan-build-notify.sh
       
 trigger:
   branch:
   - master  
+  - v2.0
 
 trigger:
   event:
@@ -45,6 +44,6 @@ trigger:
   - push
 ---
 kind: signature
-hmac: 745d50e22397b686f5ea525d4e0118588b0070209257738fde371d0962a0756a
+hmac: 76bad2ca2333cf3f99ab9fae1f7e34f177d0dcab83586938d0cb36f82d03df83
 
 ...
