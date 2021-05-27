@@ -249,7 +249,7 @@ static ks_status_t __execute_pmethod_cb(
 static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt_sess_t *sess)
 {
 	const char * method;
-	ks_status_t status;
+	ks_status_t status = KS_STATUS_FAIL;
 	ks_json_t *request;
 	ks_pool_t *cmd_pool;
 	char *cmd_str;
