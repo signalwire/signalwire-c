@@ -1409,7 +1409,9 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute(
 		NULL,
 		NULL,
 		&future);
-	if (status == KS_STATUS_SUCCESS && future) {
+	if (status == KS_STATUS_SUCCESS) {
+		/* future must exist because response_callback was not set for the swclt_sess_execute_async() call */
+		assert(future);
 		status = swclt_cmd_future_get(future, reply);
 	}
 	swclt_cmd_future_destroy(&future);
