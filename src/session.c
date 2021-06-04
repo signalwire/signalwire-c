@@ -1433,6 +1433,48 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 
 	/* Create the command */
 	if (!(cmd = CREATE_BLADE_EXECUTE_CMD(
+			NULL,
+			responder,
+			protocol,
+			method,
+			params))) {
+		status = KS_STATUS_NO_MEM;
+		goto done;
+	}
+
+	/* If the caller wants to do async, set the callback in the cmd */
+	if (response_callback) {
+		if (status = swclt_cmd_set_cb(cmd, response_callback, response_callback_data))
+			goto done;
+	}
+
+	ks_rwl_read_lock(sess->rwlock);
+	status = swclt_conn_submit_request(sess->conn, &cmd, future);
+	ks_rwl_read_unlock(sess->rwlock);
+
+done:
+	swclt_cmd_destroy(&cmd);
+
+	return status;
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id_async(
+	swclt_sess_t *sess,
+	const char *id,
+	const char *responder,
+	const char *protocol,
+	const char *method,
+	ks_json_t **params,
+	swclt_cmd_cb_t response_callback,
+	void *response_callback_data,
+	swclt_cmd_future_t **future)
+{
+	ks_status_t status = KS_STATUS_SUCCESS;
+	swclt_cmd_t *cmd = NULL;
+
+	/* Create the command */
+	if (!(cmd = CREATE_BLADE_EXECUTE_CMD(
+			id,
 			responder,
 			protocol,
 			method,
