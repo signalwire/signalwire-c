@@ -464,7 +464,6 @@ static void *on_incoming_frame_job(ks_thread_t *thread, void *data)
 
 done:
 
-	ks_pool_free(&frame->data);
 	ks_pool_free(&frame);
 
 	if (payload) {
