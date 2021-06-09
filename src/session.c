@@ -216,6 +216,7 @@ static ks_status_t __execute_pmethod_cb(
 					"Protocol method failed to set result in command: %s",
 					cmd_str);
 		err_code = -32607;
+		return KS_STATUS_FAIL; // TODO: temporary for testing, remove this line
 	}
 
 	/* If we errored, package up an error response */
