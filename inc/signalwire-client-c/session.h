@@ -267,6 +267,17 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 	void *response_callback_data,
 	swclt_cmd_future_t **future);
 
+SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id_async(
+	swclt_sess_t *sess,
+	const char *id,
+	const char *responder,
+	const char *protocol,
+	const char *method,
+	ks_json_t **params,
+	swclt_cmd_cb_t response_callback,
+	void *response_callback_data,
+	swclt_cmd_future_t **future);
+						   
 SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t *sess, const char *service, swclt_sub_cb_t cb, void *cb_data);
 SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_setup(swclt_sess_t *sess, swclt_sub_cb_t cb, void *cb_data);
 													  

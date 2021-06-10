@@ -122,6 +122,7 @@ SWCLT_JSON_PARSE_END()
 static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD_ASYNC(
 	swclt_cmd_cb_t cb,
 	void *cb_data,
+	const char *id,
 	const char *responder,
 	const char *protocol,
 	const char *method,
@@ -130,7 +131,9 @@ static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD_ASYNC(
 	swclt_cmd_t *cmd = NULL;
 	ks_status_t status;
 	ks_json_t *request;
+	ks_uuid_t msgid = ks_uuid_null();
 
+	if (id) msgid = ks_uuid_from_str(id);
 	request = ks_json_create_object();
 	if (responder) ks_json_add_string_to_object(request, "responder_nodeid", responder);
 	ks_json_add_string_to_object(request, "protocol", protocol);
@@ -150,7 +153,7 @@ static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD_ASYNC(
 			&request,
 			BLADE_EXECUTE_TTL_MS,
 			BLADE_EXECUTE_FLAGS,
-			ks_uuid_null()))) {
+			msgid))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate execute cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
@@ -164,6 +167,7 @@ static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD_ASYNC(
 }
 
 static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD(
+	const char *id,
     const char *responder,
 	const char *protocol,
 	const char *method,
@@ -172,6 +176,7 @@ static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD(
 	return CREATE_BLADE_EXECUTE_CMD_ASYNC(
 		NULL,
 		NULL,
+		id,
 		responder,
 		protocol,
 		method,

@@ -47,6 +47,7 @@ static void test_blade_execute(ks_pool_t *pool)
 	ks_json_t *params = ks_json_create_object();
 	ks_json_add_string_to_object(params, "tag", "hi");
 	swclt_cmd_t *cmd = CREATE_BLADE_EXECUTE_CMD(
+			NULL,
 		    "responder_a",
 		   	"test.protocol",
 		   	"test.method",
@@ -66,6 +67,32 @@ static void test_blade_execute(ks_pool_t *pool)
 	swclt_cmd_destroy(&cmd);
 }
 
+static void test_blade_execute_with_id(ks_pool_t *pool)
+{
+	ks_json_t *params = ks_json_create_object();
+	ks_json_add_string_to_object(params, "tag", "hi");
+	swclt_cmd_t *cmd = CREATE_BLADE_EXECUTE_CMD(
+			"a6786101-4c6e-4d1a-ac22-1c5dcbbd3c48",
+		    "responder_a",
+		   	"test.protocol",
+		   	"test.method",
+			&params);
+	REQUIRE(!params);
+
+	char *desc;
+	REQUIRE(!swclt_cmd_print(cmd, NULL, &desc));
+	ks_log(KS_LOG_INFO, "Created command: %s", desc);
+
+	REQUIRE(!strcmp(cmd->id_str, "a6786101-4c6e-4d1a-ac22-1c5dcbbd3c48"));
+	REQUIRE(!strcmp(ks_json_get_object_string(cmd->json, "responder_nodeid", ""), "responder_a"));
+	REQUIRE(!strcmp(ks_json_get_object_string(cmd->json, "protocol", ""), "test.protocol"));
+	REQUIRE(!strcmp(ks_json_get_object_string(cmd->json, "method", ""), "test.method"));
+	REQUIRE(!strcmp(ks_json_get_object_string(ks_json_get_object_item(cmd->json, "params"), "tag", ""), "hi"));
+
+	ks_pool_free(&desc);
+	swclt_cmd_destroy(&cmd);
+}
+
 static void test_blade_channel(ks_pool_t *pool)
 {
 	ks_json_t *obj = BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"bobo", BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC});
@@ -76,4 +103,5 @@ void test_json(ks_pool_t *pool)
 {
 	test_blade_channel(pool);
 	test_blade_execute(pool);
+	test_blade_execute_with_id(pool);
 }
