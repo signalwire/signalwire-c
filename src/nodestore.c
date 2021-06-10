@@ -1457,67 +1457,73 @@ SWCLT_DECLARE(ks_status_t) swclt_store_reset(swclt_store_t *store)
 	ks_status_t status = KS_STATUS_SUCCESS;
 
 	ks_hash_write_lock(store->routes);
-	while (itt = ks_hash_first(store->routes, KS_UNLOCKED)) {
+	for (itt = ks_hash_first(store->routes, KS_UNLOCKED); itt; ) {
 		const char *key = NULL;
 		void *value = NULL;
 
 		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
 
+		itt = ks_hash_next(&itt);
 		ks_hash_remove(store->routes, (const void *)key);
 	}
 	ks_hash_write_unlock(store->routes);
 
 	ks_hash_write_lock(store->identities);
-	while (itt = ks_hash_first(store->identities, KS_UNLOCKED)) {
+	for (itt = ks_hash_first(store->identities, KS_UNLOCKED); itt; ) {
 		const char *key = NULL;
 		void *value = NULL;
 
 		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
 
+		itt = ks_hash_next(&itt);
 		ks_hash_remove(store->identities, (const void *)key);
 	}
 	ks_hash_write_unlock(store->identities);
 
 	ks_hash_write_lock(store->protocols);
-	while (itt = ks_hash_first(store->protocols, KS_UNLOCKED)) {
+	for (itt = ks_hash_first(store->protocols, KS_UNLOCKED); itt; ) {
 		const char *key = NULL;
 		blade_protocol_t *protocol = NULL;
 
 		ks_hash_this(itt, (const void **)&key, NULL, (void **)&protocol);
 
+		itt = ks_hash_next(&itt);
 		ks_hash_remove(store->protocols, (const void *)key);
 	}
 	ks_hash_write_unlock(store->protocols);
 
 	ks_hash_write_lock(store->subscriptions);
-	while (itt = ks_hash_first(store->subscriptions, KS_UNLOCKED)) {
+	for (itt = ks_hash_first(store->subscriptions, KS_UNLOCKED); itt; ) {
 		const char *key = NULL;
 		void *value = NULL;
 
 		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
 
+		itt = ks_hash_next(&itt);
 		ks_hash_remove(store->subscriptions, (const void *)key);
 	}
 	ks_hash_write_unlock(store->subscriptions);
 
 	ks_hash_write_lock(store->authorities);
-	while (itt = ks_hash_first(store->authorities, KS_UNLOCKED)) {
+	for (itt = ks_hash_first(store->authorities, KS_UNLOCKED); itt; ) {
 		const char *key = NULL;
 		void *value = NULL;
 
 		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
 
+		itt = ks_hash_next(&itt);
 		ks_hash_remove(store->authorities, (const void *)key);
 	}
 	ks_hash_write_unlock(store->authorities);
 
 	ks_hash_write_lock(store->protocols_uncertified);
-	while (itt = ks_hash_first(store->protocols_uncertified, KS_UNLOCKED)) {
+	for (itt = ks_hash_first(store->protocols_uncertified, KS_UNLOCKED); itt; ) {
 		const char *key = NULL;
 		void *value = NULL;
 
 		ks_hash_this(itt, (const void **)&key, NULL, (void **)&value);
 
+		itt = ks_hash_next(&itt);
 		ks_hash_remove(store->protocols_uncertified, (const void *)key);
 	}
 	ks_hash_write_unlock(store->protocols_uncertified);
