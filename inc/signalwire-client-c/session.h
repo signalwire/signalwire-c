@@ -257,6 +257,15 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute(
 	ks_json_t **params,
 	swclt_cmd_reply_t **reply);
 
+SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id(
+	swclt_sess_t *sess,
+	const char *id,
+	const char *responder,
+	const char *protocol,
+	const char *method,
+	ks_json_t **params,
+	swclt_cmd_reply_t **reply);
+
 SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 	swclt_sess_t *sess,
 	const char *responder,
