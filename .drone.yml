@@ -5,7 +5,7 @@ name: default
 steps:
     - name: scan-build
       image: debian:buster
-      pull: true
+      pull: always
       commands:     
       - apt-get update && apt-get install -yq git build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-7
       - apt-get install -yq cmake uuid-dev libssl-dev
@@ -24,7 +24,7 @@ steps:
 
     - name: notify
       image: signalwire/drone-notify
-      pull: true
+      pull: always
       environment:
         SLACK_WEBHOOK_URL:
           from_secret: slack_webhook_url
@@ -44,6 +44,6 @@ trigger:
   - push
 ---
 kind: signature
-hmac: 76bad2ca2333cf3f99ab9fae1f7e34f177d0dcab83586938d0cb36f82d03df83
+hmac: 2e609ffccc9b6c3c0f3c2cd7da81a3793144d8e928117d27101d9e2a5cf96b5f
 
 ...
