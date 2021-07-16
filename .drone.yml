@@ -4,18 +4,18 @@ name: default
 
 steps:
     - name: scan-build
-      image: debian:stretch
-      pull: true
+      image: debian:buster
+      pull: always
       commands:     
-      - apt-get update && apt-get install -yq git build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-4.0
-      - apt-get install -yq cmake uuid-dev libssl1.0-dev      
+      - apt-get update && apt-get install -yq git build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-7
+      - apt-get install -yq cmake uuid-dev libssl-dev
       - git clone https://github.com/signalwire/libks libks
       - cd libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
       - sed -i '/cotire/d' ./CMakeLists.txt
       - sed -i '/cotire/d' ./swclt_test/CMakeLists.txt
       - mkdir -p scan-build
-      - scan-build-4.0 -o ./scan-build/ cmake .
-      - echo '#!/bin/bash\nscan-build-4.0 -o ./scan-build/ make -j`nproc --all` |& tee ./scan-build-result.txt\nexitstatus=$${PIPESTATUS[0]}\necho $$exitstatus > ./scan-build-status.txt\n' > scan.sh
+      - scan-build-7 -o ./scan-build/ cmake .
+      - echo '#!/bin/bash\nscan-build-7 -o ./scan-build/ make -j`nproc --all` |& tee ./scan-build-result.txt\nexitstatus=$${PIPESTATUS[0]}\necho $$exitstatus > ./scan-build-status.txt\n' > scan.sh
       - chmod +x scan.sh
       - ./scan.sh
       - exitstatus=`cat ./scan-build-status.txt`
@@ -23,7 +23,7 @@ steps:
 
     - name: notify
       image: signalwire/drone-notify
-      pull: true
+      pull: always
       environment:
         SLACK_WEBHOOK_URL:
           from_secret: slack_webhook_url
@@ -42,6 +42,6 @@ trigger:
   - push
 ---
 kind: signature
-hmac: 088f9c09ab42cfd913a9575b9f5e835d909e7ac59cc612f93957ef7fa330c6f4
+hmac: 4cda5542fa43796175f5abe9f8510deb23677fe8d4578e8c6096625d28705d49
 
 ...
