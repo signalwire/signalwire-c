@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 SignalWire, Inc
+ * Copyright (c) 2018-2021 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -70,8 +70,8 @@ static void check_session_state(swclt_sess_t *sess)
 				sess->state_change_cb(sess, sess->state_change_cb_data);
 			}
 		} else {
-			// try again in 5 seconds
-			sess->connect_time = ks_time_now_sec() + 5;
+			// try again in 2 seconds
+			sess->connect_time = ks_time_now_sec() + 2;
 		}
 	}
 }
