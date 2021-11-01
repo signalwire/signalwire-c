@@ -37,6 +37,7 @@ typedef struct swclt_wss_info_s {
 	char path[128];				    /* endpoint path */
 	uint32_t connect_timeout_ms;	/* our connect timeout */
 	SSL_CTX *ssl;					/* ssl context handed to us at first connect attempt */
+	char certified_client_token[128]; /* certfied client token for basic auth */
 } swclt_wss_info_t;
 
 typedef struct swclt_wss_stats {
@@ -95,7 +96,8 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	short port,
 	const char *path,
 	uint32_t timeout_ms,
-	const SSL_CTX *ssl);
+	const SSL_CTX *ssl,
+	const char *certified_client_token);
 
 SWCLT_DECLARE(void) swclt_wss_destroy(swclt_wss_t **wss);
 

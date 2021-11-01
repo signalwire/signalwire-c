@@ -274,8 +274,9 @@ static ks_status_t __connect_socket(swclt_wss_t *ctx)
 
 	snprintf(buf, sizeof(buf), "/%s:%s:swclt", ctx->info.path, ctx->info.address);
 	
-	if (status = kws_init(&ctx->wss, ctx->socket,
-			ctx->info.ssl, buf, KWS_BLOCK | KWS_CLOSE_SOCK, ctx->pool))
+	if (status = kws_init_ex(&ctx->wss, ctx->socket,
+							 ctx->info.ssl, buf, KWS_BLOCK | KWS_CLOSE_SOCK,
+							 ctx->info.certified_client_token, ctx->pool))
 		goto done;
 
 	/* Load our negotiated cipher while we're here */
@@ -337,7 +338,8 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	short port,
 	const char *path,
 	uint32_t timeout_ms,
-	const SSL_CTX *ssl)
+	const SSL_CTX *ssl,
+	const char *certified_client_token)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
 	ks_pool_t *pool = NULL;
@@ -355,6 +357,7 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	new_wss->info.connect_timeout_ms = timeout_ms;
 	strncpy(new_wss->info.address, address, sizeof(new_wss->info.address) - 1);
 	strncpy(new_wss->info.path, path, sizeof(new_wss->info.path) - 1);
+	strncpy(new_wss->info.certified_client_token, certified_client_token, sizeof(new_wss->info.certified_client_token) - 1);
 	new_wss->info.port = port;
 
 	ks_log(KS_LOG_DEBUG, "Resolving address: %s", address);

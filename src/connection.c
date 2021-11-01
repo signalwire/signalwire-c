@@ -630,7 +630,8 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 	if (status = swclt_wss_connect(&ctx->wss,
 			(swclt_wss_incoming_frame_cb_t)on_incoming_frame, ctx,
 			(swclt_wss_failed_cb_t)on_wss_failed, ctx,
-			ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path, ctx->info.wss.connect_timeout_ms, ctx->info.wss.ssl))
+			ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path, ctx->info.wss.connect_timeout_ms,
+			ctx->info.wss.certified_client_token, ctx->info.wss.ssl))
 		return status;
 
 	/* Create TTL tracking thread */
