@@ -28,6 +28,7 @@ typedef struct swclt_config_s {
 	const char *private_key_path;
 	const char *client_cert_path;
 	const char *cert_chain_path;
+	const char *certfied_client_token;
 	const char *authentication;
 	const char *agent;
 	const char *identity;

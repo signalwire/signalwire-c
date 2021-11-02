@@ -509,7 +509,8 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 			sess->config->agent,
 			sess->config->identity,
 			sess->config->network,
-			sess->ssl)) {
+			sess->ssl,
+			sess->config->certified_client_token)) {
 		if (authentication) ks_json_delete(&authentication);
 		return status;
 	}

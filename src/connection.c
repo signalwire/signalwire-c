@@ -678,7 +678,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	const char *agent,
 	const char *identity,
 	ks_json_t *network,
-	const SSL_CTX *ssl)
+	const SSL_CTX *ssl,
+	const char *certified_client_token)
 {
 	ks_status_t status = KS_STATUS_SUCCESS;
 	ks_pool_t *pool = NULL;
@@ -700,6 +701,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	strncpy(new_conn->info.wss.address, ident->host, sizeof(new_conn->info.wss.address));
 	new_conn->info.wss.port = ident->portnum;
 	new_conn->info.wss.ssl = (SSL_CTX *)ssl;
+	if (certified_client_token) strncpy(new_conn->info.wss.certified_client_token, certified_client_token, sizeof(new_conn->info.wss.certified_client_token);
 	if (ident->path) strncpy(new_conn->info.wss.path, ident->path, sizeof(new_conn->info.wss.path));
 	new_conn->info.wss.connect_timeout_ms = 10000;
 
@@ -752,7 +754,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 		agent,
 		identity,
 		network,
-		ssl);
+		ssl,
+		NULL);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cmd_t *cmd)

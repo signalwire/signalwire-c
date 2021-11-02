@@ -120,7 +120,8 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	const char *agent,
 	const char *identity,
 	ks_json_t *network,
-	const SSL_CTX *ssl);
+	const SSL_CTX *ssl,
+	const char *certified_client_token);
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t **cmd, swclt_cmd_future_t **future);
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cmd_t *cmd);

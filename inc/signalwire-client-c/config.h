@@ -39,6 +39,8 @@ SWCLT_DECLARE(const char *) swclt_config_get_client_cert_path(swclt_config_t *co
 SWCLT_DECLARE(ks_status_t) swclt_config_set_client_cert_path(swclt_config_t *config, const char *value);
 SWCLT_DECLARE(const char *) swclt_config_get_cert_chain_path(swclt_config_t *config);
 SWCLT_DECLARE(ks_status_t) swclt_config_set_cert_chain_path(swclt_config_t *config, const char *value);
+SWCLT_DECLARE(const char *) swclt_config_get_certified_client_token(swclt_config_t *config);
+SWCLT_DECLARE(ks_status_t) swclt_config_set_certified_client_token(swclt_config_t *config, const char *value);
 SWCLT_DECLARE(const char *) swclt_config_get_authentication(swclt_config_t *config);
 SWCLT_DECLARE(ks_status_t) swclt_config_set_authentication(swclt_config_t *config, const char *value);
 SWCLT_DECLARE(const char *) swclt_config_get_agent(swclt_config_t *config);

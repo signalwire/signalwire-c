@@ -86,6 +86,10 @@ SWCLT_DECLARE(ks_status_t) swclt_config_load_from_json(swclt_config_t *config, k
 	if ((val = ks_json_get_object_string(json, "cert_chain_path", NULL))) {
 		swclt_config_set_cert_chain_path(config, val);
 	}
+
+	if ((val = ks_json_get_object_string(json, "certified_client_token", NULL))) {
+		swclt_config_set_certified_client_token(config, val);
+	}
 	
 	if ((val = ks_json_get_object_string(json, "authentication", NULL))) {
 		swclt_config_set_authentication(config, val);
@@ -127,6 +131,10 @@ SWCLT_DECLARE(ks_status_t) swclt_config_load_from_env(swclt_config_t *config)
 	
 	if ((val = getenv("SW_CERT_CHAIN_PATH"))) {
 		swclt_config_set_cert_chain_path(config, val);
+	}
+
+	if ((val = getenv("SW_CERTIFIED_CLIENT_TOKEN"))) {
+		swclt_config_set_certified_client_token(config, val);
 	}
 	
 	if ((val = getenv("SW_AUTHENTICATION"))) {
@@ -237,6 +245,23 @@ SWCLT_DECLARE(ks_status_t) swclt_config_set_cert_chain_path(swclt_config_t *conf
 
 	if (config->cert_chain_path) ks_pool_free(&config->cert_chain_path);
 	if (value) config->cert_chain_path = ks_pstrdup(ks_pool_get(config), value);
+
+	return KS_STATUS_SUCCESS;
+}
+
+SWCLT_DECLARE(const char *) swclt_config_get_certified_client_token(swclt_config_t *config)
+{
+	ks_assert(config);
+
+	return config->certified_client_token;
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_config_set_certified_client_token(swclt_config_t *config, const char *value)
+{
+	ks_assert(config);
+
+	if (config->certified_client_token) ks_pool_free(&config->certified_client_token);
+	if (value) config->certified_client_token = ks_pstrdup(ks_pool_get(config), value);
 
 	return KS_STATUS_SUCCESS;
 }
