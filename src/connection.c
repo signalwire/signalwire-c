@@ -631,7 +631,7 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 			(swclt_wss_incoming_frame_cb_t)on_incoming_frame, ctx,
 			(swclt_wss_failed_cb_t)on_wss_failed, ctx,
 			ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path, ctx->info.wss.connect_timeout_ms,
-			ctx->info.wss.certified_client_token, ctx->info.wss.ssl))
+			ctx->info.wss.ssl, ctx->info.wss.certified_client_token))
 		return status;
 
 	/* Create TTL tracking thread */
@@ -701,7 +701,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	strncpy(new_conn->info.wss.address, ident->host, sizeof(new_conn->info.wss.address));
 	new_conn->info.wss.port = ident->portnum;
 	new_conn->info.wss.ssl = (SSL_CTX *)ssl;
-	if (certified_client_token) strncpy(new_conn->info.wss.certified_client_token, certified_client_token, sizeof(new_conn->info.wss.certified_client_token);
+	if (certified_client_token) strncpy(new_conn->info.wss.certified_client_token, certified_client_token, sizeof(new_conn->info.wss.certified_client_token));
 	if (ident->path) strncpy(new_conn->info.wss.path, ident->path, sizeof(new_conn->info.wss.path));
 	new_conn->info.wss.connect_timeout_ms = 10000;
 
