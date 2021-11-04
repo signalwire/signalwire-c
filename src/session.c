@@ -156,7 +156,8 @@ static ks_status_t __setup_ssl(swclt_sess_t *sess)
 {
 	swclt_ssl_destroy_context(&sess->ssl);
 
-	return swclt_ssl_create_context(sess->config->private_key_path, sess->config->client_cert_path, sess->config->cert_chain_path, &sess->ssl);
+	//return swclt_ssl_create_context(sess->config->private_key_path, sess->config->client_cert_path, sess->config->cert_chain_path, &sess->ssl);
+	return swclt_ssl_create_context(NULL, NULL, NULL, &sess->ssl);
 }
 
 static ks_bool_t __session_check_connected(swclt_sess_t *sess)
