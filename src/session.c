@@ -469,9 +469,10 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 	ks_json_t *authentication = NULL;
 
 	/* Defer this check here, so it can be rescanned from ENV at runtime after session creation */
-	if (!sess->config->private_key_path || !sess->config->client_cert_path) {
+	//if (!sess->config->private_key_path || !sess->config->client_cert_path) {
+	if (!sess->config->certified_client_token) {
 		if (!sess->config->authentication) {
-			ks_log(KS_LOG_ERROR, "Cannot connect without certificates or authentication");
+			ks_log(KS_LOG_ERROR, "Cannot connect without certified token or authentication");
 			return KS_STATUS_FAIL;
 		}
 	}

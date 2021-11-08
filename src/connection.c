@@ -687,7 +687,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	swclt_conn_t *new_conn = ks_pool_alloc(pool, sizeof(swclt_conn_t));
 	new_conn->pool = pool;
 
-	ks_log(KS_LOG_INFO, "Initiating connection to: %s (parsed port: %u) at /%s", ident->host, (unsigned int)ident->portnum, ident->path ? ident->path : "");
+	ks_log(KS_LOG_INFO, "Initiating connection to: %s (parsed port: %u) at /%s as %s", ident->host, (unsigned int)ident->portnum, ident->path ? ident->path : "", certified_client_token ? certified_client_token : "(null)");
 
 	new_conn->incoming_cmd_cb = incoming_cmd_cb;
 	new_conn->incoming_cmd_cb_data = incoming_cmd_cb_data;
