@@ -711,7 +711,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 
 	/* create thread pool to process incoming frames from websocket */
 	if (status = ks_thread_pool_create(&new_conn->incoming_frame_pool, 1, 64, KS_THREAD_DEFAULT_STACK,
-		KS_PRI_NORMAL, 30))
+		KS_PRI_DEFAULT, 30))
 		goto done;
 
 	/* Connect our websocket */
