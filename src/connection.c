@@ -256,6 +256,7 @@ static ks_status_t register_cmd(swclt_conn_t *ctx, swclt_cmd_t **cmdP)
 
 	if (!ctx->ttl || (status = ttl_tracker_watch(ctx->ttl, ks_time_now_ms() + (ks_time_t)cmd->response_ttl_ms, cmd->id))) {
 		ks_log(KS_LOG_ERROR, "Failed to track TTL for command with id: %s and TTL: %d", ks_uuid_thr_str(&cmd->id), cmd->response_ttl_ms);
+		ctx->ttl_failed = KS_TRUE;
 		report_connection_failure(ctx);
 		return status;
 	}
@@ -268,6 +269,28 @@ static ks_status_t register_cmd(swclt_conn_t *ctx, swclt_cmd_t **cmdP)
 static swclt_cmd_t *deregister_cmd(swclt_conn_t *conn, ks_uuid_t id)
 {
 	return ks_hash_remove(conn->outstanding_requests, &id);
+}
+
+static ks_status_t create_outstanding_requests(swclt_conn_t *conn)
+{
+	return ks_hash_create(&conn->outstanding_requests, KS_HASH_MODE_UUID,
+			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_KEY, conn->pool);
+}
+
+static void destroy_outstanding_requests(swclt_conn_t *conn)
+{
+	if (conn && conn->outstanding_requests) {
+		ks_hash_iterator_t *it = NULL;
+		for (it = ks_hash_first(conn->outstanding_requests, KS_UNLOCKED); it; it = ks_hash_next(&it)) {
+			void *val = NULL;
+			ks_hash_this(it, NULL, NULL, &val);
+			if (val) {
+				swclt_cmd_t *cmd = val;
+				swclt_cmd_destroy(&cmd);
+			}
+		}
+		ks_hash_destroy(&conn->outstanding_requests);
+	}
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_cancel_request(swclt_conn_t *conn, swclt_cmd_future_t **future)
@@ -653,6 +676,14 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 			ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path, ctx->info.wss.connect_timeout_ms, ctx->info.wss.ssl))
 		return status;
 
+	if (ctx->ttl_failed) {
+		/* need to re-recreate request tracking */
+		ttl_tracker_destroy(&ctx->ttl);
+		ctx->ttl_failed = KS_FALSE;
+		destroy_outstanding_requests(ctx);
+		create_outstanding_requests(ctx);
+	}
+
 	if (!ctx->ttl) {
 		/* Create TTL tracking thread */
 		if (status = ttl_tracker_create(ctx->pool, &ctx->ttl, ctx))
@@ -696,7 +727,7 @@ SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn)
 		if ((*conn)->incoming_frame_pool) {
 			ks_thread_pool_destroy(&(*conn)->incoming_frame_pool);
 		}
-		ks_hash_destroy(&(*conn)->outstanding_requests);
+		destroy_outstanding_requests(*conn);
 		ks_mutex_destroy(&(*conn)->failed_mutex);
 		ks_pool_free(conn);
 		ks_pool_close(&pool);
@@ -742,10 +773,9 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 	if (ident->path) strncpy(new_conn->info.wss.path, ident->path, sizeof(new_conn->info.wss.path));
 	new_conn->info.wss.connect_timeout_ms = 10000;
 
-	/* Create our request hash */
-	if (status = ks_hash_create(&new_conn->outstanding_requests, KS_HASH_MODE_UUID,
-			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_KEY, new_conn->pool))
+	if (status = create_outstanding_requests(new_conn)) {
 		goto done;
+	}
 
 	ks_mutex_create(&new_conn->failed_mutex, KS_MUTEX_FLAG_DEFAULT, new_conn->pool);
 

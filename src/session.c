@@ -503,7 +503,7 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 		/* Create a connection and have it call us back anytime a new read is detected */
 		swclt_conn_t *new_conn = NULL;
 		if (status = swclt_conn_connect_ex(
-			&sess->conn,
+			&new_conn,
 			(swclt_conn_incoming_cmd_cb_t)__on_incoming_cmd,
 			sess,
 			(swclt_conn_connect_cb_t)__on_connect_reply,
@@ -517,10 +517,12 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 			sess->config->identity,
 			sess->config->network,
 			sess->ssl)) {
-		if (authentication) ks_json_delete(&authentication);
-		ks_rwl_write_unlock(sess->rwlock);
-		return status;
+
+			if (authentication) ks_json_delete(&authentication);
+			ks_rwl_write_unlock(sess->rwlock);
+			return status;
 		}
+		sess->conn = new_conn;
 	}
 	swclt_conn_info(sess->conn, &sess->info.conn);
 
@@ -547,17 +549,6 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 	ks_log(KS_LOG_INFO, "   master_nodeid: %s", sess->info.master_nodeid);
 
 	return status;
-}
-
-static void __context_describe(swclt_sess_t *sess, char *buffer, ks_size_t buffer_len)
-{
-	char *desc = NULL;
-	if (sess->conn && (desc = swclt_conn_describe(sess->conn))) {
-		snprintf(buffer, buffer_len, "SWCLT Session - %s", desc);
-		ks_pool_free(&desc);
-	} else {
-		snprintf(buffer, buffer_len, "SWCLT Session (not connected)");
-	}
 }
 
 static ks_status_t __disconnect(swclt_sess_t *sess)

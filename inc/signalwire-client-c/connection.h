@@ -86,6 +86,9 @@ struct swclt_conn {
 	/* TTLs to expire */
 	swclt_ttl_tracker_t *ttl;
 
+	/* Need to flush TTL if failed */
+	ks_bool_t ttl_failed;
+
 	/* pool to process incoming websocket frames */
 	ks_thread_pool_t *incoming_frame_pool;
 
