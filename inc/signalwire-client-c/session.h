@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -137,6 +137,7 @@ SWCLT_DECLARE(ks_bool_t) swclt_sess_restored(swclt_sess_t *sess);
 SWCLT_DECLARE(ks_status_t) swclt_sess_info(swclt_sess_t *sess, ks_pool_t *pool, ks_uuid_t *sessionid, char **nodeid, char **master_nodeid);
 SWCLT_DECLARE(ks_status_t) swclt_sess_nodeid(swclt_sess_t *sess, ks_pool_t *pool, char **nodeid);
 SWCLT_DECLARE(ks_bool_t) swclt_sess_nodeid_local(swclt_sess_t *sess, const char *nodeid);
+SWCLT_DECLARE(ks_status_t) swclt_sess_wait_for_cmd_reply(swclt_sess_t *sess, swclt_cmd_future_t **future, swclt_cmd_reply_t **reply);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_register_protocol_method(
 	swclt_sess_t *sess,

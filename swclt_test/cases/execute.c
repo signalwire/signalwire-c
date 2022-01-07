@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -127,8 +127,7 @@ void test_execute(ks_pool_t *pool)
 	REQUIRE(!swclt_sess_execute_async(sess1, nodeid2, "test", "test.method", &params, NULL, NULL, &future));
 	REQUIRE(future);
 	swclt_cmd_reply_t *reply = NULL;
-	REQUIRE(!swclt_cmd_future_get(future, &reply));
-	swclt_cmd_future_destroy(&future);
+	REQUIRE(!swclt_sess_wait_for_cmd_reply(sess1, &future, &reply));
 	swclt_cmd_reply_destroy(&reply);
 
 	/* repeat, but this time don't wait for any response */

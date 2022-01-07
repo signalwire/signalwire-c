@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,15 +30,28 @@ typedef struct swclt_cmd_future {
 	ks_cond_t *cond;
 	swclt_cmd_reply_t *reply;
 	uint32_t response_ttl_ms;
+	ks_bool_t got_reply;
+	ks_uuid_t cmd_id;
+	ks_bool_t destroy;
 } swclt_cmd_future_t;
 
 static void future_cmd_cb(swclt_cmd_reply_t *cmd_reply, void *cb_data)
 {
 	swclt_cmd_future_t *future = (swclt_cmd_future_t *)cb_data;
+	ks_bool_t destroy;
 	ks_cond_lock(future->cond);
+	future->got_reply = KS_TRUE;
 	future->reply = cmd_reply;
-	ks_cond_broadcast(future->cond);
-	ks_cond_unlock(future->cond);
+	destroy = future->destroy;
+	if (destroy) {
+		// waiter has given up waiting for reply, clean things up
+		ks_cond_unlock(future->cond);
+		swclt_cmd_future_destroy(&future);
+	} else {
+		// notify waiter that the reply has arrived
+		ks_cond_broadcast(future->cond);
+		ks_cond_unlock(future->cond);
+	}
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_cmd_future_get(swclt_cmd_future_t *future, swclt_cmd_reply_t **reply)
@@ -61,14 +74,28 @@ SWCLT_DECLARE(ks_status_t) swclt_cmd_future_get(swclt_cmd_future_t *future, swcl
 	return status;
 }
 
+SWCLT_DECLARE(ks_uuid_t) swclt_cmd_future_get_id(swclt_cmd_future_t *future)
+{
+	return future->cmd_id;
+}
+
 SWCLT_DECLARE(ks_status_t) swclt_cmd_future_destroy(swclt_cmd_future_t **futureP)
 {
 	if (futureP && *futureP) {
 		swclt_cmd_future_t *future = *futureP;
-		ks_pool_t *pool = future->pool;
-		ks_cond_destroy(&future->cond);
-		swclt_cmd_reply_destroy(&future->reply);
-		ks_pool_close(&pool);
+		ks_cond_lock(future->cond);
+		if (future->got_reply) {
+			// destroy now
+			ks_cond_unlock(future->cond);
+			ks_pool_t *pool = future->pool;
+			ks_cond_destroy(&future->cond);
+			swclt_cmd_reply_destroy(&future->reply);
+			ks_pool_close(&pool);
+		} else {
+			// request destroy when reply arrives
+			future->destroy = KS_TRUE;
+			ks_cond_unlock(future->cond);
+		}
 		*futureP = NULL;
 	}
 	return KS_STATUS_SUCCESS;
@@ -469,10 +496,10 @@ static ks_status_t __set_error(swclt_cmd_t *cmd, ks_json_t **error)
 
 SWCLT_DECLARE(ks_status_t) swclt_cmd_create_frame(
 	swclt_cmd_t **cmd,
-   	swclt_cmd_cb_t cb,
-   	void *cb_data,
+	swclt_cmd_cb_t cb,
+	void *cb_data,
 	swclt_frame_t *frame,
-   	uint32_t response_ttl_ms,
+	uint32_t response_ttl_ms,
 	uint32_t flags)
 {
 	return __init_cmd(cmd, cb, cb_data, NULL, NULL, response_ttl_ms, flags, ks_uuid_null(), frame);
