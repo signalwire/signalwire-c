@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -152,7 +152,7 @@ static ks_status_t ttl_tracker_next(swclt_ttl_tracker_t *ttl, ks_uuid_t *id)
 	if (!ttl->heap[TTL_HEAP_ROOT].expiry) {
 		// nothing to wait for
 		wait_ms = 5000;
-	} else if (ttl->heap[TTL_HEAP_ROOT].expiry > now_ms) {		
+	} else if (ttl->heap[TTL_HEAP_ROOT].expiry > now_ms) {
 		wait_ms = ttl->heap[TTL_HEAP_ROOT].expiry - now_ms;
 		ks_log(KS_LOG_INFO, "Waiting %d for TTL expiration of %s", (uint32_t)wait_ms, ks_uuid_thr_str(&ttl->heap[TTL_HEAP_ROOT].id));
 	}
@@ -268,6 +268,23 @@ static ks_status_t register_cmd(swclt_conn_t *ctx, swclt_cmd_t **cmdP)
 static swclt_cmd_t *deregister_cmd(swclt_conn_t *conn, ks_uuid_t id)
 {
 	return ks_hash_remove(conn->outstanding_requests, &id);
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_conn_cancel_request(swclt_conn_t *conn, swclt_cmd_future_t **future)
+{
+	if (future && *future) {
+		swclt_cmd_t *cmd = deregister_cmd(conn, swclt_cmd_future_get_id(*future));
+		if (cmd) {
+			swclt_cmd_report_failure(cmd, KS_STATUS_TIMEOUT, "Canceled request");
+			char *cmd_str = swclt_cmd_describe(cmd);
+			ks_log(KS_LOG_WARNING, "Canceled request and destroying command: %s", cmd_str);
+			ks_pool_free(&cmd_str);
+			swclt_cmd_destroy(&cmd);
+			swclt_cmd_future_destroy(future);
+		}
+		*future = NULL;
+	}
+	return KS_STATUS_SUCCESS;
 }
 
 static ks_status_t submit_result(swclt_conn_t *ctx, swclt_cmd_t *cmd)
@@ -560,6 +577,9 @@ static ks_status_t do_logical_connect(swclt_conn_t *ctx,
 		goto done;
 	}
 	status = swclt_cmd_future_get(future, &reply);
+	if (status != KS_STATUS_SUCCESS) {
+		swclt_conn_cancel_request(ctx, &future);
+	}
 	swclt_cmd_future_destroy(&future);
 	if (swclt_cmd_reply_ok(reply) != KS_STATUS_SUCCESS) {
 		ks_log(KS_LOG_ERROR, "blade.connect failed");

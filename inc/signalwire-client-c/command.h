@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -105,6 +105,7 @@ SWCLT_DECLARE(ks_status_t) swclt_cmd_set_cb(swclt_cmd_t *cmd, swclt_cmd_cb_t cb,
 
 SWCLT_DECLARE(ks_status_t) swclt_cmd_future_create(swclt_cmd_future_t **future, swclt_cmd_t *cmd);
 SWCLT_DECLARE(ks_status_t) swclt_cmd_future_get(swclt_cmd_future_t *future, swclt_cmd_reply_t **reply);
+SWCLT_DECLARE(ks_uuid_t) swclt_cmd_future_get_id(swclt_cmd_future_t *future);
 SWCLT_DECLARE(ks_status_t) swclt_cmd_future_destroy(swclt_cmd_future_t **future);
 
 SWCLT_DECLARE(ks_status_t) swclt_cmd_reply_create(swclt_cmd_reply_t **reply);

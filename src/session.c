@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2021 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -172,9 +172,9 @@ static ks_bool_t __session_check_restored(swclt_sess_t *sess)
 static ks_status_t __execute_pmethod_cb(
 	swclt_sess_t *sess,
 	swclt_cmd_t *cmd,
-   	ks_pool_t *pool,
+	ks_pool_t *pool,
 	swclt_pmethod_ctx_t *pmethod_sess,
-   	const blade_execute_rqu_t *rqu)
+	const blade_execute_rqu_t *rqu)
 {
 	const char *err_message = NULL;
 	int err_code = 0;
@@ -184,8 +184,8 @@ static ks_status_t __execute_pmethod_cb(
 	if (!pmethod_sess) {
 		err_message = ks_psprintf(
 					pool,
-			   		"Failed to lookup any registered protocol method handlers for protocol: %s command: %s",
-				   	rqu->protocol,
+					"Failed to lookup any registered protocol method handlers for protocol: %s command: %s",
+					rqu->protocol,
 					cmd_str);
 		err_code = -32601;
 	} else {
@@ -197,8 +197,8 @@ static ks_status_t __execute_pmethod_cb(
 		if (cb_result = pmethod_sess->cb(sess, cmd, rqu, pmethod_sess->cb_data)) {
 			err_message = ks_psprintf(
 						pool,
-					   	"Protocol method callback returned status: (%lu) command: %s",
-					   	cb_result,
+						"Protocol method callback returned status: (%lu) command: %s",
+						cb_result,
 						cmd_str);
 			err_code = -32603;
 		}
@@ -433,7 +433,7 @@ static ks_status_t __on_connect_reply(swclt_conn_t *conn, ks_json_t *error, cons
 		if (sess->auth_failed_cb) sess->auth_failed_cb(sess);
 	}
 
-    if (connect_rpl) {
+	if (connect_rpl) {
 		status = KS_STATUS_SUCCESS;
 		if (!connect_rpl->session_restored)
 		{
@@ -916,7 +916,7 @@ SWCLT_DECLARE(ks_bool_t) swclt_sess_restored(swclt_sess_t *sess)
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_info(
 	swclt_sess_t *sess,
-   	ks_pool_t *pool,
+	ks_pool_t *pool,
 	ks_uuid_t *sessionid,
 	char **nodeid,
 	char **master_nodeid)
@@ -1021,7 +1021,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
 	swclt_cmd_reply_t **reply)
 {
 	swclt_cmd_future_t *future = NULL;
-	ks_status_t status = swclt_sess_subscription_add_async(
+	swclt_sess_subscription_add_async(
 		sess,
 		protocol,
 		channel,
@@ -1030,11 +1030,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
 		NULL,
 		NULL,
 		&future);
-	if (status == KS_STATUS_SUCCESS && future) {
-		status = swclt_cmd_future_get(future, reply);
-	}
-	swclt_cmd_future_destroy(&future);
-	return status;
+	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
@@ -1098,18 +1094,14 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove(
 	swclt_cmd_reply_t **reply)
 {
 	swclt_cmd_future_t *future = NULL;
-	ks_status_t status = swclt_sess_subscription_remove_async(
+	swclt_sess_subscription_remove_async(
 		sess,
 		protocol,
 		channel,
 		NULL,
 		NULL,
 		&future);
-	if (status == KS_STATUS_SUCCESS && future) {
-		status = swclt_cmd_future_get(future, reply);
-	}
-	swclt_cmd_future_destroy(&future);
-	return status;
+	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
@@ -1165,7 +1157,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
 	swclt_cmd_reply_t **reply)
 {
 	swclt_cmd_future_t *future = NULL;
-	ks_status_t status = swclt_sess_protocol_provider_add_async(
+	swclt_sess_protocol_provider_add_async(
 		sess,
 		protocol,
 		default_method_execute_access,
@@ -1178,11 +1170,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
 		NULL,
 		NULL,
 		&future);
-	if (status == KS_STATUS_SUCCESS && future) {
-		status = swclt_cmd_future_get(future, reply);
-	}
-	swclt_cmd_future_destroy(&future);
-	return status;
+	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add_async(
@@ -1234,21 +1222,17 @@ done:
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove(
 	swclt_sess_t *sess,
-   	const char * protocol,
+	const char * protocol,
 	swclt_cmd_reply_t **reply)
 {
 	swclt_cmd_future_t *future = NULL;
-	ks_status_t status = swclt_sess_protocol_provider_remove_async(
+	swclt_sess_protocol_provider_remove_async(
 		sess,
 		protocol,
 		NULL,
 		NULL,
 		&future);
-	if (status == KS_STATUS_SUCCESS && future) {
-		status = swclt_cmd_future_get(future, reply);
-	}
-	swclt_cmd_future_destroy(&future);
-	return status;
+	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_remove_async(
@@ -1290,18 +1274,14 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update(
 	swclt_cmd_reply_t **reply)
 {
 	swclt_cmd_future_t *future = NULL;
-	ks_status_t status = swclt_sess_protocol_provider_rank_update_async(
+	swclt_sess_protocol_provider_rank_update_async(
 		sess,
 		protocol,
 		rank,
 		NULL,
 		NULL,
 		&future);
-	if (status == KS_STATUS_SUCCESS && future) {
-		status = swclt_cmd_future_get(future, reply);
-	}
-	swclt_cmd_future_destroy(&future);
-	return status;
+	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_rank_update_async(
@@ -1344,17 +1324,13 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add(
 	swclt_cmd_reply_t **reply)
 {
 	swclt_cmd_future_t *future = NULL;
-	ks_status_t status = swclt_sess_identity_add_async(
+	swclt_sess_identity_add_async(
 		sess,
 		identity,
 		NULL,
 		NULL,
 		&future);
-	if (status == KS_STATUS_SUCCESS && future) {
-		status = swclt_cmd_future_get(future, reply);
-	}
-	swclt_cmd_future_destroy(&future);
-	return status;
+	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_identity_add_async(
@@ -1391,6 +1367,24 @@ done:
 	return status;
 }
 
+SWCLT_DECLARE(ks_status_t) swclt_sess_wait_for_cmd_reply(
+	swclt_sess_t *sess,
+	swclt_cmd_future_t **future,
+	swclt_cmd_reply_t **reply)
+{
+	ks_status_t status = KS_STATUS_FAIL;
+	if (future && *future) {
+		status = swclt_cmd_future_get(*future, reply);
+		if (status != KS_STATUS_SUCCESS) {
+			ks_rwl_read_lock(sess->rwlock);
+			swclt_conn_cancel_request(sess->conn, future);
+			ks_rwl_read_unlock(sess->rwlock);
+		}
+		swclt_cmd_future_destroy(future);
+	}
+	return status;
+}
+
 SWCLT_DECLARE(ks_status_t) swclt_sess_execute(
 	swclt_sess_t *sess,
 	const char *responder,
@@ -1400,7 +1394,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute(
 	swclt_cmd_reply_t **reply)
 {
 	swclt_cmd_future_t *future = NULL;
-	ks_status_t status = swclt_sess_execute_async(
+	swclt_sess_execute_async(
 		sess,
 		responder,
 		protocol,
@@ -1409,13 +1403,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute(
 		NULL,
 		NULL,
 		&future);
-	if (status == KS_STATUS_SUCCESS) {
-		/* future must exist because response_callback was not set for the swclt_sess_execute_async() call */
-		assert(future);
-		status = swclt_cmd_future_get(future, reply);
-	}
-	swclt_cmd_future_destroy(&future);
-	return status;
+	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id(
@@ -1428,7 +1416,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id(
 	swclt_cmd_reply_t **reply)
 {
 	swclt_cmd_future_t *future = NULL;
-	ks_status_t status = swclt_sess_execute_with_id_async(
+	swclt_sess_execute_with_id_async(
 		sess,
 		id,
 		responder,
@@ -1438,13 +1426,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id(
 		NULL,
 		NULL,
 		&future);
-	if (status == KS_STATUS_SUCCESS) {
-		/* future must exist because response_callback was not set for the swclt_sess_execute_async() call */
-		assert(future);
-		status = swclt_cmd_future_get(future, reply);
-	}
-	swclt_cmd_future_destroy(&future);
-	return status;
+	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
@@ -1632,7 +1614,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure(swclt_sess_t *sess,
 															 swclt_cmd_reply_t **reply)
 {
 	swclt_cmd_future_t *future = NULL;
-	ks_status_t status = swclt_sess_provisioning_configure_async(sess,
+	swclt_sess_provisioning_configure_async(sess,
 												   target,
 												   local_endpoint,
 												   external_endpoint,
@@ -1640,11 +1622,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure(swclt_sess_t *sess,
 												   NULL,
 												   NULL,
 												   &future);
-	if (status == KS_STATUS_SUCCESS && future) {
-		status = swclt_cmd_future_get(future, reply);
-	}
-	swclt_cmd_future_destroy(&future);
-	return status;
+	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t *sess,
