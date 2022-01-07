@@ -1377,7 +1377,9 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_wait_for_cmd_reply(
 		status = swclt_cmd_future_get(*future, reply);
 		if (status != KS_STATUS_SUCCESS) {
 			ks_rwl_read_lock(sess->rwlock);
-			swclt_conn_cancel_request(sess->conn, future);
+			if (sess->conn) {
+				swclt_conn_cancel_request(sess->conn, future);
+			}
 			ks_rwl_read_unlock(sess->rwlock);
 		}
 		swclt_cmd_future_destroy(future);

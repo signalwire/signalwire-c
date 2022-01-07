@@ -272,7 +272,7 @@ static swclt_cmd_t *deregister_cmd(swclt_conn_t *conn, ks_uuid_t id)
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_cancel_request(swclt_conn_t *conn, swclt_cmd_future_t **future)
 {
-	if (future && *future) {
+	if (conn && future && *future) {
 		swclt_cmd_t *cmd = deregister_cmd(conn, swclt_cmd_future_get_id(*future));
 		if (cmd) {
 			swclt_cmd_report_failure(cmd, KS_STATUS_TIMEOUT, "Canceled request");
