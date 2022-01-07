@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -86,6 +86,74 @@ void test_async(ks_pool_t *pool)
 	REQUIRE(g_protocol_response_cb_called == 1);
 	swclt_cmd_destroy(&cmd);
 	swclt_conn_destroy(&conn);
+	swclt_ssl_destroy_context(&ssl);
+}
+
+void test_reconnect(ks_pool_t *pool)
+{
+	swclt_cmd_t *cmd;
+	SSL_CTX *ssl = create_ssl_context();
+	swclt_conn_t *conn;
+	ks_json_t *channels;
+	int i;
+
+	REQUIRE(!swclt_conn_connect(&conn, __on_incoming_cmd, NULL, &g_target_ident, NULL, NULL, NULL, NULL, ssl));
+
+	channels = ks_json_create_array();
+	ks_json_add_item_to_array(channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"a_channel", 0, 0}));
+
+	/* Create an async command (bogus command but will generate a reply at least) */
+	REQUIRE(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
+			__on_protocol_result_response,
+			NULL,
+			"a_protocol",
+			0,
+			0,
+			0,
+			NULL,
+			&channels,
+			1,
+			NULL));
+
+	/* And submit it */
+	REQUIRE(!swclt_conn_submit_request(conn, &cmd, NULL));
+
+	/* Wait for it to respond */
+	for (i = 0; i < 5 && g_protocol_response_cb_called == 0; i++) {
+		ks_sleep_ms(1000);
+	}
+	REQUIRE(g_protocol_response_cb_called == 1);
+	swclt_cmd_destroy(&cmd);
+
+	swclt_conn_disconnect(conn);
+
+	REQUIRE(!swclt_conn_reconnect(conn, ks_uuid_null(), NULL, NULL, NULL, NULL));
+	channels = ks_json_create_array();
+	ks_json_add_item_to_array(channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){"b_channel", 0, 0}));
+
+	/* Create an async command (bogus command but will generate a reply at least) */
+	REQUIRE(cmd = CREATE_BLADE_PROTOCOL_PROVIDER_ADD_CMD_ASYNC(
+			__on_protocol_result_response,
+			NULL,
+			"b_protocol",
+			0,
+			0,
+			0,
+			NULL,
+			&channels,
+			1,
+			NULL));
+
+	/* And submit it */
+	REQUIRE(!swclt_conn_submit_request(conn, &cmd, NULL));
+
+	/* Wait for it to respond */
+	for (i = 0; i < 5 && g_protocol_response_cb_called == 0; i++) {
+		ks_sleep_ms(1000);
+	}
+	REQUIRE(g_protocol_response_cb_called == 2);
+	swclt_cmd_destroy(&cmd);
+
 	swclt_ssl_destroy_context(&ssl);
 }
 

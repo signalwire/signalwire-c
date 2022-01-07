@@ -653,14 +653,34 @@ static ks_status_t connect_wss(swclt_conn_t *ctx, ks_uuid_t previous_sessionid, 
 			ctx->info.wss.address, ctx->info.wss.port, ctx->info.wss.path, ctx->info.wss.connect_timeout_ms, ctx->info.wss.ssl))
 		return status;
 
-	/* Create TTL tracking thread */
-	if (status = ttl_tracker_create(ctx->pool, &ctx->ttl, ctx))
-		return status;
+	if (!ctx->ttl) {
+		/* Create TTL tracking thread */
+		if (status = ttl_tracker_create(ctx->pool, &ctx->ttl, ctx))
+			return status;
+	}
 
 	/* Now perform a logical connect to blade with the connect request */
 	if (status = do_logical_connect(ctx, previous_sessionid, authentication, agent, identity, network))
 		return status;
 
+	return status;
+}
+
+SWCLT_DECLARE(void) swclt_conn_disconnect(swclt_conn_t *conn)
+{
+	if (conn) {
+		swclt_wss_destroy(&conn->wss);
+	}
+}
+
+SWCLT_DECLARE(ks_status_t) swclt_conn_reconnect(swclt_conn_t *conn, ks_uuid_t previous_sessionid, ks_json_t **authentication, const char *agent, const char *identity, ks_json_t *network)
+{
+	ks_status_t status = KS_STATUS_FAIL;
+	if (conn) {
+		/* Connect our websocket */
+		if (status = connect_wss(conn, previous_sessionid, authentication, agent, identity, network))
+			return status;
+	}
 	return status;
 }
 

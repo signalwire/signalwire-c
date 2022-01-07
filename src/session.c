@@ -418,10 +418,8 @@ done:
 static ks_status_t __do_disconnect(swclt_sess_t *sess)
 {
 	ks_rwl_write_lock(sess->rwlock);
-	swclt_conn_t *conn = sess->conn;
-	sess->conn = NULL;
+	swclt_conn_disconnect(sess->conn);
 	ks_rwl_write_unlock(sess->rwlock);
-	swclt_conn_destroy(&conn);
 	return KS_STATUS_SUCCESS;
 }
 
@@ -464,8 +462,8 @@ static void __on_conn_failed(swclt_conn_t *conn, void *data)
 
 static ks_status_t __do_connect(swclt_sess_t *sess)
 {
-	ks_status_t status;
 	ks_json_t *authentication = NULL;
+	ks_status_t status;
 
 	/* Defer this check here, so it can be rescanned from ENV at runtime after session creation */
 	if (!sess->config->private_key_path || !sess->config->client_cert_path) {
@@ -492,11 +490,19 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 		authentication = ks_json_parse(sess->config->authentication);
 	}
 
-	swclt_conn_t *new_conn = NULL;
+	ks_rwl_write_lock(sess->rwlock);
 
-	/* Create a connection and have it call us back anytime a new read is detected */
-	if (status = swclt_conn_connect_ex(
-			&new_conn,
+	if (sess->conn) {
+		/* Reconnect */
+		if (status = swclt_conn_reconnect(sess->conn, sess->info.sessionid, &authentication, sess->config->agent, sess->config->identity, sess->config->network)) {
+			if (authentication) ks_json_delete(&authentication);
+			return status;
+		}
+	} else {
+		/* Create a connection and have it call us back anytime a new read is detected */
+		swclt_conn_t *new_conn = NULL;
+		if (status = swclt_conn_connect_ex(
+			&sess->conn,
 			(swclt_conn_incoming_cmd_cb_t)__on_incoming_cmd,
 			sess,
 			(swclt_conn_connect_cb_t)__on_connect_reply,
@@ -512,11 +518,10 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 			sess->ssl)) {
 		if (authentication) ks_json_delete(&authentication);
 		return status;
+		}
 	}
+	swclt_conn_info(sess->conn, &sess->info.conn);
 
-	swclt_conn_info(new_conn, &sess->info.conn);
-
-	ks_rwl_write_lock(sess->rwlock);
 	/* If we got a new session id, stash it */
 	if (!ks_uuid_is_null(&sess->info.sessionid)) {
 		if (ks_uuid_cmp(&sess->info.sessionid, &sess->info.conn.sessionid)) {
@@ -533,7 +538,6 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 	sess->info.sessionid = sess->info.conn.sessionid;
 	sess->info.nodeid = ks_pstrdup(sess->pool, sess->info.conn.nodeid);
 	sess->info.master_nodeid = ks_pstrdup(sess->pool, sess->info.conn.master_nodeid);
-	sess->conn = new_conn;
 	ks_rwl_write_unlock(sess->rwlock);
 
 	ks_log(KS_LOG_INFO, "Successfully established sessionid: %s", ks_uuid_thr_str(&sess->info.sessionid));

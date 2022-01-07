@@ -95,6 +95,8 @@ struct swclt_conn {
 };
 
 SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn);
+SWCLT_DECLARE(void) swclt_conn_disconnect(swclt_conn_t *conn);
+SWCLT_DECLARE(ks_status_t) swclt_conn_reconnect(swclt_conn_t *conn, ks_uuid_t previous_sessionid, ks_json_t **authentication, const char *agent, const char *identity, ks_json_t *network);
 SWCLT_DECLARE(ks_status_t) swclt_conn_connect(
 	swclt_conn_t **conn,
 	swclt_conn_incoming_cmd_cb_t incoming_command_callback,
