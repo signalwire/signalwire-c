@@ -496,6 +496,7 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 		/* Reconnect */
 		if (status = swclt_conn_reconnect(sess->conn, sess->info.sessionid, &authentication, sess->config->agent, sess->config->identity, sess->config->network)) {
 			if (authentication) ks_json_delete(&authentication);
+			ks_rwl_write_unlock(sess->rwlock);
 			return status;
 		}
 	} else {
@@ -517,6 +518,7 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 			sess->config->network,
 			sess->ssl)) {
 		if (authentication) ks_json_delete(&authentication);
+		ks_rwl_write_unlock(sess->rwlock);
 		return status;
 		}
 	}
