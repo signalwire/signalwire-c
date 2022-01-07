@@ -280,6 +280,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_cancel_request(swclt_conn_t *conn, swclt_c
 			ks_log(KS_LOG_WARNING, "Canceled request and destroying command: %s", cmd_str);
 			ks_pool_free(&cmd_str);
 			swclt_cmd_destroy(&cmd);
+			swclt_cmd_future_destroy(future);
 		}
 		*future = NULL;
 	}
