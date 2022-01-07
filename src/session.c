@@ -1394,7 +1394,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute(
 	swclt_cmd_reply_t **reply)
 {
 	swclt_cmd_future_t *future = NULL;
-	ks_status_t status = swclt_sess_execute_async(
+	swclt_sess_execute_async(
 		sess,
 		responder,
 		protocol,
