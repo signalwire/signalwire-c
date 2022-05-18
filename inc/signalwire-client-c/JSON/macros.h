@@ -251,6 +251,7 @@ KS_BEGIN_EXTERN_C
 	}
 
 #define SWCLT_JSON_PARSE_END()											\
+	(void)release_cb;													\
 	*result = (void *)target;											\
 	return KS_STATUS_SUCCESS;											\
 	}
