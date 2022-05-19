@@ -283,6 +283,7 @@ KS_BEGIN_EXTERN_C
 	function_name##_DESTROY(&target->key);
 
 #define SWCLT_JSON_DESTROY_END()			\
+	(void)target;							\
 	ks_pool_free(__free_target);			\
 }
 
