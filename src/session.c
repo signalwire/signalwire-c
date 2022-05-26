@@ -80,7 +80,7 @@ static void *session_monitor_thread(ks_thread_t *thread, void *data)
 {
 	swclt_sess_t *sess = (swclt_sess_t *)data;
 
-	ks_log(KS_LOG_INFO, "Session monitor starting");
+	ks_log(KS_LOG_DEBUG, "Session monitor starting");
 	while (ks_thread_stop_requested(thread) == KS_FALSE) {
 		ks_cond_lock(sess->monitor_cond);
 		ks_cond_timedwait(sess->monitor_cond, 1000);
@@ -90,7 +90,7 @@ static void *session_monitor_thread(ks_thread_t *thread, void *data)
 		}
 	}
 
-	ks_log(KS_LOG_INFO, "Session monitor thread stopping");
+	ks_log(KS_LOG_DEBUG, "Session monitor thread stopping");
 	return NULL;
 }
 
@@ -192,7 +192,7 @@ static ks_status_t __execute_pmethod_cb(
 		/* Raise the callback, if they respond with a general failure fail for them */
 		ks_status_t cb_result;
 
-		ks_log(KS_LOG_INFO, "Initiating execute for protocol: %s", rqu->protocol);
+		ks_log(KS_LOG_DEBUG, "Initiating execute for protocol: %s", rqu->protocol);
 
 		if (cb_result = pmethod_sess->cb(sess, cmd, rqu, pmethod_sess->cb_data)) {
 			err_message = ks_psprintf(
@@ -203,7 +203,7 @@ static ks_status_t __execute_pmethod_cb(
 			err_code = -32603;
 		}
 
-		ks_log(KS_LOG_INFO, "Completed execute for protocol: %s (%lu)", rqu->protocol, cb_result);
+		ks_log(KS_LOG_DEBUG, "Completed execute for protocol: %s (%lu)", rqu->protocol, cb_result);
 	}
 
 	/* Now verify the command was properly setup for result processing */
@@ -320,7 +320,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			if (status)
 				ks_log(KS_LOG_ERROR, "Failed to submit reply from disconnect %s, status: %lu", cmd_str, status);
 			else
-				ks_log(KS_LOG_INFO, "Sent reply back from disconnect request: %s", cmd_str);
+				ks_log(KS_LOG_DEBUG, "Sent reply back from disconnect request: %s", cmd_str);
 		}
 		goto done;
 	} else if (!strcmp(method, BLADE_PING_METHOD)) {
@@ -346,7 +346,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			if (status)
 				ks_log(KS_LOG_ERROR, "Failed to submit reply from ping: %s, status: %lu", cmd_str, status);
 			else
-				ks_log(KS_LOG_INFO, "Sent reply back from ping request: %s", cmd_str);
+				ks_log(KS_LOG_DEBUG, "Sent reply back from ping request: %s", cmd_str);
 		}
 		goto done;
 	} else if (!strcmp(method, BLADE_NETCAST_METHOD)) {
@@ -366,7 +366,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			goto done;
 		}
 
-		ks_log(KS_LOG_INFO, "Updated nodestore with netcast command: %s", cmd_str);
+		ks_log(KS_LOG_DEBUG, "Updated nodestore with netcast command: %s", cmd_str);
 		BLADE_NETCAST_RQU_DESTROY(&rqu);
 		goto done;
 	} else if (!strcmp(method, BLADE_EXECUTE_METHOD)) {
@@ -393,7 +393,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 		BLADE_EXECUTE_RQU_DESTROY(&rqu);
 
 		if (!status) {
-			ks_log(KS_LOG_INFO, "Sending reply back from execute request: %s", cmd_str);
+			ks_log(KS_LOG_DEBUG, "Sending reply back from execute request: %s", cmd_str);
 
 			/* Now the command is ready to be sent back, enqueue it */
 			ks_rwl_read_lock(sess->rwlock);
@@ -402,7 +402,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			if (status)
 				ks_log(KS_LOG_ERROR, "Failed to submit reply from execute: %s, status: %lu", cmd_str, status);
 			else
-				ks_log(KS_LOG_INFO, "Sent reply back from execute request: %s", cmd_str);
+				ks_log(KS_LOG_DEBUG, "Sent reply back from execute request: %s", cmd_str);
 		}
 		goto done;
 	} else {
@@ -442,10 +442,10 @@ static ks_status_t __on_connect_reply(swclt_conn_t *conn, ks_json_t *error, cons
 			if (status = swclt_store_populate(sess->store, connect_rpl)) {
 				ks_log(KS_LOG_WARNING, "Failed to populate node store from connect reply (%lu)", status);
 			} else {
-				ks_log(KS_LOG_INFO, "Populated node store from connect reply");
+				ks_log(KS_LOG_DEBUG, "Populated node store from connect reply");
 			}
 		} else {
-			ks_log(KS_LOG_INFO, "Restored session");
+			ks_log(KS_LOG_DEBUG, "Restored session");
 		}
 	}
 
@@ -475,7 +475,7 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 		}
 	}
 
-	ks_log(KS_LOG_INFO, "Session is performing connect");
+	ks_log(KS_LOG_DEBUG, "Session is performing connect");
 
 	/* Delete the previous connection if present */
 	__do_disconnect(sess);
@@ -486,7 +486,7 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 		return status;
 	}
 
-	ks_log(KS_LOG_INFO, "Successfully setup ssl, initiating connection");
+	ks_log(KS_LOG_DEBUG, "Successfully setup ssl, initiating connection");
 
 	if (sess->config->authentication) {
 		authentication = ks_json_parse(sess->config->authentication);
@@ -536,9 +536,7 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 	sess->conn = new_conn;
 	ks_rwl_write_unlock(sess->rwlock);
 
-	ks_log(KS_LOG_INFO, "Successfully established sessionid: %s", ks_uuid_thr_str(&sess->info.sessionid));
-	ks_log(KS_LOG_INFO, "   nodeid: %s", sess->info.nodeid);
-	ks_log(KS_LOG_INFO, "   master_nodeid: %s", sess->info.master_nodeid);
+	ks_log(KS_LOG_INFO, "Successfully established sessionid: %s, nodeid: %s  master_nodeid:%s", ks_uuid_thr_str(&sess->info.sessionid), sess->info.nodeid, sess->info.master_nodeid);
 
 	return status;
 }
@@ -580,11 +578,11 @@ static ks_status_t __swclt_sess_metric_register(swclt_sess_t *sess, const char *
 
 	reg = (swclt_metric_reg_t *)ks_hash_search(sess->metrics, (const void *)protocol, KS_UNLOCKED);
 	if (reg) {
-		ks_log(KS_LOG_INFO, "Metric update for '%s'\n", protocol);
+		ks_log(KS_LOG_DEBUG, "Metric update for '%s'\n", protocol);
 		reg->interval = interval;
 		reg->rank = rank;
 	} else {
-		ks_log(KS_LOG_INFO, "Metric added for '%s'\n", protocol);
+		ks_log(KS_LOG_DEBUG, "Metric added for '%s'\n", protocol);
 
 		reg = (swclt_metric_reg_t *)ks_pool_alloc(ks_pool_get(sess->metrics), sizeof(swclt_metric_reg_t));
 		reg->timeout = ks_time_now();
