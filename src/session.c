@@ -653,6 +653,8 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 	/* Allow the config to be shared, no ownership change */
 	sess->config = config;
 
+	ks_rwl_create(&sess->rwlock, sess->pool);
+
 	/* Parse the identity, it will contain the connection target address etc. */
 	if (status = swclt_ident_from_str(&sess->ident, sess->pool, identity_uri)) {
 		ks_log(KS_LOG_ERROR, "Invalid identity uri: %s", identity_uri);
@@ -700,8 +702,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 		ks_log(KS_LOG_ERROR, "Failed to initialize node store (%lu)", status);
 		goto done;
 	}
-
-	ks_rwl_create(&sess->rwlock, sess->pool);
 
 	if (status = ks_cond_create(&sess->monitor_cond, NULL)) {
 		ks_log(KS_LOG_ERROR, "Failed to allocate session monitor condition: %lu", status);
