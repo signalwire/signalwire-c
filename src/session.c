@@ -86,10 +86,13 @@ static void submit_results(swclt_sess_t *sess)
 	swclt_cmd_t *result = NULL;
 	dequeue_result(sess, &result);
 	while (result) {
+		ks_rwl_read_lock(sess->rwlock);
 		if (swclt_conn_submit_result(sess->conn, result) == KS_STATUS_DISCONNECTED) {
+			ks_rwl_read_unlock(sess->rwlock);
 			enqueue_result(sess, result);
 			break;
 		}
+		ks_rwl_read_unlock(sess->rwlock);
 		swclt_cmd_destroy(&result);
 	}
 }
@@ -448,7 +451,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 
 		status = BLADE_EXECUTE_RQU_PARSE(cmd_pool, request, &rqu);
 
-		ks_log(KS_LOG_DEBUG, "Dispatching incoming blade execute request: %s to callback", cmd_str);
+		ks_log(KS_LOG_INFO, "RX: %s", cmd_str);
 
 		if (status) {
 			ks_log(KS_LOG_WARNING, "Failed to parse execute payload: %s (%lu)", cmd_str, status);
@@ -466,7 +469,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 		BLADE_EXECUTE_RQU_DESTROY(&rqu);
 
 		if (!status) {
-			ks_log(KS_LOG_DEBUG, "Sending reply back from execute request: %s", cmd_str);
+			char *reply_str = swclt_cmd_describe(cmd);
 
 			/* Now the command is ready to be sent back, send it */
 			ks_rwl_read_lock(sess->rwlock);
@@ -474,14 +477,15 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			ks_rwl_read_unlock(sess->rwlock);
 			if (status == KS_STATUS_DISCONNECTED) {
 				/* send after reconnection */
-				ks_log(KS_LOG_INFO, "Enqueue reply back from execute request: %s", cmd_str);
+				ks_log(KS_LOG_INFO, "(Not connected) TX ENQUEUE: %s", reply_str);
 				enqueue_result(sess, cmd);
 				status = KS_STATUS_SUCCESS;
 			} else if (status) {
-				ks_log(KS_LOG_ERROR, "Failed to submit reply from execute %s, status: %lu", cmd_str, status);
+				ks_log(KS_LOG_ERROR, "TX FAILED %s, status: %lu", reply_str, status);
 			} else {
-				ks_log(KS_LOG_DEBUG, "Sent reply back from execute request: %s", cmd_str);
+				ks_log(KS_LOG_INFO, "TX: %s", reply_str);
 			}
+			ks_pool_free(&reply_str);
 		}
 		goto done;
 	} else {
@@ -1542,9 +1546,18 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 			goto done;
 	}
 
+	char *request_str = swclt_cmd_describe(cmd);
+
 	ks_rwl_read_lock(sess->rwlock);
 	status = swclt_conn_submit_request(sess->conn, &cmd, future);
 	ks_rwl_read_unlock(sess->rwlock);
+
+	if (status) {
+		ks_log(KS_LOG_WARNING, "FAILED TX: %s", request_str);
+	} else {
+		ks_log(KS_LOG_INFO, "TX: %s", request_str);
+	}
+	ks_pool_free(&request_str);
 
 done:
 	swclt_cmd_destroy(&cmd);
@@ -1583,9 +1596,18 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id_async(
 			goto done;
 	}
 
+	char *request_str = swclt_cmd_describe(cmd);
+
 	ks_rwl_read_lock(sess->rwlock);
 	status = swclt_conn_submit_request(sess->conn, &cmd, future);
 	ks_rwl_read_unlock(sess->rwlock);
+
+	if (status) {
+		ks_log(KS_LOG_WARNING, "FAILED TX: %s", request_str);
+	} else {
+		ks_log(KS_LOG_INFO, "TX: %s", request_str);
+	}
+	ks_pool_free(&request_str);
 
 done:
 	swclt_cmd_destroy(&cmd);
