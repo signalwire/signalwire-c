@@ -30,8 +30,79 @@ typedef struct swclt_metric_reg_s {
 	ks_bool_t dirty;
 } swclt_metric_reg_t;
 
+typedef struct swclt_result_queue {
+	swclt_cmd_t *result;
+	struct swclt_result_queue *next;
+	ks_time_t expire_time;
+} swclt_result_queue_t;
+
 static ks_status_t __do_connect(swclt_sess_t *sess);
 static ks_status_t __do_disconnect(swclt_sess_t *sess);
+
+static void enqueue_result(swclt_sess_t *sess, swclt_cmd_t *cmd)
+{
+	ks_mutex_lock(sess->result_mutex);
+	swclt_result_queue_t *node = ks_pool_alloc(sess->pool, sizeof(*node));
+	node->result = swclt_cmd_duplicate(cmd);
+	node->expire_time = ks_time_now_sec() + 5;
+	if (sess->result_last) {
+		sess->result_last->next = node;
+	}
+	sess->result_last = node;
+	if (!sess->result_first) {
+		sess->result_first = node;
+	}
+	ks_mutex_unlock(sess->result_mutex);
+}
+
+static void dequeue_result(swclt_sess_t *sess, swclt_cmd_t **cmd)
+{
+	int retry;
+	do {
+		retry = 0;
+		ks_mutex_lock(sess->result_mutex);
+		swclt_result_queue_t *first = sess->result_first;
+		*cmd = NULL;
+		if (first) {
+			if (first->expire_time >= ks_time_now_sec()) {
+				*cmd = first->result;
+			} else {
+				// too old... discard it and retry with next result
+				swclt_cmd_destroy(&first->result);
+				retry = 1;
+			}
+			sess->result_first = first->next;
+			ks_pool_free(&first);
+		}
+		if (!sess->result_first) {
+			sess->result_last = NULL;
+		}
+		ks_mutex_unlock(sess->result_mutex);
+	} while (!retry);
+}
+
+static void submit_results(swclt_sess_t *sess)
+{
+	swclt_cmd_t *result = NULL;
+	dequeue_result(sess, &result);
+	while (result) {
+		if (swclt_conn_submit_result(sess->conn, result) == KS_STATUS_DISCONNECTED) {
+			enqueue_result(sess, result);
+			break;
+		}
+		swclt_cmd_destroy(&result);
+	}
+}
+
+static void flush_results(swclt_sess_t *sess)
+{
+	swclt_cmd_t *result = NULL;
+	dequeue_result(sess, &result);
+	while (result) {
+		swclt_cmd_destroy(&result);
+		dequeue_result(sess, &result);
+	}
+}
 
 static void check_session_state(swclt_sess_t *sess)
 {
@@ -129,6 +200,8 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sessP)
 		swclt_ident_destroy(&sess->ident);
 		swclt_store_destroy(&sess->store);
 		ks_rwl_destroy(&sess->rwlock);
+		flush_results(sess);
+		ks_mutex_destroy(&sess->result_mutex);
 		ks_pool_close(&pool);
 	}
 	return KS_STATUS_SUCCESS;
@@ -307,13 +380,13 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 		}
 
 		// TODO: Handle disconnect properly, should halt sending more data until restored
-		ks_json_t *cmd_result = ks_json_create_object();
-		status = swclt_cmd_set_result(cmd, &cmd_result);
+		ks_json_t *result = ks_json_create_object();
+		status = swclt_cmd_set_result(cmd, &result);
 
 		BLADE_DISCONNECT_RQU_DESTROY(&rqu);
 
 		if (!status) {
-			/* Now the command is ready to be sent back, enqueue it */
+			/* Now the command is ready to be sent back, send it */
 			ks_rwl_read_lock(sess->rwlock);
 			status = swclt_conn_submit_result(sess->conn, cmd);
 			ks_rwl_read_unlock(sess->rwlock);
@@ -333,13 +406,13 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			goto done;
 		}
 
-		ks_json_t *cmd_result = BLADE_PING_RPL_MARSHAL(&(blade_ping_rpl_t){ rqu->timestamp, rqu->payload });
-		status = swclt_cmd_set_result(cmd, &cmd_result);
+		ks_json_t *result = BLADE_PING_RPL_MARSHAL(&(blade_ping_rpl_t){ rqu->timestamp, rqu->payload });
+		status = swclt_cmd_set_result(cmd, &result);
 
 		BLADE_PING_RQU_DESTROY(&rqu);
 
 		if (!status) {
-			/* Now the command is ready to be sent back, enqueue it */
+			/* Now the command is ready to be sent back, send it */
 			ks_rwl_read_lock(sess->rwlock);
 			status = swclt_conn_submit_result(sess->conn, cmd);
 			ks_rwl_read_unlock(sess->rwlock);
@@ -395,14 +468,19 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 		if (!status) {
 			ks_log(KS_LOG_DEBUG, "Sending reply back from execute request: %s", cmd_str);
 
-			/* Now the command is ready to be sent back, enqueue it */
+			/* Now the command is ready to be sent back, send it */
 			ks_rwl_read_lock(sess->rwlock);
 			status = swclt_conn_submit_result(sess->conn, cmd);
-			ks_rwl_read_unlock(sess->rwlock);
-			if (status)
-				ks_log(KS_LOG_ERROR, "Failed to submit reply from execute: %s, status: %lu", cmd_str, status);
-			else
+			if (status == KS_STATUS_DISCONNECTED) {
+				/* send after reconnection */
+				ks_log(KS_LOG_INFO, "Enqueue reply back from execute request: %s", cmd_str);
+				enqueue_result(sess, cmd);
+				status = KS_STATUS_SUCCESS;
+			} else if (status) {
+				ks_log(KS_LOG_ERROR, "Failed to submit reply from execute %s, status: %lu", cmd_str, status);
+			} else {
 				ks_log(KS_LOG_DEBUG, "Sent reply back from execute request: %s", cmd_str);
+			}
 		}
 		goto done;
 	} else {
@@ -689,6 +767,10 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 			KS_HASH_MODE_CASE_SENSITIVE,
 			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_KEY | KS_HASH_FLAG_FREE_VALUE | KS_HASH_FLAG_RWLOCK,
 			sess->pool))
+		goto done;
+
+	if (status = ks_mutex_create(
+			&sess->result_mutex, KS_MUTEX_FLAG_DEFAULT, sess->pool))
 		goto done;
 
 	/* Verify the config has what we need */

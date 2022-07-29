@@ -49,6 +49,9 @@ static inline const char *swclt_sess_state_str(swclt_sess_state_t state)
 typedef void (*swclt_sess_auth_failed_cb_t)(swclt_sess_t *sess);
 typedef void (*swclt_sess_state_change_cb_t)(swclt_sess_t *sess, void *cb_data);
 
+struct swclt_result_queue;
+typedef struct swclt_result_queue swclt_result_queue_t;
+
 typedef struct swclt_sess_info_s {
 	/* The info structure from our connection (it itself then contains
 	 * an info structure for the transport) */
@@ -100,6 +103,11 @@ struct swclt_sess {
 
 	/* Registry for metric rank updates for local protocols */
 	ks_hash_t *metrics;
+
+	/* Results that are pending delivery on re-connection */
+	swclt_result_queue_t *result_first;
+	swclt_result_queue_t *result_last;
+	ks_mutex_t *result_mutex;
 
 	/* Optional callback for state changes */
 	swclt_sess_state_change_cb_t state_change_cb;
