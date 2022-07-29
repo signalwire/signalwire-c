@@ -78,7 +78,7 @@ static void dequeue_result(swclt_sess_t *sess, swclt_cmd_t **cmd)
 			sess->result_last = NULL;
 		}
 		ks_mutex_unlock(sess->result_mutex);
-	} while (!retry);
+	} while (retry);
 }
 
 static void submit_results(swclt_sess_t *sess)
@@ -380,8 +380,8 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 		}
 
 		// TODO: Handle disconnect properly, should halt sending more data until restored
-		ks_json_t *result = ks_json_create_object();
-		status = swclt_cmd_set_result(cmd, &result);
+		ks_json_t *cmd_result = ks_json_create_object();
+		status = swclt_cmd_set_result(cmd, &cmd_result);
 
 		BLADE_DISCONNECT_RQU_DESTROY(&rqu);
 
@@ -406,8 +406,8 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			goto done;
 		}
 
-		ks_json_t *result = BLADE_PING_RPL_MARSHAL(&(blade_ping_rpl_t){ rqu->timestamp, rqu->payload });
-		status = swclt_cmd_set_result(cmd, &result);
+		ks_json_t *cmd_result = BLADE_PING_RPL_MARSHAL(&(blade_ping_rpl_t){ rqu->timestamp, rqu->payload });
+		status = swclt_cmd_set_result(cmd, &cmd_result);
 
 		BLADE_PING_RQU_DESTROY(&rqu);
 
@@ -471,6 +471,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			/* Now the command is ready to be sent back, send it */
 			ks_rwl_read_lock(sess->rwlock);
 			status = swclt_conn_submit_result(sess->conn, cmd);
+			ks_rwl_read_unlock(sess->rwlock);
 			if (status == KS_STATUS_DISCONNECTED) {
 				/* send after reconnection */
 				ks_log(KS_LOG_INFO, "Enqueue reply back from execute request: %s", cmd_str);
