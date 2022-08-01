@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,20 +30,14 @@ KS_BEGIN_EXTERN_C
 static inline uint32_t BLADE_METHOD_FLAGS(const char * const method)
 {
 	ks_assertd(method != NULL);
-	if (!strcmp(method, BLADE_BROADCAST_METHOD))
-		return BLADE_BROADCAST_FLAGS;
-	else if (!strcmp(method, BLADE_DISCONNECT_METHOD))
+	if (!strcmp(method, BLADE_DISCONNECT_METHOD))
 		return BLADE_DISCONNECT_FLAGS;
-	else if (!strcmp(method, BLADE_NETCAST_METHOD))
-		return BLADE_NETCAST_FLAGS;
 	else if (!strcmp(method, BLADE_PROTOCOL_METHOD))
 		return BLADE_PROTOCOL_FLAGS;
 	else if (!strcmp(method, BLADE_IDENTITY_METHOD))
 		return BLADE_IDENTITY_FLAGS;
 	else if (!strcmp(method, BLADE_EXECUTE_METHOD))
 		return BLADE_EXECUTE_FLAGS;
-	else if (!strcmp(method, BLADE_SUBSCRIPTION_METHOD))
-		return BLADE_SUBSCRIPTION_FLAGS;
 	else if (!strcmp(method, BLADE_PING_METHOD))
 		return BLADE_PING_FLAGS;
 	else {

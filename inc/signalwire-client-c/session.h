@@ -66,10 +66,6 @@ struct swclt_sess {
 	/* The pool that manages all the allocations */
 	ks_pool_t *pool;
 
-	/* The node store, an api to keep the cache in sync with blade, contains
-	 * a lotta info about stuff. */
-	swclt_store_t *store;
-
 	/* Our connection */
 	swclt_conn_t *conn;
 
@@ -87,16 +83,8 @@ struct swclt_sess {
 	/* Optional callback for authentication failure */
 	swclt_sess_auth_failed_cb_t auth_failed_cb;
 
-	/* We keep track of subscriptions in a hash here, each call to subscribe
-	 * from the client will add an entry in this hash. The hash points to the
-	 * subscription handle which will contain the users callback */
-	ks_hash_t *subscriptions;
-
 	/* Registry for Protocol RPC methods */
 	ks_hash_t *methods;
-
-	/* Setups completed for provider event channels */
-	ks_hash_t *setups;
 
 	/* Registry for metric rank updates for local protocols */
 	ks_hash_t *metrics;
@@ -145,52 +133,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_register_protocol_method(
 	const char *method,
 	swclt_pmethod_cb_t pmethod,
 	void *cb_data);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_register_subscription_method(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	swclt_sub_cb_t cb,
-	void *cb_data);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_broadcast(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	const char *event,
-	ks_json_t **params);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	swclt_sub_cb_t cb,
-	void *cb_data,
-	swclt_cmd_reply_t **reply);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	swclt_sub_cb_t cb,
-	void *cb_data,
-	swclt_cmd_cb_t response_callback,
-	void *response_callback_data,
-	swclt_cmd_future_t **future);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	swclt_cmd_reply_t **reply);
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	swclt_cmd_cb_t response_callback,
-	void *response_callback_data,
-	swclt_cmd_future_t **future);
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
 	swclt_sess_t *sess,
@@ -287,24 +229,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id_async(
 	swclt_cmd_cb_t response_callback,
 	void *response_callback_data,
 	swclt_cmd_future_t **future);
-						   
-SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t *sess, const char *service, swclt_sub_cb_t cb, void *cb_data);
-SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_setup(swclt_sess_t *sess, swclt_sub_cb_t cb, void *cb_data);
-													  
-SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure(swclt_sess_t *sess,
-															 const char *target,
-															 const char *local_endpoint,
-															 const char *external_endpoint,
-															 const char *relay_connector_id,
-															 swclt_cmd_reply_t **reply);
-SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t *sess,
-																   const char *target,
-																   const char *local_endpoint,
-																   const char *external_endpoint,
-																   const char *relay_connector_id,
-																   swclt_cmd_cb_t response_callback,
-																   void *response_callback_data,
-																   swclt_cmd_future_t **future);
+
 
 KS_END_EXTERN_C
 

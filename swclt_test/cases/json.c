@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,26 +21,6 @@
  */
 
 #include "swclt_test.h"
-
-static blade_netcast_rqu_t __netcast_protocol_provider_add_request(ks_pool_t *pool, const char *protocol, ks_uuid_t nodeid, const char *channel)
-{
-	blade_netcast_rqu_t request;
-	request.command = BLADE_NETCAST_CMD_PROTOCOL_PROVIDER_ADD;
-	request.certified_only = KS_TRUE;
-	request.netcaster_nodeid = ks_uuid_null_thr_str();
-
-	/* Fill in the params too */
-	blade_netcast_protocol_provider_add_param_t params = {0};
-	params.protocol = protocol;
-	params.nodeid = ks_uuid_str(NULL, &nodeid);
-	params.channels = ks_json_create_array();
-	ks_json_add_item_to_array(params.channels, BLADE_CHANNEL_MARSHAL(&(blade_channel_t){channel, BLADE_ACL_PUBLIC, BLADE_ACL_PUBLIC}));
-
-	/* Marshal it into its parent request */
-	request.params = BLADE_NETCAST_PROTOCOL_PROVIDER_ADD_PARAM_MARSHAL(&params);
-
-	return request;
-}
 
 static void test_blade_execute(ks_pool_t *pool)
 {

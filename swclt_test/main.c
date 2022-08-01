@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,6 @@ DECLARE_TEST(command);
 DECLARE_TEST(execute);
 DECLARE_TEST(connection);
 DECLARE_TEST(session);
-DECLARE_TEST(nodestore);
 DECLARE_TEST(uncert_exp);
 
 test_entry_t g_test_methods[] = {
@@ -35,7 +34,6 @@ test_entry_t g_test_methods[] = {
 	TEST_ENTRY(execute),
 	TEST_ENTRY(connection),
 	TEST_ENTRY(session),
-	TEST_ENTRY(nodestore),
 	TEST_ENTRY(uncert_exp),
 };
 

@@ -119,24 +119,16 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sessP)
 		ks_rwl_write_lock(sess->rwlock);
 
 		// now destroy everything
-		ks_hash_destroy(&sess->subscriptions);
 		ks_hash_destroy(&sess->methods);
-		ks_hash_destroy(&sess->setups);
 		ks_hash_destroy(&sess->metrics);
 		if (sess->ssl) {
 			swclt_ssl_destroy_context(&sess->ssl);
 		}
 		swclt_ident_destroy(&sess->ident);
-		swclt_store_destroy(&sess->store);
 		ks_rwl_destroy(&sess->rwlock);
 		ks_pool_close(&pool);
 	}
 	return KS_STATUS_SUCCESS;
-}
-
-static const char * __make_subscription_key(swclt_sess_t *sess, const char * protocol, const char * channel)
-{
-	return ks_psprintf(sess->pool, "%s:%s", protocol, channel);
 }
 
 static const char * __make_pmethod_key(swclt_sess_t *sess, const char *protocol, const char *method)
@@ -266,37 +258,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 	request = cmd->json;
 
 	/* Keep it locked until we parse the request */
-	if (!strcmp(method, BLADE_BROADCAST_METHOD)) {
-		/* Locate the protocol */
-		blade_broadcast_rqu_t *rqu;
-		swclt_sub_t *sub;
-		const char *key;
-
-		status = BLADE_BROADCAST_RQU_PARSE(cmd_pool, request, &rqu);
-
-		if (status) {
-			ks_log(KS_LOG_ERROR, "Failed to parse broadcast command: %s (%lu)",
-				cmd_str, status);
-			goto done;
-		}
-
-		key = __make_subscription_key(sess, rqu->protocol, rqu->channel);
-		sub = ks_hash_search(sess->subscriptions, key, KS_UNLOCKED);
-		ks_pool_free(&key);
-
-		if (!sub) {
-			ks_log(KS_LOG_WARNING, "Could not locate sub for protocol: %s channel: %s command: %s",
-				rqu->protocol, rqu->channel, cmd_str);
-			BLADE_BROADCAST_RQU_DESTROY(&rqu);
-			status = KS_STATUS_NOT_FOUND;
-			goto done;
-		}
-
-		status = swclt_sub_invoke(sub, sess, rqu);
-
-		BLADE_BROADCAST_RQU_DESTROY(&rqu);
-		goto done;
-	} else if (!strcmp(method, BLADE_DISCONNECT_METHOD)) {
+	if (!strcmp(method, BLADE_DISCONNECT_METHOD)) {
 		blade_disconnect_rqu_t *rqu;
 
 		status = BLADE_DISCONNECT_RQU_PARSE(cmd_pool, request, &rqu);
@@ -348,26 +310,6 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			else
 				ks_log(KS_LOG_DEBUG, "Sent reply back from ping request: %s", cmd_str);
 		}
-		goto done;
-	} else if (!strcmp(method, BLADE_NETCAST_METHOD)) {
-		blade_netcast_rqu_t *rqu;
-
-		status = BLADE_NETCAST_RQU_PARSE(cmd_pool, request, &rqu);
-
-		if (status) {
-			ks_log(KS_LOG_ERROR, "Failed to parse netcast command: %s (%lu)", cmd_str, status);
-			goto done;
-		}
-
-		if (status = swclt_store_update(sess->store, rqu)) {
-			ks_log(KS_LOG_WARNING, "Failed to update nodestore from netcast command: %s (%lu)",
-				cmd_str, status);
-			BLADE_NETCAST_RQU_DESTROY(&rqu);
-			goto done;
-		}
-
-		ks_log(KS_LOG_DEBUG, "Updated nodestore with netcast command: %s", cmd_str);
-		BLADE_NETCAST_RQU_DESTROY(&rqu);
 		goto done;
 	} else if (!strcmp(method, BLADE_EXECUTE_METHOD)) {
 		blade_execute_rqu_t *rqu;
@@ -435,16 +377,7 @@ static ks_status_t __on_connect_reply(swclt_conn_t *conn, ks_json_t *error, cons
 
 	if (connect_rpl) {
 		status = KS_STATUS_SUCCESS;
-		if (!connect_rpl->session_restored)
-		{
-			/* Great we got the reply populate the node store */
-			swclt_store_reset(sess->store);
-			if (status = swclt_store_populate(sess->store, connect_rpl)) {
-				ks_log(KS_LOG_WARNING, "Failed to populate node store from connect reply (%lu)", status);
-			} else {
-				ks_log(KS_LOG_DEBUG, "Populated node store from connect reply");
-			}
-		} else {
+		if (connect_rpl->session_restored) {
 			ks_log(KS_LOG_DEBUG, "Restored session");
 		}
 	}
@@ -661,26 +594,11 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 		goto done;
 	}
 
-	/* Allocate the subscriptions hash */
-	if (status = ks_hash_create(
-			&sess->subscriptions,
-			KS_HASH_MODE_CASE_SENSITIVE,
-			KS_HASH_FLAG_FREE_KEY | KS_HASH_FLAG_FREE_VALUE | KS_HASH_FLAG_MUTEX,
-			sess->pool))
-		goto done;
-
 	/* Allocate the methods hash */
 	if (status = ks_hash_create(
 			&sess->methods,
 			KS_HASH_MODE_CASE_SENSITIVE,
 			KS_HASH_FLAG_FREE_KEY | KS_HASH_FLAG_FREE_VALUE | KS_HASH_FLAG_RWLOCK,
-			sess->pool))
-		goto done;
-
-	if (status = ks_hash_create(
-			&sess->setups,
-			KS_HASH_MODE_CASE_SENSITIVE,
-			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_KEY | KS_HASH_FLAG_FREE_VALUE | KS_HASH_FLAG_RWLOCK,
 			sess->pool))
 		goto done;
 
@@ -696,11 +614,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 		if (!sess->config->authentication) {
 			ks_log(KS_LOG_WARNING, "No authentication configured");
 		}
-	}
-
-	if (status = swclt_store_create(&sess->store)) {
-		ks_log(KS_LOG_ERROR, "Failed to initialize node store (%lu)", status);
-		goto done;
 	}
 
 	if (status = ks_cond_create(&sess->monitor_cond, NULL)) {
@@ -730,43 +643,6 @@ static ks_status_t __nodeid_local(swclt_sess_t *sess, const char *nodeid)
 	return status;
 }
 
-static ks_status_t __unregister_subscription(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel)
-{
-	const char *key = __make_subscription_key(sess, protocol, channel);
-	swclt_sub_t *sub = ks_hash_remove(sess->subscriptions, key);
-	ks_pool_free(&key);
-	if (!sub)
-		return KS_STATUS_NOT_FOUND;
-
-	swclt_sub_destroy(&sub);
-
-	return KS_STATUS_SUCCESS;
-}
-
-static ks_status_t __register_subscription(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	swclt_sub_t **sub)
-{
-	ks_rwl_read_lock(sess->rwlock);
-	/* unregister if already registered so it does not leak anything, even the handle for the sub
-	 * should be cleaned up to avoid leaking for the duration of the session */
-	__unregister_subscription(sess, protocol, channel);
-
-	/* And add it to the hash */
-	ks_status_t status = ks_hash_insert(sess->subscriptions, __make_subscription_key(sess, protocol, channel), *sub);
-	ks_rwl_read_unlock(sess->rwlock);
-
-	if (status == KS_STATUS_SUCCESS) {
-		*sub = NULL; // take ownership
-	}
-	return status;
-}
-
 static ks_status_t __register_pmethod(
 	swclt_sess_t *sess,
 	const char *protocol,
@@ -781,34 +657,6 @@ static ks_status_t __register_pmethod(
 		return KS_STATUS_SUCCESS;
 	}
 	return ks_hash_insert(sess->methods, __make_pmethod_key(sess, protocol, method), __make_pmethod_value(sess, pmethod, cb_data));
-}
-
-static ks_status_t __lookup_setup(swclt_sess_t *sess, const char *service, ks_pool_t *pool, char **protocol)
-{
-	ks_status_t status = KS_STATUS_NOT_FOUND;
-	ks_bool_t exists = KS_FALSE;
-	const char *proto = NULL;
-
-	ks_hash_read_lock(sess->setups);
-	proto = ks_hash_search(sess->setups, service, KS_UNLOCKED);
-	if (proto) {
-		*protocol = ks_pstrdup(pool, proto);
-		status = KS_STATUS_SUCCESS;
-	}
-	ks_hash_read_unlock(sess->setups);
-
-	return status;
-}
-
-static ks_status_t __register_setup(swclt_sess_t *sess, const char *service, const char *protocol)
-{
-	ks_status_t status;
-
-	ks_hash_write_lock(sess->setups);
-	status = ks_hash_insert(sess->setups, ks_pstrdup(ks_pool_get(sess->setups), service), ks_pstrdup(ks_pool_get(sess->setups), protocol));
-	ks_hash_write_unlock(sess->setups);
-
-	return status;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_set_auth_failed_cb(swclt_sess_t *sess, swclt_sess_auth_failed_cb_t cb)
@@ -957,189 +805,6 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_register_protocol_method(
 	void *cb_data)
 {
 	return __register_pmethod(sess, protocol, method, pmethod_cb, cb_data);
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_register_subscription_method(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	swclt_sub_cb_t cb,
-	void *cb_data)
-{
-	ks_status_t status = KS_STATUS_SUCCESS;
-	swclt_sub_t *sub = NULL;
-	if (status = swclt_sub_create(&sub, sess->pool, protocol, channel, cb, cb_data))
-		return status;
-
-	/* Register this subscription, if request fails we just won't receive the events,
-	 * but registering the callback is fine and can be replaced if client tries again */
-	status = __register_subscription(sess, protocol, channel, &sub);
-	swclt_sub_destroy(&sub);
-	return status;
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_broadcast(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	const char *event,
-	ks_json_t **params)
-{
-	ks_status_t status = KS_STATUS_SUCCESS;
-	swclt_cmd_t *cmd = NULL;
-
-	/* Create the command */
-	if (!(cmd = CREATE_BLADE_BROADCAST_CMD(
-			protocol,
-			channel,
-			event,
-			sess->info.nodeid,
-			params))) {
-		status = KS_STATUS_NO_MEM;
-		goto done;
-	}
-
-	/* Now submit it */
-	ks_rwl_read_lock(sess->rwlock);
-	status = swclt_conn_submit_request(sess->conn, &cmd, NULL);
-	ks_rwl_read_unlock(sess->rwlock);
-
-done:
-	swclt_cmd_destroy(&cmd);
-
-	return status;
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	swclt_sub_cb_t cb,
-	void *cb_data,
-	swclt_cmd_reply_t **reply)
-{
-	swclt_cmd_future_t *future = NULL;
-	swclt_sess_subscription_add_async(
-		sess,
-		protocol,
-		channel,
-		cb,
-		cb_data,
-		NULL,
-		NULL,
-		&future);
-	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_add_async(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	swclt_sub_cb_t cb,
-	void *cb_data,
-	swclt_cmd_cb_t response_callback,
-	void *response_callback_data,
-	swclt_cmd_future_t **future)
-{
-	ks_status_t status = KS_STATUS_SUCCESS;
-	swclt_cmd_t *cmd = NULL;
-	blade_subscription_rpl_t *subscription_rpl = NULL;
-	swclt_sub_t *sub = NULL;
-
-	/* @todo remove the next 2 calls, and call swclt_sess_register_subscription_method externally, and
-	 * update to allow multiple channels to be subscribed via ks_json_t array of channel name strings
-	 * can also verify that the callbacks are already registered here as a sanity check */
-
-	/* We also will track this subscription with a handle */
-	if (status = swclt_sub_create(&sub, sess->pool, protocol, channel, cb, cb_data))
-		goto done;
-
-	/* Register this subscription, if request fails we just won't receive the events,
-	 * but registering the callback is fine and can be replaced if client tries again */
-	if (status = __register_subscription(sess, protocol, channel, &sub))
-		goto done;
-
-	/* Allocate the request */
-	if (!(cmd = CREATE_BLADE_SUBSCRIPTION_CMD(
-			BLADE_SUBSCRIPTION_CMD_ADD,
-			protocol,
-			channel))) {
-		goto done;
-	}
-
-	/* If the caller wants to do async, set the callback in the cmd */
-	if (response_callback) {
-		if (status = swclt_cmd_set_cb(cmd, response_callback, response_callback_data))
-			goto done;
-	}
-
-	/* Now submit the command */
-	ks_rwl_read_lock(sess->rwlock);
-	status = swclt_conn_submit_request(sess->conn, &cmd, future);
-	ks_rwl_read_unlock(sess->rwlock);
-
-done:
-	swclt_cmd_destroy(&cmd);
-	swclt_sub_destroy(&sub);
-
-	return status;
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	swclt_cmd_reply_t **reply)
-{
-	swclt_cmd_future_t *future = NULL;
-	swclt_sess_subscription_remove_async(
-		sess,
-		protocol,
-		channel,
-		NULL,
-		NULL,
-		&future);
-	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_subscription_remove_async(
-	swclt_sess_t *sess,
-	const char *protocol,
-	const char *channel,
-	swclt_cmd_cb_t response_callback,
-	void *response_callback_data,
-	swclt_cmd_future_t **future)
-{
-	ks_status_t status = KS_STATUS_SUCCESS;
-	swclt_cmd_t *cmd = NULL;
-
-	/* Unregister this subscription if it exists, if not then just continue with subscription removal
-	 * because the callback may have been removed manually */
-	__unregister_subscription(sess, protocol, channel);
-
-	/* Allocate the request */
-	if (!(cmd = CREATE_BLADE_SUBSCRIPTION_CMD(
-			BLADE_SUBSCRIPTION_CMD_REMOVE,
-			protocol,
-			channel))) {
-		goto done;
-	}
-
-	/* If the caller wants to do async, set the callback in the cmd */
-	if (response_callback) {
-		if (status = swclt_cmd_set_cb(cmd, response_callback, response_callback_data))
-			goto done;
-	}
-
-	/* Now submit the command */
-	ks_rwl_read_lock(sess->rwlock);
-	status = swclt_conn_submit_request(sess->conn, &cmd, future);
-	ks_rwl_read_unlock(sess->rwlock);
-
-done:
-	swclt_cmd_destroy(&cmd);
-
-	return status;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_sess_protocol_provider_add(
@@ -1509,178 +1174,6 @@ done:
 
 	return status;
 }
-
-// signalwire consumer
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_signalwire_setup(swclt_sess_t *sess, const char *service, swclt_sub_cb_t cb, void *cb_data)
-{
-	ks_status_t status = KS_STATUS_SUCCESS;
-
-	swclt_store_t *store;
-	ks_json_t *params = NULL;
-	swclt_cmd_reply_t *reply = NULL;
-	ks_json_t *result = NULL;
-	const char *protocol = NULL;
-	ks_bool_t instance_found = KS_FALSE;
-
-	if (!service) {
-		ks_log(KS_LOG_ERROR, "Missing service for signalwire.setup");
-		return KS_STATUS_ARG_INVALID;
-	}
-
-	// Make sure we are at least connected
-	if (!swclt_sess_connected(sess)) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' failed because session is not connected", service);
-		status = KS_STATUS_INACTIVE;
-		goto done;
-	}
-
-	params = ks_json_create_object();
-	ks_json_add_string_to_object(params, "service", service);
-
-	// Send the setup request syncronously, if it fails bail out
-	if (status = swclt_sess_execute(sess,
-									NULL,
-									"signalwire",
-									"setup",
-									&params,
-									&reply)) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' execute failed: %d", service, status);
-		goto done;
-	}
-
-	// Get protocol from result, duplicate it so we can destroy the command
-	protocol = ks_json_get_object_string(ks_json_get_object_item(reply->json, "result"), "protocol", NULL);
-	if (protocol) protocol = ks_pstrdup(sess->pool, protocol);
-
-	if (!protocol) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' response has no result.result.protocol", service);
-		status = KS_STATUS_ARG_NULL;
-		goto done;
-	}
-
-	// Destroy the reply, taking the result data with it, protocol is duplicated in session pool
-	swclt_cmd_reply_destroy(&reply);
-
-	ks_log(KS_LOG_DEBUG, "Setup for '%s' waiting for provider of protocol instance: %s", service, protocol);
-
-	// poll nodestore until protocol is seen locally (or timeout after 2 seconds of waiting), which
-	// ensures our upstream also sees it which means we can subscribe to the channel without failing
-	// if it's not known by upstream yet
-	{
-		int nodestore_attempts = 20;
-		while (!instance_found && nodestore_attempts) {
-			if (!(instance_found = !swclt_store_check_protocol(sess->store, protocol))) {
-				ks_sleep_ms(100);
-				--nodestore_attempts;
-			}
-		}
-	}
-
-	// If we didn't see the protocol, we timed out waiting, gandalf issue?
-	if (!instance_found) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' protocol instance timeout", service);
-		status = KS_STATUS_TIMEOUT;
-		goto done;
-	}
-
-	// Now that protocol is available, sync subscribe to the notifications channel
-	if (status = swclt_sess_subscription_add(sess, protocol, "notifications", cb, cb_data, NULL)) {
-		ks_log(KS_LOG_ERROR, "Setup for '%s' subscription add failed: %d", service, status);
-		goto done;
-	}
-	__register_setup(sess, service, protocol);
-
-done:
-	if (protocol) ks_pool_free(&protocol);
-	swclt_cmd_reply_destroy(&reply);
-	if (params) ks_json_delete(&params);
-
-	return status;
-}
-
-// signalwire provisioning consumer
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_setup(swclt_sess_t *sess, swclt_sub_cb_t cb, void *cb_data)
-{
-	return swclt_sess_signalwire_setup(sess, "provisioning", cb, cb_data);
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure(swclt_sess_t *sess,
-															 const char *target,
-															 const char *local_endpoint,
-															 const char *external_endpoint,
-															 const char *relay_connector_id,
-															 swclt_cmd_reply_t **reply)
-{
-	swclt_cmd_future_t *future = NULL;
-	swclt_sess_provisioning_configure_async(sess,
-												   target,
-												   local_endpoint,
-												   external_endpoint,
-												   relay_connector_id,
-												   NULL,
-												   NULL,
-												   &future);
-	return swclt_sess_wait_for_cmd_reply(sess, &future, reply);
-}
-
-SWCLT_DECLARE(ks_status_t) swclt_sess_provisioning_configure_async(swclt_sess_t *sess,
-																   const char *target,
-																   const char *local_endpoint,
-																   const char *external_endpoint,
-																   const char *relay_connector_id,
-																   swclt_cmd_cb_t response_callback,
-																   void *response_callback_data,
-																	swclt_cmd_future_t **future)
-{
-	ks_status_t status = KS_STATUS_SUCCESS;
-
-	swclt_store_t *store;
-	ks_pool_t *pool = NULL;
-	char *protocol = NULL;
-	ks_json_t *params = NULL;
-
-	if (!target || !local_endpoint || !external_endpoint || !relay_connector_id) {
-		ks_log(KS_LOG_ERROR, "Missing required parameter");
-		return KS_STATUS_ARG_INVALID;
-	}
-
-	if (!swclt_sess_connected(sess)) {
-		goto done;
-	}
-
-	pool = sess->pool;
-
-	if (__lookup_setup(sess, "provisioning", pool, &protocol)) {
-		ks_log(KS_LOG_ERROR, "Provisioning setup has not been performed");
-		status = KS_STATUS_FAIL;
-		goto done;
-	}
-
-	params = ks_json_create_object();
-
-	ks_json_add_string_to_object(params, "target", target);
-	ks_json_add_string_to_object(params, "local_endpoint", local_endpoint);
-	ks_json_add_string_to_object(params, "external_endpoint", external_endpoint);
-	ks_json_add_string_to_object(params, "relay_connector_id", relay_connector_id);
-
-	status = swclt_sess_execute_async(sess,
-									  NULL,
-									  protocol,
-									  "configure",
-									  &params,
-									  response_callback,
-									  response_callback_data,
-									  future);
-done:
-	if (protocol) ks_pool_free(&protocol);
-	if (params) ks_json_delete(&params);
-
-	return status;
-}
-
-
 
 
 /* For Emacs:
