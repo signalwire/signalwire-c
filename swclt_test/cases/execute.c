@@ -76,6 +76,27 @@ static ks_status_t __on_incoming_test_execute_rqu(swclt_sess_t *sess, swclt_cmd_
 	return KS_STATUS_SUCCESS;
 }
 
+
+static ks_status_t __on_incoming_test_execute_rqu_slow(swclt_sess_t *sess, swclt_cmd_t *cmd, const blade_execute_rqu_t *rqu, void *data)
+{
+	/* Formulate a response */
+	ks_cond_t *cond = (ks_cond_t *)data;
+	ks_json_t *result = ks_json_create_object();
+	ks_json_add_string_to_object(result, "reply", "pong!");
+
+	ks_json_t *cmd_result = BLADE_EXECUTE_RPL_MARSHAL(
+		&(blade_execute_rpl_t){
+			rqu->requester_nodeid,
+			rqu->responder_nodeid,
+			result});
+
+	ks_sleep_ms(1000);
+
+	REQUIRE(!swclt_cmd_set_result(cmd, &cmd_result));
+
+	return KS_STATUS_SUCCESS;
+}
+
 static void __on_outgoing_test_execute_rpl(swclt_cmd_reply_t *reply, void *cond)
 {
 	ks_cond_broadcast((ks_cond_t *)cond);
@@ -101,6 +122,7 @@ void test_execute(ks_pool_t *pool)
 
 	/* On the second session register a execute handler we'll communicate with */
 	REQUIRE(!swclt_sess_register_protocol_method(sess2, "test", "test.method", __on_incoming_test_execute_rqu, cond));
+	REQUIRE(!swclt_sess_register_protocol_method(sess2, "test", "test.slow_method", __on_incoming_test_execute_rqu_slow, cond));
 
 	/* Initiate the connect */
 	REQUIRE(!swclt_sess_connect(sess1));
@@ -137,6 +159,28 @@ void test_execute(ks_pool_t *pool)
 	REQUIRE(!swclt_sess_execute_async(sess1, nodeid2, "test", "test.method", &params, NULL, NULL, NULL));
 
 	ks_sleep_ms(5000);
+
+	/* Now execute from the first session to the second session forcing a disconnect before the response is delivered */
+	params = ks_json_create_object();
+	REQUIRE(params);
+	ks_json_add_string_to_object(params, "arg", "value");
+	future = NULL;
+	REQUIRE(!swclt_sess_execute_async(sess1, nodeid2, "test", "test.slow_method", &params, NULL, NULL, &future));
+	REQUIRE(future);
+
+	ks_sleep_ms(200);
+
+	/* Disconnect server */
+	swclt_sess_disconnect(sess2);
+
+	ks_sleep_ms(2000);
+
+	/* Reconnect server */
+	swclt_sess_connect(sess2);
+
+	reply = NULL;
+	REQUIRE(!swclt_sess_wait_for_cmd_reply(sess1, &future, &reply));
+	swclt_cmd_reply_destroy(&reply);
 
 	swclt_sess_destroy(&sess1);
 	swclt_sess_destroy(&sess2);

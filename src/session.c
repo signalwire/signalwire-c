@@ -621,6 +621,9 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 
 	ks_log(KS_LOG_INFO, "Successfully established sessionid: %s, nodeid: %s  master_nodeid:%s", ks_uuid_thr_str(&sess->info.sessionid), sess->info.nodeid, sess->info.master_nodeid);
 
+	// send any results that were enqueued during disconnect
+	submit_results(sess);
+
 	return status;
 }
 
@@ -1546,7 +1549,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 			goto done;
 	}
 
-	char *request_str = swclt_cmd_describe(cmd);
+	char *request_str = strdup(swclt_cmd_describe(cmd));
 
 	ks_rwl_read_lock(sess->rwlock);
 	status = swclt_conn_submit_request(sess->conn, &cmd, future);
@@ -1557,7 +1560,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 	} else {
 		ks_log(KS_LOG_INFO, "TX: %s", request_str);
 	}
-	ks_pool_free(&request_str);
+	free(request_str);
 
 done:
 	swclt_cmd_destroy(&cmd);
@@ -1596,7 +1599,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id_async(
 			goto done;
 	}
 
-	char *request_str = swclt_cmd_describe(cmd);
+	char *request_str = strdup(swclt_cmd_describe(cmd));
 
 	ks_rwl_read_lock(sess->rwlock);
 	status = swclt_conn_submit_request(sess->conn, &cmd, future);
@@ -1607,7 +1610,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id_async(
 	} else {
 		ks_log(KS_LOG_INFO, "TX: %s", request_str);
 	}
-	ks_pool_free(&request_str);
+	free(request_str);
 
 done:
 	swclt_cmd_destroy(&cmd);
