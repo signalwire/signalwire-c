@@ -35,7 +35,6 @@
 #include "signalwire-client-c/blade/identity.h"
 #include "signalwire-client-c/blade/ping.h"
 #include "signalwire-client-c/blade/protocol.h"
-#include "signalwire-client-c/blade/register.h"
 #include "signalwire-client-c/blade/util.h"
 
 /* For Emacs:
