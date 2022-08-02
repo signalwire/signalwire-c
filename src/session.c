@@ -30,8 +30,82 @@ typedef struct swclt_metric_reg_s {
 	ks_bool_t dirty;
 } swclt_metric_reg_t;
 
+typedef struct swclt_result_queue {
+	swclt_cmd_t *result;
+	struct swclt_result_queue *next;
+	ks_time_t expire_time;
+} swclt_result_queue_t;
+
 static ks_status_t __do_connect(swclt_sess_t *sess);
 static ks_status_t __do_disconnect(swclt_sess_t *sess);
+
+static void enqueue_result(swclt_sess_t *sess, swclt_cmd_t *cmd)
+{
+	ks_mutex_lock(sess->result_mutex);
+	swclt_result_queue_t *node = ks_pool_alloc(sess->pool, sizeof(*node));
+	node->result = swclt_cmd_duplicate(cmd);
+	node->expire_time = ks_time_now_sec() + 5;
+	if (sess->result_last) {
+		sess->result_last->next = node;
+	}
+	sess->result_last = node;
+	if (!sess->result_first) {
+		sess->result_first = node;
+	}
+	ks_mutex_unlock(sess->result_mutex);
+}
+
+static void dequeue_result(swclt_sess_t *sess, swclt_cmd_t **cmd)
+{
+	int retry;
+	do {
+		retry = 0;
+		ks_mutex_lock(sess->result_mutex);
+		swclt_result_queue_t *first = sess->result_first;
+		*cmd = NULL;
+		if (first) {
+			if (first->expire_time >= ks_time_now_sec()) {
+				*cmd = first->result;
+			} else {
+				// too old... discard it and retry with next result
+				swclt_cmd_destroy(&first->result);
+				retry = 1;
+			}
+			sess->result_first = first->next;
+			ks_pool_free(&first);
+		}
+		if (!sess->result_first) {
+			sess->result_last = NULL;
+		}
+		ks_mutex_unlock(sess->result_mutex);
+	} while (retry);
+}
+
+static void submit_results(swclt_sess_t *sess)
+{
+	swclt_cmd_t *result = NULL;
+	dequeue_result(sess, &result);
+	while (result) {
+		ks_rwl_read_lock(sess->rwlock);
+		if (swclt_conn_submit_result(sess->conn, result) == KS_STATUS_DISCONNECTED) {
+			ks_rwl_read_unlock(sess->rwlock);
+			enqueue_result(sess, result);
+			break;
+		}
+		ks_rwl_read_unlock(sess->rwlock);
+		swclt_cmd_destroy(&result);
+	}
+}
+
+static void flush_results(swclt_sess_t *sess)
+{
+	swclt_cmd_t *result = NULL;
+	dequeue_result(sess, &result);
+	while (result) {
+		swclt_cmd_destroy(&result);
+		dequeue_result(sess, &result);
+	}
+}
 
 static void check_session_state(swclt_sess_t *sess)
 {
@@ -126,6 +200,8 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sessP)
 		}
 		swclt_ident_destroy(&sess->ident);
 		ks_rwl_destroy(&sess->rwlock);
+		flush_results(sess);
+		ks_mutex_destroy(&sess->result_mutex);
 		ks_pool_close(&pool);
 	}
 	return KS_STATUS_SUCCESS;
@@ -275,7 +351,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 		BLADE_DISCONNECT_RQU_DESTROY(&rqu);
 
 		if (!status) {
-			/* Now the command is ready to be sent back, enqueue it */
+			/* Now the command is ready to be sent back, send it */
 			ks_rwl_read_lock(sess->rwlock);
 			status = swclt_conn_submit_result(sess->conn, cmd);
 			ks_rwl_read_unlock(sess->rwlock);
@@ -301,7 +377,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 		BLADE_PING_RQU_DESTROY(&rqu);
 
 		if (!status) {
-			/* Now the command is ready to be sent back, enqueue it */
+			/* Now the command is ready to be sent back, send it */
 			ks_rwl_read_lock(sess->rwlock);
 			status = swclt_conn_submit_result(sess->conn, cmd);
 			ks_rwl_read_unlock(sess->rwlock);
@@ -317,7 +393,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 
 		status = BLADE_EXECUTE_RQU_PARSE(cmd_pool, request, &rqu);
 
-		ks_log(KS_LOG_DEBUG, "Dispatching incoming blade execute request: %s to callback", cmd_str);
+		ks_log(KS_LOG_INFO, "RX: %s", cmd_str);
 
 		if (status) {
 			ks_log(KS_LOG_WARNING, "Failed to parse execute payload: %s (%lu)", cmd_str, status);
@@ -335,16 +411,23 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 		BLADE_EXECUTE_RQU_DESTROY(&rqu);
 
 		if (!status) {
-			ks_log(KS_LOG_DEBUG, "Sending reply back from execute request: %s", cmd_str);
+			char *reply_str = swclt_cmd_describe(cmd);
 
-			/* Now the command is ready to be sent back, enqueue it */
+			/* Now the command is ready to be sent back, send it */
 			ks_rwl_read_lock(sess->rwlock);
 			status = swclt_conn_submit_result(sess->conn, cmd);
 			ks_rwl_read_unlock(sess->rwlock);
-			if (status)
-				ks_log(KS_LOG_ERROR, "Failed to submit reply from execute: %s, status: %lu", cmd_str, status);
-			else
-				ks_log(KS_LOG_DEBUG, "Sent reply back from execute request: %s", cmd_str);
+			if (status == KS_STATUS_DISCONNECTED) {
+				/* send after reconnection */
+				ks_log(KS_LOG_INFO, "(Not connected) TX ENQUEUE: %s", reply_str);
+				enqueue_result(sess, cmd);
+				status = KS_STATUS_SUCCESS;
+			} else if (status) {
+				ks_log(KS_LOG_ERROR, "TX FAILED %s, status: %lu", reply_str, status);
+			} else {
+				ks_log(KS_LOG_INFO, "TX: %s", reply_str);
+			}
+			ks_pool_free(&reply_str);
 		}
 		goto done;
 	} else {
@@ -470,6 +553,9 @@ static ks_status_t __do_connect(swclt_sess_t *sess)
 	ks_rwl_write_unlock(sess->rwlock);
 
 	ks_log(KS_LOG_INFO, "Successfully established sessionid: %s, nodeid: %s  master_nodeid:%s", ks_uuid_thr_str(&sess->info.sessionid), sess->info.nodeid, sess->info.master_nodeid);
+
+	// send any results that were enqueued during disconnect
+	submit_results(sess);
 
 	return status;
 }
@@ -607,6 +693,10 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_create(
 			KS_HASH_MODE_CASE_SENSITIVE,
 			KS_HASH_FLAG_DUP_CHECK | KS_HASH_FLAG_FREE_KEY | KS_HASH_FLAG_FREE_VALUE | KS_HASH_FLAG_RWLOCK,
 			sess->pool))
+		goto done;
+
+	if (status = ks_mutex_create(
+			&sess->result_mutex, KS_MUTEX_FLAG_DEFAULT, sess->pool))
 		goto done;
 
 	/* Verify the config has what we need */
@@ -1124,9 +1214,18 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 			goto done;
 	}
 
+	char *request_str = strdup(swclt_cmd_describe(cmd));
+
 	ks_rwl_read_lock(sess->rwlock);
 	status = swclt_conn_submit_request(sess->conn, &cmd, future);
 	ks_rwl_read_unlock(sess->rwlock);
+
+	if (status) {
+		ks_log(KS_LOG_WARNING, "FAILED TX: %s", request_str);
+	} else {
+		ks_log(KS_LOG_INFO, "TX: %s", request_str);
+	}
+	free(request_str);
 
 done:
 	swclt_cmd_destroy(&cmd);
@@ -1165,9 +1264,18 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id_async(
 			goto done;
 	}
 
+	char *request_str = strdup(swclt_cmd_describe(cmd));
+
 	ks_rwl_read_lock(sess->rwlock);
 	status = swclt_conn_submit_request(sess->conn, &cmd, future);
 	ks_rwl_read_unlock(sess->rwlock);
+
+	if (status) {
+		ks_log(KS_LOG_WARNING, "FAILED TX: %s", request_str);
+	} else {
+		ks_log(KS_LOG_INFO, "TX: %s", request_str);
+	}
+	free(request_str);
 
 done:
 	swclt_cmd_destroy(&cmd);

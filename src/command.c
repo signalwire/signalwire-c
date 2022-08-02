@@ -344,6 +344,26 @@ static ks_status_t __init_cmd(swclt_cmd_t **cmdP, swclt_cmd_cb_t cb, void *cb_da
 	return KS_STATUS_SUCCESS;
 }
 
+SWCLT_DECLARE(swclt_cmd_t *) swclt_cmd_duplicate(swclt_cmd_t *cmd)
+{
+	ks_pool_t *pool = NULL;
+	ks_pool_open(&pool);
+	swclt_cmd_t *dup_cmd = ks_pool_alloc(pool, sizeof(*dup_cmd));
+	dup_cmd->pool = pool;
+	if (cmd->json) {
+		dup_cmd->json = ks_json_duplicate(cmd->json, KS_TRUE);
+	}
+	dup_cmd->type = cmd->type;
+	dup_cmd->id = cmd->id;
+	dup_cmd->id_str = ks_uuid_str(dup_cmd->pool, &dup_cmd->id);
+	dup_cmd->response_ttl_ms = cmd->response_ttl_ms;
+	if (cmd->method) {
+		dup_cmd->method = ks_pstrdup(dup_cmd->pool, cmd->method);
+	}
+	dup_cmd->flags = cmd->flags;
+	return dup_cmd;
+}
+
 SWCLT_DECLARE(ks_status_t) swclt_cmd_destroy(swclt_cmd_t **cmdP)
 {
 	if (cmdP && *cmdP) {

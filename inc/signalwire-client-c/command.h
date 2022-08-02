@@ -130,6 +130,8 @@ SWCLT_DECLARE(ks_status_t) swclt_cmd_create_frame(
 	uint32_t response_ttl_ms,
 	uint32_t flags);
 
+/* Duplicate a command, excluding its callback data */
+SWCLT_DECLARE(swclt_cmd_t *) swclt_cmd_duplicate(swclt_cmd_t *cmd);
 SWCLT_DECLARE(ks_status_t) swclt_cmd_destroy(swclt_cmd_t **cmd);
 SWCLT_DECLARE(char *) swclt_cmd_describe(swclt_cmd_t *cmd);
 SWCLT_DECLARE(ks_status_t) swclt_cmd_print(swclt_cmd_t *cmd, ks_pool_t *pool, char **string);
