@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ static ks_cond_t *g_cond;
 
 static void __on_sess_state_event(swclt_sess_t *sess, void *cb_data)
 {
-	REQUIRE(!strcmp((char *)cb_data, "bobo"));
+	REQUIRE(!strcmp((char *)cb_data, "foo"));
 	ks_cond_lock(g_cond);
 	ks_cond_broadcast(g_cond);
 	ks_cond_unlock(g_cond);
@@ -45,7 +45,7 @@ void test_session(ks_pool_t *pool)
 	REQUIRE(!swclt_sess_create(&sess, g_target_ident_str, g_certified_config));
 
 	/* Register a monitor to get to know when session comes online successfully */
-	REQUIRE(!swclt_sess_set_state_change_cb(sess, __on_sess_state_event, "bobo"));
+	REQUIRE(!swclt_sess_set_state_change_cb(sess, __on_sess_state_event, "foo"));
 
 	ks_cond_lock(g_cond);
 

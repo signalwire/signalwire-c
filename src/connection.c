@@ -154,7 +154,7 @@ static ks_status_t ttl_tracker_next(swclt_ttl_tracker_t *ttl, ks_uuid_t *id)
 		wait_ms = 5000;
 	} else if (ttl->heap[TTL_HEAP_ROOT].expiry > now_ms) {
 		wait_ms = ttl->heap[TTL_HEAP_ROOT].expiry - now_ms;
-		ks_log(KS_LOG_INFO, "Waiting %d for TTL expiration of %s", (uint32_t)wait_ms, ks_uuid_thr_str(&ttl->heap[TTL_HEAP_ROOT].id));
+		ks_log(KS_LOG_DEBUG, "Waiting %d for TTL expiration of %s", (uint32_t)wait_ms, ks_uuid_thr_str(&ttl->heap[TTL_HEAP_ROOT].id));
 	}
 
 	// wait for TTL, up to 5 seconds
@@ -292,7 +292,7 @@ static ks_status_t submit_result(swclt_conn_t *ctx, swclt_cmd_t *cmd)
 	ks_status_t status;
 
 	if (ctx->failed || !ctx->wss) {
-		return KS_STATUS_FAIL;
+		return KS_STATUS_DISCONNECTED;
 	}
 
 	if (cmd->type != SWCLT_CMD_TYPE_RESULT && cmd->type != SWCLT_CMD_TYPE_ERROR) {
@@ -312,6 +312,7 @@ static ks_status_t submit_result(swclt_conn_t *ctx, swclt_cmd_t *cmd)
 	/* Write the command data on the socket */
 	if ((status = swclt_wss_write(ctx->wss, data))) {
 		ks_log(KS_LOG_WARNING, "Failed to write to websocket: %lu, %s", status, data);
+		status = KS_STATUS_DISCONNECTED;
 	}
 	ks_pool_free(&data);
 
@@ -779,7 +780,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cm
 	if (conn) {
 		return submit_result(conn, cmd);
 	}
-	return KS_STATUS_FAIL;
+	return KS_STATUS_DISCONNECTED;
 }
 
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t **cmd, swclt_cmd_future_t **future)
