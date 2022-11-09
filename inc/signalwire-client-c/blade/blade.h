@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,16 +31,10 @@
 #include "signalwire-client-c/blade/type.h"
 #include "signalwire-client-c/blade/connect.h"
 #include "signalwire-client-c/blade/disconnect.h"
-#include "signalwire-client-c/blade/authenticate.h"
-#include "signalwire-client-c/blade/authority.h"
-#include "signalwire-client-c/blade/broadcast.h"
 #include "signalwire-client-c/blade/execute.h"
 #include "signalwire-client-c/blade/identity.h"
 #include "signalwire-client-c/blade/ping.h"
 #include "signalwire-client-c/blade/protocol.h"
-#include "signalwire-client-c/blade/register.h"
-#include "signalwire-client-c/blade/subscription.h"
-#include "signalwire-client-c/blade/netcast.h"
 #include "signalwire-client-c/blade/util.h"
 
 /* For Emacs:

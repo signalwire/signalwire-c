@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2022 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -132,30 +132,6 @@ SWCLT_JSON_PARSE_BEG(BLADE_PROVIDER, blade_provider_t)
 	SWCLT_JSON_PARSE_ITEM_OPT(identities)
 	SWCLT_JSON_PARSE_INT_OPT_DEF(rank, 1)
 	SWCLT_JSON_PARSE_ITEM_OPT(data)
-SWCLT_JSON_PARSE_END()
-
-typedef struct blade_subscription_s {
-	const char *protocol;
-	const char *channel;
-	ks_json_t *subscribers;	/* list of identities */
-} blade_subscription_t;
-
-SWCLT_JSON_MARSHAL_BEG(BLADE_SUBSCRIPTION, blade_subscription_t)
-	SWCLT_JSON_MARSHAL_STRING(protocol)
-	SWCLT_JSON_MARSHAL_STRING(channel)
-	SWCLT_JSON_MARSHAL_ITEM(subscribers)
-SWCLT_JSON_MARSHAL_END()
-
-SWCLT_JSON_DESTROY_BEG(BLADE_SUBSCRIPTION, blade_subscription_t)
-	SWCLT_JSON_DESTROY_STRING(protocol)
-	SWCLT_JSON_DESTROY_STRING(channel)
-	SWCLT_JSON_DESTROY_ITEM(subscribers)
-SWCLT_JSON_DESTROY_END()
-
-SWCLT_JSON_PARSE_BEG(BLADE_SUBSCRIPTION, blade_subscription_t)
-	SWCLT_JSON_PARSE_STRING(protocol)
-	SWCLT_JSON_PARSE_STRING(channel)
-	SWCLT_JSON_PARSE_ITEM(subscribers)
 SWCLT_JSON_PARSE_END()
 
 typedef struct blade_protocol_s {
