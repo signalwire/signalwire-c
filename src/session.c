@@ -203,8 +203,10 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_destroy(swclt_sess_t **sessP)
 		swclt_ident_destroy(&sess->ident);
 		swclt_store_destroy(&sess->store);
 		ks_rwl_destroy(&sess->rwlock);
-		flush_results(sess);
-		ks_mutex_destroy(&sess->result_mutex);
+		if(sess->result_mutex) {
+			flush_results(sess);
+			ks_mutex_destroy(&sess->result_mutex);
+		}
 		ks_pool_close(&pool);
 	}
 	return KS_STATUS_SUCCESS;
