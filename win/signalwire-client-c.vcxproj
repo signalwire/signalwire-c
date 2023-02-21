@@ -27,19 +27,19 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
     <OpenSSLPlatform>x86</OpenSSLPlatform>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
     <OpenSSLPlatform>x64</OpenSSLPlatform>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
     <OpenSSLPlatform>x86</OpenSSLPlatform>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
     <OpenSSLPlatform>x64</OpenSSLPlatform>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -50,7 +50,7 @@
   <PropertyGroup Label="UserMacros" />
   <Target Name="Build">
     <MakeDir Directories="../build-$(Platform)" />
-    <Exec Command="cmake .. -DCMAKE_GENERATOR_PLATFORM=$(Platform) -DLIBKS_LIBRARY_PATH=$(BaseDir)/libks-$(libksVersion)/binaries/$(Platform)/$(Configuration)/ -DLIBKS_INCLUDE_DIRS=$(BaseDir)/libks-$(libksVersion) -DOPENSSL_INCLUDE_DIR=$(BaseDir)openssl-$(OpenSSLVersion)/include_$(OpenSSLPlatform)/;$(BaseDir)openssl-$(OpenSSLVersion)/include/ -DOPENSSL_LIBRARIES=$(BaseDir)openssl-$(OpenSSLVersion)/binaries/$(Platform)/$(Configuration)/lib -DOPENSSL_ROOT=$(BaseDir)openssl-$(OpenSSLVersion)/binaries/$(Platform)/$(Configuration)/ -T v141" WorkingDirectory="../build-$(Platform)" />
+    <Exec Command="cmake .. -DCMAKE_GENERATOR_PLATFORM=$(Platform) -DLIBKS_LIBRARY_PATH=$(BaseDir)/libks-$(libksVersion)/binaries/$(Platform)/$(Configuration)/ -DLIBKS_INCLUDE_DIRS=$(BaseDir)/libks-$(libksVersion) -DOPENSSL_INCLUDE_DIR=$(BaseDir)openssl-$(OpenSSLVersion)/include_$(OpenSSLPlatform)/;$(BaseDir)openssl-$(OpenSSLVersion)/include/ -DOPENSSL_LIBRARIES=$(BaseDir)openssl-$(OpenSSLVersion)/binaries/$(Platform)/$(Configuration)/lib -DOPENSSL_ROOT=$(BaseDir)openssl-$(OpenSSLVersion)/binaries/$(Platform)/$(Configuration)/ -T $(DefaultPlatformToolset)" WorkingDirectory="../build-$(Platform)" />
     <MsBuild Projects="$(signalwire-client-cLibDir)\build-$(Platform)\signalwire_client.vcxproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
   </Target>
 </Project>
