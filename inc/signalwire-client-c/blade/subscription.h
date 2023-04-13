@@ -123,8 +123,8 @@ static inline swclt_cmd_t *CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 			cb_data,
 			BLADE_SUBSCRIPTION_METHOD,
 			&request_obj,
-			BLADE_SUBSCRIPTION_FLAGS,
 			BLADE_SUBSCRIPTION_TTL_MS,
+			BLADE_SUBSCRIPTION_FLAGS,
 			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate subscription command: %lu", status);
 		ks_json_delete(&request_obj);

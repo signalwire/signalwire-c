@@ -920,6 +920,10 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_target_set(swclt_sess_t *sess, const char 
 {
 	ks_status_t result = KS_STATUS_SUCCESS;
 
+	if (!sess) {
+		return result;
+	}
+
 	/* Parse the identity, it will contain the connection target address etc. */
 	if (result = swclt_ident_from_str(&sess->ident, sess->pool, target)) {
 		ks_log(KS_LOG_ERROR, "Invalid identity uri: %s", target);

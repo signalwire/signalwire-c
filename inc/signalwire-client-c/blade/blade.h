@@ -26,7 +26,7 @@
 #define SWCLT_BLADE_VERSION_REVISION	1
 
 /* Define the default time to live amount for all blade commands */
-#define BLADE_DEFAULT_CMD_TTL_MS		5000
+#define BLADE_DEFAULT_CMD_TTL_MS		10000
 
 #include "signalwire-client-c/blade/type.h"
 #include "signalwire-client-c/blade/connect.h"
