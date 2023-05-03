@@ -57,7 +57,7 @@ using System.Diagnostics;
 
                 CopyFilesRecursively(new DirectoryInfo(@"..\inc\"), new DirectoryInfo(package_root + @"\include"));
 
-                ZipFile.CreateFromDirectory(@"$(BaseDir)out\packages\" + package + @"-headers\", @"$(BaseDir)out\" + package + @"-headers.zip".ToLower(), CompressionLevel.Optimal, false);
+                ZipFile.CreateFromDirectory(@"$(BaseDir)out\packages\" + package + @"-headers\", @"$(BaseDir)out\" + package + @"_$(signalwire-client-cBuildNumber)" + @"-headers.zip".ToLower(), CompressionLevel.Optimal, false);
             }
 
             package_root = @"$(BaseDir)out\packages\signalwire-client-c-$(signalwire-client-cVersion)-binaries-$(Platform)-$(Configuration)\" + package;
@@ -76,7 +76,7 @@ using System.Diagnostics;
                     }
                 }
 
-                ZipFile.CreateFromDirectory(@"$(BaseDir)out\packages\" + package + @"-binaries-$(Platform)-$(Configuration)\", @"$(BaseDir)out\"+ package + @"-binaries-$(Platform)-$(Configuration).zip".ToLower(), CompressionLevel.Optimal, false);
+                ZipFile.CreateFromDirectory(@"$(BaseDir)out\packages\" + package + @"-binaries-$(Platform)-$(Configuration)\", @"$(BaseDir)out\"+ package + @"_$(signalwire-client-cBuildNumber)" + @"-binaries-$(Platform)-$(Configuration).zip".ToLower(), CompressionLevel.Optimal, false);
             }
 
             return true;
