@@ -125,7 +125,7 @@ SWCLT_DECLARE(ks_status_t) swclt_conn_connect_ex(
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_request(swclt_conn_t *conn, swclt_cmd_t **cmd, swclt_cmd_future_t **future);
 SWCLT_DECLARE(ks_status_t) swclt_conn_submit_result(swclt_conn_t *conn, swclt_cmd_t *cmd);
 SWCLT_DECLARE(ks_status_t) swclt_conn_cancel_request(swclt_conn_t *conn, swclt_cmd_future_t **future);
-SWCLT_DECLARE(ks_status_t) swclt_conn_info(swclt_conn_t *conn, swclt_conn_info_t *info);
+ks_status_t swclt_conn_info(swclt_conn_t *conn, swclt_conn_info_t *info);
 SWCLT_DECLARE(char *) swclt_conn_describe(swclt_conn_t *conn);
 
 KS_END_EXTERN_C
