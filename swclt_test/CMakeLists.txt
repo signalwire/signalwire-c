@@ -19,6 +19,9 @@ add_executable(
 # Link to signal-wire-client/catch/LibPal
 target_link_libraries(swclt_test signalwire_client)
 
+# Define our exports symbol to key any definitions to toggle the visibility type
+set_target_properties(signalwire_client PROPERTIES DEFINE_SYMBOL SWCLT_EXPORTS)
+
 # Register our tests with cmake
 add_test(swclt_test swclt_test)
 
