@@ -5,6 +5,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros">
     <signalwire-client-cVersion>2.0.0</signalwire-client-cVersion>
+    <signalwire-client-cBuildNumber>0</signalwire-client-cBuildNumber>
     <signalwire-client-cLibDir>$(BaseDir)../</signalwire-client-cLibDir>
   </PropertyGroup>
   <PropertyGroup>
