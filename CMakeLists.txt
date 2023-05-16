@@ -47,7 +47,7 @@ if(KS_PLAT_LIN)
 endif()
 
 # Set package name
-string(TOLOWER ${CMAKE_PROJECT_NAME} PACKAGE_NAME)
+string(TOLOWER "${CMAKE_PROJECT_NAME}2" PACKAGE_NAME)
 
 # Set package contact
 set(CPACK_PACKAGE_CONTACT "support@signalwire.com")
@@ -113,7 +113,7 @@ if("${CMAKE_OS_NAME}" STREQUAL "Centos")
 	set(CPACK_GENERATOR RPM)
 
 	# Set RPM package name
-	set(CPACK_RPM_RUNTIME_PACKAGE_NAME "signalwire-client-c")
+	set(CPACK_RPM_RUNTIME_PACKAGE_NAME "signalwire-client-c2")
 
 	# Set version release from environment variable
 	if (NOT "$ENV{PACKAGE_RELEASE}" STREQUAL "")
@@ -188,7 +188,7 @@ if("${CMAKE_OS_NAME}" STREQUAL "Debian")
 	set(CPACK_DEB_COMPONENT_INSTALL "ON")
 
 	# Set package name
-	set(CPACK_DEBIAN_PACKAGE_NAME "signalwire-client-c")
+	set(CPACK_DEBIAN_PACKAGE_NAME "signalwire-client-c2")
 
  	# Abuse Cmake component name
  	set(CPACK_DEBIAN_RUNTIME_PACKAGE_NAME ${CPACK_DEBIAN_PACKAGE_NAME})
@@ -253,7 +253,7 @@ if("${CMAKE_OS_NAME}" STREQUAL "Debian")
 	set(CPACK_DEBIAN_FILE_NAME "${PACKAGE_NAME}_${PROJECT_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE}_${DISTRO_CODENAME}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}.deb")
 
 	# Set a Debian compliant changelog header
-	set(CHANGELOG_HEADER "${PACKAGE_NAME} (${CPACK_DEBIAN_PACKAGE_VERSION}) ${DISTRO_CODENAME}\; urgency=${CPACK_DEBIAN_PACKAGE_PRIORITY}")
+	set(CHANGELOG_HEADER "signalwire-client-c (${CPACK_DEBIAN_PACKAGE_VERSION}) ${DISTRO_CODENAME}\; urgency=${CPACK_DEBIAN_PACKAGE_PRIORITY}")
 
 	# Generate a Debian compliant changelog
 	if(GIT_FOUND AND GZIP_CMD AND DATE_CMD)
@@ -293,7 +293,7 @@ if("${CMAKE_OS_NAME}" STREQUAL "Debian")
 		execute_process(COMMAND ${GZIP_CMD} -f -9 -n changelog.Debian)
 
 		# Install changelog
-		install(FILES "${CMAKE_BINARY_DIR}/changelog.Debian.gz" COMPONENT "runtime" DESTINATION "share/doc/${CPACK_DEBIAN_PACKAGE_NAME}")
+		install(FILES "${CMAKE_BINARY_DIR}/changelog.Debian.gz" COMPONENT "runtime" DESTINATION "share/doc/signalwire-client-c")
 
 		# Delete changelog related variables
 		unset(CHANGELOG_HEADER)
@@ -435,7 +435,7 @@ if (NOT KS_PLAT_WIN)
 	set(PC_PREFIX ${CMAKE_INSTALL_PREFIX})
 	get_property(PC_DEFINITIONS TARGET signalwire_client PROPERTY INTERFACE_COMPILE_DEFINITIONS)
 	get_property(PC_DEFINITIONS TARGET ks PROPERTY INTERFACE_COMPILE_DEFINITIONS)
-	set(PACKAGE_NAME signalwire_client)
+	set(PACKAGE_NAME signalwire_client2)
 	set(PACKAGE_VERSION ${PROJECT_VERSION})
 	configure_file("${CMAKE_CURRENT_LIST_DIR}/signalwire_client.pc.in" "${PROJECT_BINARY_DIR}/signalwire_client.pc" @ONLY)
 endif()
