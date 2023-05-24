@@ -1,4 +1,5 @@
 #!/bin/bash
+cd /__w/signalwire-c
 sed -i '/cotire/d' ./CMakeLists.txt
 sed -i '/cotire/d' ./swclt_test/CMakeLists.txt
 mkdir -p scan-build
@@ -12,7 +13,7 @@ if [ "0" -ne $exitstatus ] ; then
   export COMPILATION_FAILED=true;
   echo MESSAGE="compilation failed" >> $GITHUB_OUTPUT;
 fi
-export RESULTFILE="/signalwire-c/scan-build-result.txt";
+export RESULTFILE="/__w/signalwire-c/scan-build-result.txt";
 cat $RESULTFILE;
 if ! grep -sq "$SubString" $RESULTFILE; then
   export BUGS_FOUND=true;

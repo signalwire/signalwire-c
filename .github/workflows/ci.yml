@@ -17,18 +17,18 @@ jobs:
         run: |
           apt-get update && apt-get install -yq git build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-7
           apt-get install -yq cmake uuid-dev libssl-dev
-      - run: mkdir -p /signalwire-c && cd /signalwire-c
+      - run: mkdir -p /__w/signalwire-c && cd /__w/signalwire-c
       - name: Checkout
         uses: actions/checkout@v3
       - name: clone libks
         uses: actions/checkout@v3
         with:
           repository: signalwire/libks
-          path: /signalwire-c/libks
+          path: /__w/signalwire-c/libks
       - name: build libks
-        run: cd /signalwire-c/libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
+        run: cd /__w/signalwire-c/libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
       - id: scan_build
-        run: /signalwire-c/scan_build.sh
+        run: /__w/signalwire-c/scan_build.sh
       - name: Tar logs
         id: tar
         if: failure()
@@ -36,16 +36,16 @@ jobs:
           COMPILATION_FAILED: ${{ steps.scan_build.outputs.COMPILATION_FAILED }}
           BUGS_FOUND: ${{ steps.scan_build.outputs.BUGS_FOUND }}
         run: |
-          cd /signalwire-c
+          cd /__w/signalwire-c
           ls -l
           if [ "true" -eq $COMPILATION_FAILED ]; then
-            tar czvf /sw/scan-build-result.tar.gz ./scan-build-result.txt;
-            echo "ARTIFACT_PATH=/sw/scan-build-result.tar.gz" >> $GITHUB_OUTPUT;
+            tar czvf /__w/signalwire-c/scan-build-result.tar.gz ./scan-build-result.txt;
+            echo "ARTIFACT_PATH=/__w/signalwire-c/scan-build-result.tar.gz" >> $GITHUB_OUTPUT;
             echo "ARTIFACT=scan-build-result" >> $GITHUB_OUTPUT;
           fi
           if [ "true" -eq $BUGS_FOUND ]; then
-            tar czvf /sw/reports.tar.gz $REPORT;
-            echo "ARTIFACT_PATH=/sw/reports.tar.gz" >> $GITHUB_OUTPUT;
+            tar czvf /__w/signalwire-c/reports.tar.gz $REPORT;
+            echo "ARTIFACT_PATH=/__w/signalwire-c/reports.tar.gz" >> $GITHUB_OUTPUT;
             echo "ARTIFACT=reports" >> $GITHUB_OUTPUT;
           fi
 
