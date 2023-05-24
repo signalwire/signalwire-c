@@ -24,9 +24,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           repo: signalwire/libks
-          path: ./libks
+          path: /signalwire-c/libks
       - name: build libks
-        run: cd libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
+        run: cd /signalwire-c/libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
       - id: scan_build
         run: /signalwire-c/scan_build.sh
       - name: Tar logs
