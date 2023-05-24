@@ -17,7 +17,6 @@ jobs:
         run: |
           apt-get update && apt-get install -yq git build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-7
           apt-get install -yq cmake uuid-dev libssl-dev
-      - run: mkdir -p /__w/signalwire-c && cd /__w/signalwire-c
       - name: Checkout
         uses: actions/checkout@v3
       - run: pwd
