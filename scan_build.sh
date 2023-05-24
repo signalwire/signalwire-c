@@ -1,12 +1,6 @@
 #!/bin/bash
-cd /sw/src/modules/mod_com_g729
-apt-get update && apt-get install -yq apt-transport-https ruby jq curl openssh-client gnupg2 wget build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-7 uncrustify
-./check-style.sh
-echo "machine fsa.freeswitch.com login $FSA_USERNAME password $FSA_PASSWORD" > /etc/apt/auth.conf
-echo "deb [trusted=yes] https://fsa.freeswitch.com/repo/deb/fsa/ $(lsb_release -sc) unstable" > /etc/apt/sources.list.d/freeswitch.list
-apt-get update && apt-get install -yq libfreeswitch-dev libcurl4-openssl-dev librdkafka-dev
-./bootstrap.sh
-PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/2.0/lib/pkgconfig ./configure
+sed -i '/cotire/d' ./CMakeLists.txt
+sed -i '/cotire/d' ./swclt_test/CMakeLists.txt
 mkdir -p scan-build
 scan-build-7 -o ./scan-build/ make -j`nproc --all` |& tee ./scan-build-result.txt
 exitstatus=${PIPESTATUS[0]}
@@ -18,7 +12,8 @@ if [ "0" -ne $exitstatus ] ; then
   export COMPILATION_FAILED=true;
   echo MESSAGE="compilation failed" >> $GITHUB_OUTPUT;
 fi
-export RESULTFILE="/sw/src/modules/mod_com_g729/scan-build-result.txt";
+export RESULTFILE="/signalwire-c/scan-build-result.txt";
+cat $RESULTFILE;
 if ! grep -sq "$SubString" $RESULTFILE; then
   export BUGS_FOUND=true;
   echo MESSAGE="found bugs" >> $GITHUB_OUTPUT;
