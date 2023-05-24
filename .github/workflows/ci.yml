@@ -23,7 +23,7 @@ jobs:
       - name: clone libks
         uses: actions/checkout@v3
         with:
-          repo: signalwire/libks
+          repository: signalwire/libks
           path: /signalwire-c/libks
       - name: build libks
         run: cd /signalwire-c/libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
