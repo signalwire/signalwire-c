@@ -20,6 +20,7 @@ jobs:
       - run: mkdir -p /__w/signalwire-c && cd /__w/signalwire-c
       - name: Checkout
         uses: actions/checkout@v3
+      - run: pwd
       - name: clone libks
         uses: actions/checkout@v3
         with:
