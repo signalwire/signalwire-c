@@ -3,35 +3,11 @@ kind: pipeline
 name: default
 
 steps:
-    - name: scan-build
-      image: debian:buster
+    - name: dummy
+      image: alpine:3
       pull: always
       commands:     
-      - apt-get update && apt-get install -yq git build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-7
-      - apt-get install -yq cmake uuid-dev libssl-dev
-      - git clone https://github.com/signalwire/libks libks
-      - cd libks && git checkout v2.0 && git pull
-      - cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
-      - sed -i '/cotire/d' ./CMakeLists.txt
-      - sed -i '/cotire/d' ./swclt_test/CMakeLists.txt
-      - mkdir -p scan-build
-      - scan-build-7 -o ./scan-build/ cmake .
-      - echo '#!/bin/bash\nscan-build-7 -o ./scan-build/ make -j`nproc --all` |& tee ./scan-build-result.txt\nexitstatus=$${PIPESTATUS[0]}\necho $$exitstatus > ./scan-build-status.txt\n' > scan.sh
-      - chmod +x scan.sh
-      - ./scan.sh
-      - exitstatus=`cat ./scan-build-status.txt`
-      - echo "*** Exit status is $exitstatus"
-
-    - name: notify
-      image: signalwire/drone-notify
-      pull: always
-      environment:
-        SLACK_WEBHOOK_URL:
-          from_secret: slack_webhook_url
-        ENV_FILE:
-          from_secret: notify_env
-      commands:
-      - /root/scan-build-notify.sh
+      - echo "Hello"
       
 trigger:
   branch:
