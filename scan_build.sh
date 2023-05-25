@@ -2,6 +2,7 @@
 cd /__w/signalwire-c/signalwire-c
 sed -i '/cotire/d' ./CMakeLists.txt
 sed -i '/cotire/d' ./swclt_test/CMakeLists.txt
+apt-get install -y git
 mkdir -p scan-build
 scan-build-7 -o ./scan-build/ cmake .
 scan-build-7 -o ./scan-build/ make -j`nproc --all` |& tee ./scan-build-result.txt
