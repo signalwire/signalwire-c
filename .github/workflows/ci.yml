@@ -24,6 +24,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: signalwire/libks
+          ref: v2.0
           path: /__w/signalwire-c/signalwire-c/libks
       - name: build libks
         run: cd /__w/signalwire-c/signalwire-c/libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
