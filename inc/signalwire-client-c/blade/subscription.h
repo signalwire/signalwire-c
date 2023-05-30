@@ -97,7 +97,6 @@ static inline swclt_cmd_t *CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 	swclt_cmd_t *cmd = NULL;
 
 	ks_json_t *channels = ks_json_create_array();
-	ks_json_add_string_to_array(channels, channel);
 
 	/* Create a blade subscription request structure then marshal it */
 	blade_subscription_rqu_t request = {
@@ -105,6 +104,8 @@ static inline swclt_cmd_t *CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 		protocol,
 		channels,
 	};
+
+	ks_json_add_string_to_array(channels, channel);
 
 	if (!(request_obj = BLADE_SUBSCRIPTION_RQU_MARSHAL(&request))) {
 		ks_log(KS_LOG_WARNING, "Failed to create subscription request");
@@ -157,9 +158,9 @@ static inline ks_json_t *BLADE_SUBSCRIPTION_RQU(
 	blade_access_control_t subscribe_access)
 {
 	ks_json_t *request = ks_json_create_object();
+	ks_json_t *channels = ks_json_add_array_to_object(request, "channels");
 	ks_json_add_string_to_object(request, "command", command);
 	ks_json_add_string_to_object(request, "protocol", protocol);
-	ks_json_t *channels = ks_json_add_array_to_object(request, "channels");
 	ks_json_add_string_to_array(channels, channel);
 	(void)(broadcast_access);  // unused
 	(void)(subscribe_access);  // unused

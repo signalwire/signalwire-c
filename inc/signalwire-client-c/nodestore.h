@@ -58,8 +58,6 @@ struct swclt_store {
 
 typedef struct swclt_store swclt_store_t;
 
-typedef struct swclt_sess swclt_sess_t;
-
 typedef void (*swclt_store_cb_protocol_add_t)(swclt_sess_t *sess,
 											  const char *protocol);
 
