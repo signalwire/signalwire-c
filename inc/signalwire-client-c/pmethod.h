@@ -31,8 +31,6 @@
 
 KS_BEGIN_EXTERN_C
 
-typedef struct swclt_sess swclt_sess_t;
-
 typedef ks_status_t (*swclt_pmethod_cb_t)(
 	swclt_sess_t *sess,
 	swclt_cmd_t *cmd,

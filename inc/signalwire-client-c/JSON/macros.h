@@ -94,11 +94,11 @@ KS_BEGIN_EXTERN_C
 	{																		\
 		ks_json_t *item = ks_json_get_object_item(object, #key);			\
 		if (item) {															\
+			const char *str = "";											\
 			if (!ks_json_type_is_string(item))  {							\
 				release_cb(&target);										\
 				return KS_STATUS_INVALID_ARGUMENT;							\
 			}																\
-			const char *str = "";											\
 			ks_json_value_string(item, &str);								\
 			target->key = ks_uuid_from_str(str);							\
 		}																	\
@@ -204,11 +204,11 @@ KS_BEGIN_EXTERN_C
 #define SWCLT_JSON_PARSE_UUID(key)										\
 	{																	\
 		ks_json_t *item = ks_json_get_object_item(object, #key);		\
+		const char *str = "";											\
 		if (!item || !ks_json_type_is_string(item))  {					\
 			release_cb(&target);										\
 			return KS_STATUS_INVALID_ARGUMENT;							\
 		}																\
-		const char *str = "";											\
 		ks_json_value_string(item, &str);								\
 		target->key = ks_uuid_from_str(str);							\
 	}
@@ -321,9 +321,10 @@ KS_BEGIN_EXTERN_C
 #define SWCLT_JSON_MARSHAL_BEG(function_name, target_type)											\
 	static inline ks_json_t * function_name##_MARSHAL(target_type *source)							\
 	{																								\
+		ks_json_t *target;																			\
 		if (!source)																				\
 			return NULL;																			\
-		ks_json_t *target = ks_json_create_object();												\
+		target = ks_json_create_object();															\
 		if (!target)																				\
 			return NULL;
 

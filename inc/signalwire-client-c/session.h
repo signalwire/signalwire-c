@@ -24,8 +24,6 @@
 
 KS_BEGIN_EXTERN_C
 
-typedef struct swclt_sess swclt_sess_t;
-
 typedef enum swclt_sess_state {
 	SWCLT_STATE_OFFLINE,
 	SWCLT_STATE_ONLINE,
