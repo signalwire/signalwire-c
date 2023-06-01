@@ -58,7 +58,7 @@ jobs:
           path: ${{ steps.tar.outputs.ARTIFACT_PATH }}
           retention-days: 5
       - name: comment on PR
-        if: ${{ failure() && github.event_name == "pull_request" }}
+        if: ${{ failure() && github.event_name == 'pull_request' }}
         uses: thollander/actions-comment-pull-request@v2
         with:
           message: |
@@ -67,7 +67,7 @@ jobs:
             Action Run: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           pr_number: 123 # This will comment on pull request #123
       - name: notify slack
-        if: ${{ failure() && github.event_name == "push" }}
+        if: ${{ failure() && github.event_name == 'push' }}
         uses: signalwire/actions-template/.github/actions/slack@main
         with:
           CHANNEL: CCS2AV2H2
