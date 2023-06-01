@@ -1,15 +1,16 @@
 name: CI
 
 on:
+  pull_request:
+    types: [synchronize, opened]
   push:
     branches:
-      - "*"
-      - "**"
-      - "!master"
+      - "v2.0"
 
 jobs:
   scan_build:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == "push" || github.event_name == "pull_request" && github.ref_name == "v2.0" }}
     container:
       image: debian:buster
     steps:
@@ -40,16 +41,15 @@ jobs:
           cd /__w/signalwire-c/signalwire-c
           ls -l
           if [ "true" -eq $COMPILATION_FAILED ]; then
-            tar czvf /__w/signalwire-c/signalwire-c/scan-build-result.tar.gz ./scan-build-result.txt;
-            echo "ARTIFACT_PATH=/__w/signalwire-c/signalwire-c/scan-build-result.tar.gz" >> $GITHUB_OUTPUT;
+            tar czvf scan-build-result.tar.gz ./scan-build-result.txt;
+            echo "ARTIFACT_PATH=scan-build-result.tar.gz" >> $GITHUB_OUTPUT;
             echo "ARTIFACT=scan-build-result" >> $GITHUB_OUTPUT;
           fi
           if [ "true" -eq $BUGS_FOUND ]; then
-            tar czvf /__w/signalwire-c/reports.tar.gz $REPORT;
-            echo "ARTIFACT_PATH=/__w/signalwire-c/signalwire-c/reports.tar.gz" >> $GITHUB_OUTPUT;
+            tar czvf reports.tar.gz $REPORT;
+            echo "ARTIFACT_PATH=reports.tar.gz" >> $GITHUB_OUTPUT;
             echo "ARTIFACT=reports" >> $GITHUB_OUTPUT;
           fi
-
       - name: Upload artifacts
         if: failure()
         uses: actions/upload-artifact@v3
@@ -57,11 +57,20 @@ jobs:
           name: ${{ steps.tar.outputs.ARTIFACT }}-${{ github.sha }}-${{ github.run_id }}
           path: ${{ steps.tar.outputs.ARTIFACT_PATH }}
           retention-days: 5
+      - name: comment on PR
+        if: ${{ failure() && github.event_name == "pull_request" }}
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: |
+            scan_build _*failed*_.
+            Please checkout the results.
+            Action Run: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          pr_number: 123 # This will comment on pull request #123
       - name: notify slack
-        if: failure()
+        if: ${{ failure() && github.event_name == "push" }}
         uses: signalwire/actions-template/.github/actions/slack@main
         with:
-          CHANNEL: ${{ secrets.SLACK_CHANNEL_ID  }}
+          CHANNEL: CCS2AV2H2
           MESSAGE: Scan-build ${{ github.repository }} > <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.run_id }}>.\n ${{ steps.scan_build.outputs.MESSAGE }}}.\nPlease check the results.
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL  }}
