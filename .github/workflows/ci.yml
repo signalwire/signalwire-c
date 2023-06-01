@@ -8,6 +8,12 @@ on:
       - "v2.0"
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo ${{ github.event_name }}
+          echo ${{ github.ref_name }}
   scan_build:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' && github.ref_name == 'v2.0' }}
