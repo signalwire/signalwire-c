@@ -70,7 +70,7 @@ jobs:
         if: ${{ failure() && github.event_name == 'push' }}
         uses: signalwire/actions-template/.github/actions/slack@main
         with:
-          CHANNEL: CCS2AV2H2
+          CHANNEL: ${{ secrets.SLACK_CHANNEL_ID  }}
           MESSAGE: Scan-build ${{ github.repository }} > <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.run_id }}>.\n ${{ steps.scan_build.outputs.MESSAGE }}}.\nPlease check the results.
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL  }}
