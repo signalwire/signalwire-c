@@ -12,7 +12,6 @@ on:
 jobs:
   scan_build:
     runs-on: ubuntu-latest
-    # if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'v2.0' }}
     container:
       image: debian:buster
     steps:
