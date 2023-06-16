@@ -90,7 +90,7 @@ done:
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_DISCONNECT_CMD()
+static inline swclt_cmd_t CREATE_BLADE_DISCONNECT_CMD(void)
 {
 	return CREATE_BLADE_DISCONNECT_CMD_ASYNC(
 		NULL,

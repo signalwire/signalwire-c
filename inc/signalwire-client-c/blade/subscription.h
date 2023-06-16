@@ -96,16 +96,15 @@ static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 	ks_json_t *request_obj;
 	ks_status_t status;
 	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	blade_subscription_rqu_t request = { 0 };
 
 	if (ks_pool_open(&pool))
 		return cmd;
 
 	/* Create a blade subscription request structure then marshal it */
-	blade_subscription_rqu_t request = {
-		command,
-		protocol,
-		ks_json_pcreate_array_inline(pool, 1, ks_json_pcreate_string(pool, channel))
-	};
+	request.command  = command;
+	request.protocol = protocol;
+	request.channels = ks_json_pcreate_array_inline(pool, 1, ks_json_pcreate_string(pool, channel));
 
 	if (!(request_obj = BLADE_SUBSCRIPTION_RQU_MARSHAL(pool, &request))) {
 		ks_log(KS_LOG_WARNING, "Failed to create subscription request");
