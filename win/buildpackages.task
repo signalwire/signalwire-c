@@ -64,13 +64,13 @@ using System.Diagnostics;
             if (!FileOrDirectoryExists(package_root))
             {
                 Directory.CreateDirectory(package_root + @"\binaries\$(Platform)\$(Configuration)");
-                string[] files = {"signalwire_client.lib", @"signalwire_client.dll"};
+                string[] files = {"signalwire_client2.lib", @"signalwire_client2.dll"};
                 foreach (string f in files) {        
                     File.Copy(@"..\Build-$(Platform)\$(Configuration)\" + f, package_root + @"\binaries\$(Platform)\$(Configuration)\" + f);
                 }
 
                 if ("$(Configuration.ToLower())" == "debug" ) {
-                    string[] debug_files = {"signalwire_client.pdb"};
+                    string[] debug_files = {"signalwire_client2.pdb"};
                     foreach (string f in debug_files) {        
                             File.Copy(@"..\Build-$(Platform)\$(Configuration)\" + f, package_root + @"\binaries\$(Platform)\$(Configuration)\" + f);
                     }
