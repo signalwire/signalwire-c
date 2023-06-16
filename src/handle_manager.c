@@ -276,7 +276,7 @@ static void * __manager_thread_wrapper(ks_thread_t *thread, void *data)
 	return NULL;
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_hmgr_init()
+SWCLT_DECLARE(ks_status_t) swclt_hmgr_init(void)
 {
 	ks_status_t status;
 
@@ -290,7 +290,7 @@ SWCLT_DECLARE(ks_status_t) swclt_hmgr_init()
 	return status;
 }
 
-SWCLT_DECLARE(void) swclt_hmgr_shutdown()
+SWCLT_DECLARE(void) swclt_hmgr_shutdown(void)
 {
 	ks_log(KS_LOG_INFO, "Shutting down manager");
 

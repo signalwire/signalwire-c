@@ -292,9 +292,10 @@ KS_BEGIN_EXTERN_C
 #define SWCLT_JSON_MARSHAL_BEG(function_name, target_type)											\
 	static inline ks_json_t * function_name##_MARSHAL(ks_pool_t *pool, target_type *source)			\
 	{																								\
+		ks_json_t *target = NULL;																		\
 		if (!source)																				\
 			return NULL;																			\
-		ks_json_t *target = ks_json_pcreate_object(pool);											\
+		target = ks_json_pcreate_object(pool);											\
 		if (!target)																				\
 			return NULL;
 
