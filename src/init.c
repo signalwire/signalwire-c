@@ -34,7 +34,7 @@ SWCLT_DECLARE(ks_status_t) swclt_init(int default_log_level)
 	return status;
 }
 
-SWCLT_DECLARE(ks_status_t) swclt_shutdown()
+SWCLT_DECLARE(ks_status_t) swclt_shutdown(void)
 {
 	return ks_shutdown();
 }
