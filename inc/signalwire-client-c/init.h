@@ -25,7 +25,7 @@
 KS_BEGIN_EXTERN_C
 
 SWCLT_DECLARE(ks_status_t) swclt_init(int default_log_level);
-SWCLT_DECLARE(ks_status_t) swclt_shutdown();
+SWCLT_DECLARE(ks_status_t) swclt_shutdown(void);
 SWCLT_DECLARE(void) swclt_enable_log_output(int default_log_level);
 
 KS_END_EXTERN_C
