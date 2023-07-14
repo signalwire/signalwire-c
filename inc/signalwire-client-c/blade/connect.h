@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@
 #pragma once
 
 /* The method name for a connect request */
-static const char *BLADE_CONNECT_METHOD = "blade.connect";
+#define BLADE_CONNECT_METHOD "blade.connect"
 
 /* Flags for the command */
 #define BLADE_CONNECT_FLAGS 0
@@ -41,17 +41,26 @@ typedef struct blade_connect_rqu_s {
 	blade_version_t *version;
 	ks_uuid_t sessionid;
 	ks_json_t *authentication;
+	const char *agent;
+	const char *identity;
+	ks_json_t *network;
 } blade_connect_rqu_t;
 
 SWCLT_JSON_MARSHAL_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
 	SWCLT_JSON_MARSHAL_CUSTOM(BLADE_VERSION, version)
 	SWCLT_JSON_MARSHAL_UUID(sessionid)
 	SWCLT_JSON_MARSHAL_ITEM_OPT(authentication)
+	SWCLT_JSON_MARSHAL_STRING_OPT(agent)
+	SWCLT_JSON_MARSHAL_STRING_OPT(identity)
+	SWCLT_JSON_MARSHAL_ITEM_OPT(network)
 SWCLT_JSON_MARSHAL_END()
 
 SWCLT_JSON_DESTROY_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
 	SWCLT_JSON_DESTROY_CUSTOM(BLADE_VERSION, version)
 	SWCLT_JSON_DESTROY_UUID(sessionid)
+	SWCLT_JSON_DESTROY_STRING(agent)
+	SWCLT_JSON_DESTROY_STRING(identity)
+	SWCLT_JSON_DESTROY_ITEM(network)
 SWCLT_JSON_DESTROY_END()
 
 SWCLT_JSON_ALLOC_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
@@ -62,6 +71,9 @@ SWCLT_JSON_PARSE_BEG(BLADE_CONNECT_RQU, blade_connect_rqu_t)
 	SWCLT_JSON_PARSE_CUSTOM(BLADE_VERSION, version)
 	SWCLT_JSON_PARSE_UUID(sessionid)
 	SWCLT_JSON_PARSE_ITEM_OPT(authentication)
+	SWCLT_JSON_PARSE_STRING_OPT(agent)
+	SWCLT_JSON_PARSE_STRING_OPT(identity)
+	SWCLT_JSON_PARSE_ITEM_OPT(network)
 SWCLT_JSON_PARSE_END()
 
 /* Define our reply structure */
@@ -121,35 +133,37 @@ SWCLT_JSON_PARSE_END()
  * CREATE_BLADE_CONNECT_CMD_ASYNC - Creates a command which holds
  * and owns the request json for a connect request.
  */
-static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD_ASYNC(
+static inline swclt_cmd_t *CREATE_BLADE_CONNECT_CMD_ASYNC(
+	ks_pool_t *pool,
 	ks_uuid_t previous_sessionid,
 	ks_json_t **authentication,
+	const char *agent,
+	const char *identity,
+	ks_json_t *network,
 	swclt_cmd_cb_t cb,
 	void *cb_data)
 {
 	blade_connect_rqu_t *connect_rqu = NULL;
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
+	swclt_cmd_t *cmd = NULL;
 	ks_json_t *obj = NULL;
-	ks_pool_t *pool;
-
-	if (ks_pool_open(&pool))
-		goto done;
 
 	if (BLADE_CONNECT_RQU_ALLOC(pool, &connect_rqu))
 		goto done;
 
 	connect_rqu->sessionid = previous_sessionid;
+	connect_rqu->agent = agent;
+	connect_rqu->identity = identity;
+	connect_rqu->network = ks_json_duplicate(network, KS_TRUE);
 	if (authentication && *authentication) {
 		connect_rqu->authentication = *authentication;
 		*authentication = NULL;
 	}
 
-	if (!(obj = BLADE_CONNECT_RQU_MARSHAL(pool, connect_rqu)))
+	if (!(obj = BLADE_CONNECT_RQU_MARSHAL(connect_rqu)))
 		goto done;
 
 	if (swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_CONNECT_METHOD,
@@ -160,15 +174,25 @@ static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD_ASYNC(
 		goto done;
 
 done:
-	BLADE_CONNECT_RQU_DESTROY(&connect_rqu);
+	// These are not owned by the request, don't destroy them
+	if (connect_rqu) {
+		connect_rqu->agent = NULL;
+		connect_rqu->identity = NULL;
+
+		BLADE_CONNECT_RQU_DESTROY(&connect_rqu);
+	}
+
 	ks_json_delete(&obj);
-	ks_pool_close(&pool);
 
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_CONNECT_CMD(ks_uuid_t previous_sessionid,
-												   ks_json_t **authentication)
+static inline swclt_cmd_t *CREATE_BLADE_CONNECT_CMD(ks_pool_t *pool,
+												   ks_uuid_t previous_sessionid,
+												   ks_json_t **authentication,
+												   const char *agent,
+												   const char *identity,
+												   ks_json_t *network)
 {
-	return CREATE_BLADE_CONNECT_CMD_ASYNC(previous_sessionid, authentication, NULL, NULL);
+	return CREATE_BLADE_CONNECT_CMD_ASYNC(pool, previous_sessionid, authentication, agent, identity, network, NULL, NULL);
 }

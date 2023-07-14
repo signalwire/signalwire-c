@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2019 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@
 #pragma once
 
 /* The method name for a protocol request */
-static const char *BLADE_EXECUTE_METHOD = "blade.execute";
+#define BLADE_EXECUTE_METHOD "blade.execute"
 
 /* Flags for the command */
 #define BLADE_EXECUTE_FLAGS 0
@@ -119,33 +119,25 @@ SWCLT_JSON_PARSE_END()
  * CREATE_BLADE_EXECUTE_CMD_ASYNC - Creates a command which holds
  * and owns the request json for an execute request.
  */
-#define CREATE_BLADE_EXECUTE_CMD_ASYNC(...)	__CREATE_BLADE_EXECUTE_CMD_ASYNC(	\
-	__FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-
-static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
-	const char *file, int line, const char *tag,
+static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD_ASYNC(
 	swclt_cmd_cb_t cb,
 	void *cb_data,
+	const char *id,
 	const char *responder,
 	const char *protocol,
 	const char *method,
 	ks_json_t **params)
 {
-	swclt_cmd_t cmd;
+	swclt_cmd_t *cmd = NULL;
 	ks_status_t status;
 	ks_json_t *request;
-	ks_pool_t *pool;
+	ks_uuid_t msgid = ks_uuid_null();
 
-	/* Forward declare the pool we're going to use for allocations relative to
-	 * the command, we will hand this pool to the command and it will use it
-	 * for its allocation */
-	if ((status = ks_pool_open(&pool)))
-		return status;
-
+	if (id) msgid = ks_uuid_from_str(id);
 	request = ks_json_create_object();
-	if (responder) ks_json_padd_string_to_object(pool, request, "responder_nodeid", responder);
-	ks_json_padd_string_to_object(pool, request, "protocol", protocol);
-	ks_json_padd_string_to_object(pool, request, "method", method);
+	if (responder) ks_json_add_string_to_object(request, "responder_nodeid", responder);
+	ks_json_add_string_to_object(request, "protocol", protocol);
+	ks_json_add_string_to_object(request, "method", method);
 	ks_json_add_item_to_object(request, "params", *params);
 
 	/* Clear callers ptr */
@@ -155,28 +147,27 @@ static inline swclt_cmd_t __CREATE_BLADE_EXECUTE_CMD_ASYNC(
 	 * and null out our ptr */
 	if ((status = swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_EXECUTE_METHOD,
 			&request,
 			BLADE_EXECUTE_TTL_MS,
 			BLADE_EXECUTE_FLAGS,
-			ks_uuid_null()))) {
+			msgid))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate execute cmd: %lu", status);
 
 		/* Safe to free this or at least attempt to, cmd will have set it to null if it
 		 * took ownership of it */
 		ks_json_delete(&request);
-		ks_pool_close(&pool);
-		return KS_NULL_HANDLE;
+		return NULL;
 	}
 
 	/* Phew, successfully allocated the command */
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_EXECUTE_CMD(
+static inline swclt_cmd_t *CREATE_BLADE_EXECUTE_CMD(
+	const char *id,
     const char *responder,
 	const char *protocol,
 	const char *method,
@@ -185,6 +176,7 @@ static inline swclt_cmd_t CREATE_BLADE_EXECUTE_CMD(
 	return CREATE_BLADE_EXECUTE_CMD_ASYNC(
 		NULL,
 		NULL,
+		id,
 		responder,
 		protocol,
 		method,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,7 @@
 #pragma once
 
 /* The method name for a disconnect request */
-static const char *BLADE_DISCONNECT_METHOD = "blade.disconnect";
+#define BLADE_DISCONNECT_METHOD "blade.disconnect"
 
 /* Flags for the command, in our case we don't get replies */
 #define BLADE_DISCONNECT_FLAGS SWCLT_CMD_FLAG_NOREPLY
@@ -48,23 +48,18 @@ SWCLT_JSON_PARSE_END()
  * CREATE_BLADE_DISCONNECT_CMD_ASYNC - Creates a command with a request
  * in it setup to submit a disconnect method to blade.
  */
-static inline swclt_cmd_t CREATE_BLADE_DISCONNECT_CMD_ASYNC(
+static inline swclt_cmd_t *CREATE_BLADE_DISCONNECT_CMD_ASYNC(
 	swclt_cmd_cb_t cb,
 	void *cb_data)
 {
 	ks_json_t *obj = NULL;
 	blade_disconnect_rqu_t disconnect_rqu;
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
-	ks_pool_t *pool;
-
-	if (ks_pool_open(&pool))
-		return cmd;
+	swclt_cmd_t *cmd = NULL;
 
 	/* Fill in the disconnect request then marshal it, it will create copies
 	 * of all the fields so caller doesn't lose ownership here */
 
-	if (!(obj = BLADE_DISCONNECT_RQU_MARSHAL(pool, &disconnect_rqu))) {
-		ks_pool_close(&pool);
+	if (!(obj = BLADE_DISCONNECT_RQU_MARSHAL(&disconnect_rqu))) {
 
 		/* Since params is last, on error here we can be sure params was
 		 * not freed so do not set the callers params to NULL */
@@ -74,7 +69,6 @@ static inline swclt_cmd_t CREATE_BLADE_DISCONNECT_CMD_ASYNC(
 	/* Now give it to the new command */
 	if (swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_DISCONNECT_METHOD,
@@ -86,11 +80,10 @@ static inline swclt_cmd_t CREATE_BLADE_DISCONNECT_CMD_ASYNC(
 
 done:
 	ks_json_delete(&obj);
-	ks_pool_close(&pool);
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_DISCONNECT_CMD(void)
+static inline swclt_cmd_t *CREATE_BLADE_DISCONNECT_CMD(void)
 {
 	return CREATE_BLADE_DISCONNECT_CMD_ASYNC(
 		NULL,

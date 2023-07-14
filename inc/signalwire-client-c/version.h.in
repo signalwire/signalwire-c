@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,29 +22,9 @@
 
 #pragma once
 
-KS_BEGIN_EXTERN_C
+#define SIGNALWIRE_CLIENT_C_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define SIGNALWIRE_CLIENT_C_VERSION_MINOR @PROJECT_VERSION_MINOR@
 
-/* A subscription represents a logical registration of
- * a listener on a channel */
-struct swclt_sub_ctx {
-	swclt_handle_base_t base;
-
-	const char * protocol;
-	const char * channel;
-
-	swclt_sub_cb_t cb;
-
-	void *cb_data;
-};
-
-KS_END_EXTERN_C
-
-/* Define helper macros to eliminate boiler code in handle wrapped apis */
-#define SWCLT_SUB_SCOPE_BEG(sub, ctx, status) \
-	KS_HANDLE_SCOPE_BEG(SWCLT_HTYPE_SUB, sub, swclt_sub_ctx_t, ctx, status);
-
-#define SWCLT_SUB_SCOPE_END(sub, ctx, status) \
-	KS_HANDLE_SCOPE_END(SWCLT_HTYPE_SUB, sub, swclt_sub_ctx_t, ctx, status);
 
 /* For Emacs:
  * Local Variables:

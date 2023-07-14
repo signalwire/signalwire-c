@@ -29,6 +29,9 @@ typedef struct swclt_config_s {
 	const char *client_cert_path;
 	const char *cert_chain_path;
 	const char *authentication;
+	const char *agent;
+	const char *identity;
+	ks_json_t *network;
 } swclt_config_t;
 
 KS_END_EXTERN_C
