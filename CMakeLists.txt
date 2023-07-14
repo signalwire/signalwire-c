@@ -16,14 +16,19 @@ if (WIN32)
 	endif()
 endif()
 
-# Declare our project, libks
-project(SignalWire-Client-C VERSION 1.3.3 LANGUAGES C)
-message("SignalWire-Client-C ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
+# Declare our project, SignalWire-Client-C2
+project(SignalWire-Client-C2 VERSION 2.0.0 LANGUAGES C)
+message("SignalWire-Client-C2 ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
 
 # Set package version
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH "0")
+
+# Configure the version header file 
+configure_file (
+  "${CMAKE_CURRENT_LIST_DIR}/inc/signalwire-client-c/version.h.in"
+  "${CMAKE_CURRENT_LIST_DIR}/inc/signalwire-client-c/version.h"  )
 
 include(cmake/FindLibKS.cmake)
 include(${LIBKS_CMAKE_DIR}/ksutil.cmake)
@@ -42,7 +47,7 @@ if(KS_PLAT_LIN)
 endif()
 
 # Set package name
-string(TOLOWER ${CMAKE_PROJECT_NAME} PACKAGE_NAME)
+string(TOLOWER "${CMAKE_PROJECT_NAME}" PACKAGE_NAME)
 
 # Set package contact
 set(CPACK_PACKAGE_CONTACT "support@signalwire.com")
@@ -108,7 +113,7 @@ if("${CMAKE_OS_NAME}" STREQUAL "Centos")
 	set(CPACK_GENERATOR RPM)
 
 	# Set RPM package name
-	set(CPACK_RPM_RUNTIME_PACKAGE_NAME "signalwire-client-c")
+	set(CPACK_RPM_RUNTIME_PACKAGE_NAME "signalwire-client-c2")
 
 	# Set version release from environment variable
 	if (NOT "$ENV{PACKAGE_RELEASE}" STREQUAL "")
@@ -183,7 +188,7 @@ if("${CMAKE_OS_NAME}" STREQUAL "Debian")
 	set(CPACK_DEB_COMPONENT_INSTALL "ON")
 
 	# Set package name
-	set(CPACK_DEBIAN_PACKAGE_NAME "signalwire-client-c")
+	set(CPACK_DEBIAN_PACKAGE_NAME "signalwire-client-c2")
 
  	# Abuse Cmake component name
  	set(CPACK_DEBIAN_RUNTIME_PACKAGE_NAME ${CPACK_DEBIAN_PACKAGE_NAME})
@@ -248,7 +253,7 @@ if("${CMAKE_OS_NAME}" STREQUAL "Debian")
 	set(CPACK_DEBIAN_FILE_NAME "${PACKAGE_NAME}_${PROJECT_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE}_${DISTRO_CODENAME}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}.deb")
 
 	# Set a Debian compliant changelog header
-	set(CHANGELOG_HEADER "${PACKAGE_NAME} (${CPACK_DEBIAN_PACKAGE_VERSION}) ${DISTRO_CODENAME}\; urgency=${CPACK_DEBIAN_PACKAGE_PRIORITY}")
+	set(CHANGELOG_HEADER "signalwire-client-c2 (${CPACK_DEBIAN_PACKAGE_VERSION}) ${DISTRO_CODENAME}\; urgency=${CPACK_DEBIAN_PACKAGE_PRIORITY}")
 
 	# Generate a Debian compliant changelog
 	if(GIT_FOUND AND GZIP_CMD AND DATE_CMD)
@@ -288,7 +293,7 @@ if("${CMAKE_OS_NAME}" STREQUAL "Debian")
 		execute_process(COMMAND ${GZIP_CMD} -f -9 -n changelog.Debian)
 
 		# Install changelog
-		install(FILES "${CMAKE_BINARY_DIR}/changelog.Debian.gz" COMPONENT "runtime" DESTINATION "share/doc/${CPACK_DEBIAN_PACKAGE_NAME}")
+		install(FILES "${CMAKE_BINARY_DIR}/changelog.Debian.gz" COMPONENT "runtime" DESTINATION "share/doc/signalwire-client-c2")
 
 		# Delete changelog related variables
 		unset(CHANGELOG_HEADER)
@@ -324,26 +329,26 @@ if (KS_PLAT_WIN)
 	source_group(TREE ${CMAKE_CURRENT_LIST_DIR} FILES ${SWCltInc})
 endif()
 
-add_library(signalwire_client SHARED ${SWCltSrc} ${SWCltInc})
-set_target_properties(signalwire_client PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
-set_target_properties(signalwire_client PROPERTIES DEBUG_POSTFIX "")
+add_library(signalwire_client2 SHARED ${SWCltSrc} ${SWCltInc})
+set_target_properties(signalwire_client2 PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
+set_target_properties(signalwire_client2 PROPERTIES DEBUG_POSTFIX "")
 
 # Define our exports symbol to key any definitions to toggle the visibility type
-set_target_properties(signalwire_client PROPERTIES DEFINE_SYMBOL SWCLT_EXPORTS)
+set_target_properties(signalwire_client2 PROPERTIES DEFINE_SYMBOL SWCLT_EXPORTS)
 
 # Setup blade core definnitions
-target_compile_definitions(signalwire_client PUBLIC
+target_compile_definitions(signalwire_client2 PUBLIC
   -DSWCLT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
   -DSWCLT_VERSION_MINOR=${PROJECT_VERSION_MINOR}
   -DSWCLT_VERSION_REVISION=${PROJECT_VERSION_PATCH}
 )
 
 if (KS_PLAT_WIN)
-	target_compile_definitions(signalwire_client PUBLIC)
+	target_compile_definitions(signalwire_client2 PUBLIC)
 endif()
 
 if (SWCLT_DEBUG_JSON)
-	target_compile_definitions(signalwire_client PUBLIC
+	target_compile_definitions(signalwire_client2 PUBLIC
 	  -DSWCLT_DEBUG_JSON=1
 	)
 endif()
@@ -355,11 +360,11 @@ endif()
 
 # Setup ks core dependent linkages
 if (NOT WIN32)
-		target_link_libraries(signalwire_client PUBLIC ks)
+		target_link_libraries(signalwire_client2 PUBLIC ks2)
 else()
 		target_link_libraries(
-			signalwire_client PUBLIC
-			${LIBKS_LIBRARY_PATH}/ks.lib
+			signalwire_client2 PUBLIC
+			${LIBKS_LIBRARY_PATH}/ks2.lib
 			OpenSSL::SSL
 			OpenSSL::Crypto
 		)
@@ -367,22 +372,22 @@ endif()
 
 # Include key paths
 target_include_directories(
-  signalwire_client PUBLIC
-  $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include/libks>
+  signalwire_client2 PUBLIC
+  $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include/libks2/libks>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
 )
 
 if (WIN32)
 # Include key paths
 		target_include_directories(
-			signalwire_client PUBLIC
+			signalwire_client2 PUBLIC
 			$<BUILD_INTERFACE:;${LIBKS_INCLUDE_DIRS}/src/include>
 			$<BUILD_INTERFACE:;${OPENSSL_INCLUDE_DIR}>
 		)
 endif()
 
 target_include_directories(
-	signalwire_client PRIVATE
+	signalwire_client2 PRIVATE
 )
 
 # Include the bin dir for config discovery
@@ -390,22 +395,22 @@ set(CONF_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
 
 if (NOT KS_PLAT_WIN)
 	# Set install targets
-	install(TARGETS signalwire_client COMPONENT "runtime" EXPORT SignalWireClientConfig DESTINATION lib)
-	install(DIRECTORY inc/signalwire-client-c COMPONENT "runtime" DESTINATION include PATTERN internal EXCLUDE)
+	install(TARGETS signalwire_client2 COMPONENT "runtime" EXPORT SignalWireClient2Config DESTINATION lib)
+	install(DIRECTORY inc/signalwire-client-c COMPONENT "runtime" DESTINATION include/signalwire-client-c2 PATTERN internal EXCLUDE)
 
 	# Set path for pkg-config based on ARCH and distro type
 	if("${CMAKE_OS_NAME}" STREQUAL "Centos") # pkg-config --variable pc_path pkg-config
 		if(${CPACK_SYSTEM_NAME} MATCHES "x86_64")
-			install(FILES ${PROJECT_BINARY_DIR}/signalwire_client.pc COMPONENT "runtime" DESTINATION lib64/pkgconfig)
+			install(FILES ${PROJECT_BINARY_DIR}/signalwire_client2.pc COMPONENT "runtime" DESTINATION lib64/pkgconfig)
 		else()
-			install(FILES ${PROJECT_BINARY_DIR}/signalwire_client.pc COMPONENT "runtime" DESTINATION lib/pkgconfig)
+			install(FILES ${PROJECT_BINARY_DIR}/signalwire_client2.pc COMPONENT "runtime" DESTINATION lib/pkgconfig)
 		endif()
 	else()
-		install(FILES ${PROJECT_BINARY_DIR}/signalwire_client.pc COMPONENT "runtime" DESTINATION lib/pkgconfig)
+		install(FILES ${PROJECT_BINARY_DIR}/signalwire_client2.pc COMPONENT "runtime" DESTINATION lib/pkgconfig)
 	endif()
 
-	install(EXPORT SignalWireClientConfig COMPONENT "runtime" DESTINATION include/signalwire-client-c/cmake)
-	install(FILES ${PROJECT_BINARY_DIR}/copyright COMPONENT "runtime" DESTINATION share/doc/signalwire-client-c)
+	install(EXPORT SignalWireClient2Config COMPONENT "runtime" DESTINATION include/signalwire-client-c2/signalwire-client-c/cmake)
+	install(FILES ${PROJECT_BINARY_DIR}/copyright COMPONENT "runtime" DESTINATION share/doc/signalwire-client-c2)
 
 	# Set uninstall target
 	if(NOT TARGET uninstall)
@@ -428,16 +433,14 @@ if (NOT KS_PLAT_WIN)
 	# Name: @PACKAGE_NAME@
 	# Version: @PACKAGE_VERSION@
 	set(PC_PREFIX ${CMAKE_INSTALL_PREFIX})
-	get_property(PC_DEFINITIONS TARGET signalwire_client PROPERTY INTERFACE_COMPILE_DEFINITIONS)
-	get_property(PC_DEFINITIONS TARGET ks PROPERTY INTERFACE_COMPILE_DEFINITIONS)
-	set(PACKAGE_NAME signalwire_client)
+	get_property(PC_DEFINITIONS TARGET signalwire_client2 PROPERTY INTERFACE_COMPILE_DEFINITIONS)
+	get_property(PC_DEFINITIONS TARGET ks2 PROPERTY INTERFACE_COMPILE_DEFINITIONS)
+	set(PACKAGE_NAME signalwire_client2)
 	set(PACKAGE_VERSION ${PROJECT_VERSION})
-	configure_file("${CMAKE_CURRENT_LIST_DIR}/signalwire_client.pc.in" "${PROJECT_BINARY_DIR}/signalwire_client.pc" @ONLY)
+	configure_file("${CMAKE_CURRENT_LIST_DIR}/signalwire_client.pc.in" "${PROJECT_BINARY_DIR}/signalwire_client2.pc" @ONLY)
 endif()
 
-cotire(signalwire_client)
-
-add_subdirectory(swclt_bench)
+cotire(signalwire_client2)
 
 enable_testing()
 add_subdirectory(swclt_test)

@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+    types: [synchronize, opened]
+    branches:
+      - "v2.0"
+  push:
+    branches:
+      - "v2.0"
+
+jobs:
+  scan_build:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:buster
+    steps:
+      - name: install deps
+        run: |
+          apt-get update && apt-get install -yq build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-7
+          apt-get install -yq cmake uuid-dev libssl-dev
+      - name: Checkout
+        uses: actions/checkout@v3
+      - run: pwd
+      - name: clone libks
+        uses: actions/checkout@v3
+        with:
+          repository: signalwire/libks
+          ref: v2.0
+          path: /__w/signalwire-c/signalwire-c/libks
+      - name: build libks
+        run: cd /__w/signalwire-c/signalwire-c/libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
+      - id: scan_build
+        run: /__w/signalwire-c/signalwire-c/scan_build.sh
+      - name: Tar logs
+        id: tar
+        if: failure()
+        env:
+          COMPILATION_FAILED: ${{ steps.scan_build.outputs.COMPILATION_FAILED }}
+          BUGS_FOUND: ${{ steps.scan_build.outputs.BUGS_FOUND }}
+        run: |
+          cd /__w/signalwire-c/signalwire-c
+          ls -l
+          if [ "true" -eq $COMPILATION_FAILED ]; then
+            tar czvf scan-build-result.tar.gz ./scan-build-result.txt;
+            echo "ARTIFACT_PATH=scan-build-result.tar.gz" >> $GITHUB_OUTPUT;
+            echo "ARTIFACT=scan-build-result" >> $GITHUB_OUTPUT;
+          fi
+          if [ "true" -eq $BUGS_FOUND ]; then
+            tar czvf reports.tar.gz $REPORT;
+            echo "ARTIFACT_PATH=reports.tar.gz" >> $GITHUB_OUTPUT;
+            echo "ARTIFACT=reports" >> $GITHUB_OUTPUT;
+          fi
+      - name: Upload artifacts
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.tar.outputs.ARTIFACT }}-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ steps.tar.outputs.ARTIFACT_PATH }}
+          retention-days: 5
+      - name: comment on PR
+        if: ${{ failure() && github.event_name == 'pull_request' }}
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: |
+            scan_build _*failed*_.
+            Please checkout the results.
+            Action Run: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          pr_number: 123 # This will comment on pull request #123
+      - name: notify slack
+        if: ${{ failure() && github.event_name == 'push' }}
+        uses: signalwire/actions-template/.github/actions/slack@main
+        with:
+          CHANNEL: ${{ secrets.SLACK_CHANNEL_ID  }}
+          MESSAGE: Scan-build ${{ github.repository }} > <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.run_id }}>.\n ${{ steps.scan_build.outputs.MESSAGE }}}.\nPlease check the results.
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL  }}

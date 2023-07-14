@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 SignalWire, Inc
+ * Copyright (c) 2018-2020 SignalWire, Inc
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,11 +24,11 @@
 
 KS_BEGIN_EXTERN_C
 
-static const char *BLADE_SUBSCRIPTION_CMD_ADD = "add";
-static const char *BLADE_SUBSCRIPTION_CMD_REMOVE = "remove";
+#define BLADE_SUBSCRIPTION_CMD_ADD "add"
+#define BLADE_SUBSCRIPTION_CMD_REMOVE "remove"
 
 /* The method name for a subscription request */
-static const char *BLADE_SUBSCRIPTION_METHOD = "blade.subscription";
+#define BLADE_SUBSCRIPTION_METHOD "blade.subscription"
 
 /* Flags for the command */
 #define BLADE_SUBSCRIPTION_FLAGS 0
@@ -85,33 +85,33 @@ SWCLT_JSON_PARSE_END()
  * CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC - Creates a command which holds
  * and owns the request json for a subscription request.
  */
-static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
+static inline swclt_cmd_t *CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 	swclt_cmd_cb_t cb,
 	void *cb_data,
 	const char *command,
 	const char *protocol,
 	const char *channel)
 {
-	ks_pool_t *pool;
 	ks_json_t *request_obj;
 	ks_status_t status;
-	swclt_cmd_t cmd = KS_NULL_HANDLE;
-	blade_subscription_rqu_t request = { 0 };
+	swclt_cmd_t *cmd = NULL;
 
-	if (ks_pool_open(&pool))
-		return cmd;
+	ks_json_t *channels = ks_json_create_array();
 
 	/* Create a blade subscription request structure then marshal it */
-	request.command  = command;
-	request.protocol = protocol;
-	request.channels = ks_json_pcreate_array_inline(pool, 1, ks_json_pcreate_string(pool, channel));
+	blade_subscription_rqu_t request = {
+		command,
+		protocol,
+		channels,
+	};
 
-	if (!(request_obj = BLADE_SUBSCRIPTION_RQU_MARSHAL(pool, &request))) {
+	ks_json_add_string_to_array(channels, channel);
+
+	if (!(request_obj = BLADE_SUBSCRIPTION_RQU_MARSHAL(&request))) {
 		ks_log(KS_LOG_WARNING, "Failed to create subscription request");
 
 		/* Don't forget to free the channels we instantiated inline above */
 		ks_json_delete(&request.channels);
-		ks_pool_close(&pool);
 		return cmd;
 	}
 
@@ -120,25 +120,23 @@ static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD_ASYNC(
 	/* Now wrap it in a command */
 	if ((status = swclt_cmd_create_ex(
 			&cmd,
-			&pool,
 			cb,
 			cb_data,
 			BLADE_SUBSCRIPTION_METHOD,
 			&request_obj,
-			BLADE_SUBSCRIPTION_FLAGS,
 			BLADE_SUBSCRIPTION_TTL_MS,
+			BLADE_SUBSCRIPTION_FLAGS,
 			ks_uuid_null()))) {
 		ks_log(KS_LOG_WARNING, "Failed to allocate subscription command: %lu", status);
 		ks_json_delete(&request_obj);
-		ks_pool_close(&pool);
-		return status;
+		return cmd;
 	}
 
 	/* Success */
 	return cmd;
 }
 
-static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD(
+static inline swclt_cmd_t *CREATE_BLADE_SUBSCRIPTION_CMD(
 	const char *command,
 	const char *protocol,
 	const char *channel)
@@ -153,20 +151,19 @@ static inline swclt_cmd_t CREATE_BLADE_SUBSCRIPTION_CMD(
 
 /* Creates a subscription request */
 static inline ks_json_t *BLADE_SUBSCRIPTION_RQU(
-	ks_pool_t *pool,
 	const char * const command,
 	const char * const protocol,
 	const char * const channel,
 	blade_access_control_t broadcast_access,
 	blade_access_control_t subscribe_access)
 {
-	ks_json_t *request = ks_json_pcreate_object(pool);
-	ks_json_t *channels = ks_json_pcreate_array(pool);
-	ks_json_padd_string_to_array(pool, channels, channel);
-	ks_json_padd_string_to_object(pool, request, "command", command);
-	ks_json_padd_string_to_object(pool, request, "protocol", protocol);
+	ks_json_t *request = ks_json_create_object();
+	ks_json_t *channels = ks_json_add_array_to_object(request, "channels");
+	ks_json_add_string_to_object(request, "command", command);
+	ks_json_add_string_to_object(request, "protocol", protocol);
 	ks_json_add_string_to_array(channels, channel);
-	ks_json_add_item_to_object(request, "channels", channels);
+	(void)(broadcast_access);  // unused
+	(void)(subscribe_access);  // unused
 	return request;
 }
 
