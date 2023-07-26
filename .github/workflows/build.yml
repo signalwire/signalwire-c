@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          repo: signalwire/libks
+          repository: signalwire/libks
           ref: master
           path: /__w/signalwire-c/signalwire-c/libks
       - run: |
