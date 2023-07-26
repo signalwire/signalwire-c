@@ -55,7 +55,7 @@ jobs:
           - tag: signalwire-c-libs10-${{ needs.hash.outputs.HASH }}
             baseimage: signalwire/freeswitch-base:debian-10
             libks_image: ${{ needs.stack_image.outputs.LIBS10 }}
-          - tag: libks-libs11-${{ needs.hash.outputs.HASH }}
+          - tag: signalwire-c-libs11-${{ needs.hash.outputs.HASH }}
             baseimage: signalwire/freeswitch-base:debian-11
             libks_image: ${{ needs.stack_image.outputs.LIBS11 }}     
     name: "build signalwire-c"
