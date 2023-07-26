@@ -36,10 +36,11 @@ jobs:
       - uses: actions/checkout@v3
         with:
           repository: signalwire/libks
-          ref: master
-          path: /__w/signalwire-c/signalwire-c/libks
+          # NOTE: change back to master after libks PR is merged
+          ref: min/build-image
+          path: /home/runner/work/signalwire-c/signalwire-c/libks
       - run: |
-          cd /__w/signalwire-c/signalwire-c/libks
+          cd /home/runner/work/signalwire-c/signalwire-c/libks
           export LIBKS_SHA=$(git rev-parse --short HEAD);
           export IMAGE_LIBS10="signalwire/freeswitch-libs:libks-libs10-$LIBKS_SHA"
           export IMAGE_LIBS11="signalwire/freeswitch-libs:libks-libs11-$LIBKS_SHA"
