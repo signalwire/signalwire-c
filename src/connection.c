@@ -672,11 +672,11 @@ SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn)
 		if ((*conn)->blade_connect_rpl) {
 			BLADE_CONNECT_RPL_DESTROY(&(*conn)->blade_connect_rpl);
 		}
-		ttl_tracker_destroy(&(*conn)->ttl);
 		swclt_wss_destroy(&(*conn)->wss);
 		if ((*conn)->incoming_frame_pool) {
 			ks_thread_pool_destroy(&(*conn)->incoming_frame_pool);
 		}
+		ttl_tracker_destroy(&(*conn)->ttl);
 		ks_hash_destroy(&(*conn)->outstanding_requests);
 		ks_mutex_destroy(&(*conn)->failed_mutex);
 		ks_pool_free(conn);
