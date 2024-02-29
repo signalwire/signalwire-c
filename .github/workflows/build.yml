@@ -70,23 +70,26 @@ jobs:
         repo_url_amd64="https://\\\${domain}/repo/deb/debian-release"
         repo_url_armhf="https://\\\${domain}/repo/deb/rpi/debian-release"
 
-        echo "machine \\\${domain} login \\\${login} password \${GENERIC_TOKEN}" > /root/.netrc
-        cp -f /root/.netrc /etc/apt/auth.conf
+        echo "machine \\\${domain} login \\\${login} password \${GENERIC_TOKEN}" > ~/.netrc
+        cp -f ~/.netrc /etc/apt/auth.conf
 
         if [ "${{ matrix.platform }}" == "amd64" ]; then
           echo "deb [signed-by=\\\${gpg_key}] \\\${repo_url_amd64}/ ${{ matrix.codename }} main" > \\\${source_list}
           echo "deb-src [signed-by=\\\${gpg_key}] \\\${repo_url_amd64}/ ${{ matrix.codename }} main" >> \\\${source_list}
+
+          curl --netrc -o \\\${gpg_key} \\\${repo_url_amd64}/signalwire-freeswitch-repo.gpg || exit 1
         elif [ "${{ matrix.platform }}" == "armhf" ]; then
           echo "deb [signed-by=\\\${gpg_key}] \\\${repo_url_armhf}/ ${{ matrix.codename }} main" > \\\${source_list}
           echo "deb-src [signed-by=\\\${gpg_key}] \\\${repo_url_armhf}/ ${{ matrix.codename }} main" >> \\\${source_list}
+
+          curl --netrc -o \\\${gpg_key} \\\${repo_url_armhf}/signalwire-freeswitch-repo.gpg || exit 1
         else
           echo "Architecture is not supported: ${{ matrix.platform }}"
           exit 1
         fi
 
-        echo "cat \\\${source_list}" && cat \\\${source_list}
+        echo "# cat \\\${source_list}" && cat \\\${source_list}
 
-        curl --netrc -o \\\${gpg_key} \\\${repo_url_amd64}/signalwire-freeswitch-repo.gpg && \
         apt-get -q update && apt-get -y install libks2
     secrets:
       GENERIC_TOKEN: ${{ secrets.REPOTOKEN }}
