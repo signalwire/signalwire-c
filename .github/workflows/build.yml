@@ -1,0 +1,305 @@
+name: Build and Distribute
+
+on:
+  pull_request:
+  push:
+    branches:
+      - release
+      - master
+    paths:
+      - "**"
+      - "!debian/changelog"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.head_ref || github.ref }}
+
+jobs:
+  build_rpm:
+    name: 'Build RPM'
+    uses: signalwire/actions-template/.github/workflows/ci-rpm-packages.yml@main
+    with:
+      PROJECT_NAME: signalwire-c
+      RUNNER: ubuntu-latest
+      PACKAGER: 'packager Andrey Volk <andrey@signalwire.com>'
+      PLATFORM: amd64
+      USE_CMAKE: true
+      CMAKE_BUILD_TYPE: 'Debug'
+      ADDITIONAL_PACKAGES: 'libks2'
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      SIGNALWIRE_USERNAME: 'signalwire'
+      SIGNALWIRE_TOKEN: ${{ secrets.REPOTOKEN }}
+
+  build_deb:
+    name: 'Build DEB'
+    uses: signalwire/actions-template/.github/workflows/ci-deb-packages-v2.yml@main
+    strategy:
+      fail-fast: false
+      matrix:
+        codename:
+          - bookworm
+          - bullseye
+          - buster
+          - stretch
+        platform:
+          - amd64
+          - armhf
+        exclude:
+          - codename: bookworm
+            platform: armhf
+    with:
+      PROJECT_NAME: signalwire-c
+      RUNNER: ubuntu-latest
+      BASE_IMAGE: signalwire/build-deb-action
+      DISTRO_CODENAME: ${{ matrix.codename }}
+      PLATFORM: ${{ matrix.platform }}
+      USE_CMAKE: true
+      CMAKE_BUILD_TYPE: 'Debug'
+      PREBUILD_SCRIPT: |
+        if [ -z "\${GENERIC_TOKEN}" ]; then
+          echo "Error: GENERIC_TOKEN is empty or not set."
+          exit 1
+        fi
+
+        login="signalwire"
+        domain="freeswitch.signalwire.com"
+        gpg_key="/usr/share/keyrings/signalwire-freeswitch-repo.gpg"
+        source_list="/etc/apt/sources.list.d/freeswitch.list"
+        repo_url_amd64="https://\\\${domain}/repo/deb/debian-release"
+        repo_url_armhf="https://\\\${domain}/repo/deb/rpi/debian-release"
+
+        echo "machine \\\${domain} login \\\${login} password \${GENERIC_TOKEN}" > ~/.netrc
+        cp -f ~/.netrc /etc/apt/auth.conf
+
+        if [ "${{ matrix.platform }}" == "amd64" ]; then
+          echo "deb [signed-by=\\\${gpg_key}] \\\${repo_url_amd64}/ ${{ matrix.codename }} main" > \\\${source_list}
+          echo "deb-src [signed-by=\\\${gpg_key}] \\\${repo_url_amd64}/ ${{ matrix.codename }} main" >> \\\${source_list}
+
+          curl --netrc -o \\\${gpg_key} \\\${repo_url_amd64}/signalwire-freeswitch-repo.gpg || exit 1
+        elif [ "${{ matrix.platform }}" == "armhf" ]; then
+          echo "deb [signed-by=\\\${gpg_key}] \\\${repo_url_armhf}/ ${{ matrix.codename }} main" > \\\${source_list}
+          echo "deb-src [signed-by=\\\${gpg_key}] \\\${repo_url_armhf}/ ${{ matrix.codename }} main" >> \\\${source_list}
+
+          curl --netrc -o \\\${gpg_key} \\\${repo_url_armhf}/signalwire-freeswitch-repo.gpg || exit 1
+        else
+          echo "Architecture is not supported: ${{ matrix.platform }}"
+          exit 1
+        fi
+
+        echo "# cat \\\${source_list}" && cat \\\${source_list}
+
+        apt-get -q update && apt-get -y install libks2
+    secrets:
+      GENERIC_TOKEN: ${{ secrets.REPOTOKEN }}
+
+  generate_meta_rpm:
+    if: (github.ref_type == 'branch' && github.base_ref == '')
+    name: 'Meta RPM'
+    needs: [ build_rpm ]
+    strategy:
+      matrix:
+        os:
+          - rpm
+        platform:
+          - amd64
+    uses: signalwire/actions-template/.github/workflows/ci-libs-metadata-v2.yml@main
+    with:
+      ARTIFACT_NAME: ${{ matrix.os }}-${{ matrix.platform }}-artifact
+      OS_PLATFORM: ${{ matrix.os }}-${{ matrix.platform }}
+      RUNNER: ubuntu-latest
+      FILE_PATH_PREFIX: /var/www/signalwire-c-${{ github.ref_name }}-${{ matrix.os }}-${{ matrix.platform }}/${{ github.run_id }}-${{ github.run_number }}
+
+  generate_meta_deb:
+    if: (github.ref_type == 'branch' && github.base_ref == '')
+    name: 'Meta DEB'
+    needs: [ build_deb ]
+    strategy:
+      matrix:
+        os:
+          - deb
+        codename:
+          - bookworm
+          - bullseye
+          - buster
+          - stretch
+        platform:
+          - amd64
+          - armhf
+        exclude:
+          - codename: bookworm
+            platform: armhf
+    uses: signalwire/actions-template/.github/workflows/ci-libs-metadata-v2.yml@main
+    with:
+      ARTIFACT_NAME: ${{ matrix.os }}-${{ matrix.codename }}-${{ matrix.platform }}-artifact
+      OS_PLATFORM: ${{ matrix.os }}-${{ matrix.codename }}-${{ matrix.platform }}
+      RUNNER: ubuntu-latest
+      FILE_PATH_PREFIX: /var/www/signalwire-c-${{ github.ref_name }}-${{ matrix.os }}-${{ matrix.platform }}/${{ github.run_id }}-${{ github.run_number }}
+
+  distribute_matrix_rpm:
+    if: (github.ref_type == 'branch' && github.base_ref == '')
+    permissions: write-all
+    name: 'Copy to remote RPM'
+    needs: [ build_rpm ]
+    strategy:
+      matrix:
+        os:
+          - rpm
+        platform:
+          - amd64
+    uses: signalwire/actions-template/.github/workflows/cd-scp.yml@main
+    with:
+      ARTIFACT_NAME: ${{ matrix.os }}-${{ matrix.platform }}-artifact
+      TARGET_FOLDER: /var/www/signalwire-c-${{ github.ref_name }}-${{ matrix.os }}-${{ matrix.platform }}/${{ github.run_id }}-${{ github.run_number }}
+      RUNNER: ubuntu-latest
+      FILES: '*.tar.gz'
+      CREATE_DESTINATION_FOLDERS: true
+    secrets:
+      # Explicit define secrets for better understanding but it could be just inherit
+      PROXY_URL: ${{ secrets.PROXY_URL }}
+      USERNAME: ${{ secrets.USERNAME }}
+      HOSTNAME: ${{ secrets.HOSTNAME }}
+      TELEPORT_TOKEN: ${{ secrets.TELEPORT_TOKEN }}
+
+  distribute_matrix_deb:
+    if: (github.ref_type == 'branch' && github.base_ref == '')
+    permissions: write-all
+    name: 'Copy to remote DEB'
+    needs: [ build_deb ]
+    strategy:
+      matrix:
+        os:
+          - deb
+        codename:
+          - bookworm
+          - bullseye
+          - buster
+          - stretch
+        platform:
+          - amd64
+          - armhf
+        exclude:
+          - codename: bookworm
+            platform: armhf
+    uses: signalwire/actions-template/.github/workflows/cd-scp.yml@main
+    with:
+      ARTIFACT_NAME: ${{ matrix.os }}-${{ matrix.codename }}-${{ matrix.platform }}-artifact
+      TARGET_FOLDER: /var/www/signalwire-c-${{ github.ref_name }}-${{ matrix.os }}-${{ matrix.platform }}/${{ github.run_id }}-${{ github.run_number }}
+      RUNNER: ubuntu-latest
+      FILES: '*.tar.gz'
+      CREATE_DESTINATION_FOLDERS: true
+    secrets:
+      # Explicit define secrets for better understanding but it could be just inherit
+      PROXY_URL: ${{ secrets.PROXY_URL }}
+      USERNAME: ${{ secrets.USERNAME }}
+      HOSTNAME: ${{ secrets.HOSTNAME }}
+      TELEPORT_TOKEN: ${{ secrets.TELEPORT_TOKEN }}
+
+  distribute_meta_rpm:
+    if: (github.ref_type == 'branch' && github.base_ref == '')
+    permissions: write-all
+    name: 'Copy meta to remote RPM'
+    needs: [ generate_meta_rpm ]
+    strategy:
+      max-parallel: 1
+      matrix:
+        os:
+          - rpm
+        platform:
+          - amd64
+    uses: signalwire/actions-template/.github/workflows/cd-libs-metadata.yml@main
+    with:
+      ARTIFACT_NAME: ${{ matrix.os }}-${{ matrix.platform }}-meta
+      LIB_NAME: signalwire-c
+      SOURCE_BRANCH: ${{ github.ref_name }}
+      TARGET_OS: ${{ matrix.os }}
+      TARGET_PLATFORM: ${{ matrix.platform }}
+      RUNNER: ubuntu-latest
+      TARGET_REPO: signalwire/bamboo_gha_trigger
+    secrets:
+      GH_BOT_DEPLOY_TOKEN: ${{ secrets.PAT }}
+    concurrency:
+      group: signalwire-c-${{ matrix.os }}-${{ matrix.platform }}
+      cancel-in-progress: false
+
+  distribute_meta_deb:
+    if: (github.ref_type == 'branch' && github.base_ref == '')
+    permissions: write-all
+    name: 'Copy meta to remote DEB'
+    needs: [ generate_meta_deb ]
+    strategy:
+      max-parallel: 1
+      matrix:
+        os:
+          - deb
+        codename:
+          - bookworm
+          - bullseye
+          - buster
+          - stretch
+        platform:
+          - amd64
+          - armhf
+        exclude:
+          - codename: bookworm
+            platform: armhf
+    uses: signalwire/actions-template/.github/workflows/cd-libs-metadata.yml@main
+    with:
+      ARTIFACT_NAME: ${{ matrix.os }}-${{ matrix.codename }}-${{ matrix.platform }}-meta
+      LIB_NAME: signalwire-c
+      SOURCE_BRANCH: ${{ github.ref_name }}
+      TARGET_OS: ${{ matrix.os }}
+      TARGET_PLATFORM: ${{ matrix.platform }}
+      RUNNER: ubuntu-latest
+      TARGET_REPO: signalwire/bamboo_gha_trigger
+    secrets:
+      GH_BOT_DEPLOY_TOKEN: ${{ secrets.PAT }}
+    concurrency:
+      group: signalwire-c-${{ matrix.os }}-${{ matrix.platform }}
+      cancel-in-progress: true
+
+  distribute_hash_rpm:
+    if: (github.ref_type == 'branch' && github.base_ref == '')
+    permissions: write-all
+    name: 'Copy hash to remote RPM'
+    needs: [ distribute_meta_rpm ]
+    uses: signalwire/actions-template/.github/workflows/cd-scp.yml@main
+    strategy:
+      matrix:
+        os:
+          - rpm
+        platform:
+          - amd64
+    with:
+      RUNNER: ubuntu-latest
+      CREATE_DESTINATION_FOLDERS: false
+      EXEC_COMMANDS: 'echo "${{ github.sha }}" > /var/www/signalwire-c-${{ github.ref_name }}-${{ matrix.os }}-${{ matrix.platform }}/${{ github.run_id }}-${{ github.run_number }}/hash.txt'
+    secrets:
+      PROXY_URL: ${{ secrets.PROXY_URL }}
+      USERNAME: ${{ secrets.USERNAME }}
+      HOSTNAME: ${{ secrets.HOSTNAME }}
+      TELEPORT_TOKEN: ${{ secrets.TELEPORT_TOKEN }}
+
+  distribute_hash_deb:
+    if: (github.ref_type == 'branch' && github.base_ref == '')
+    permissions: write-all
+    name: 'Copy hash to remote DEB'
+    needs: [ distribute_meta_deb ]
+    uses: signalwire/actions-template/.github/workflows/cd-scp.yml@main
+    strategy:
+      matrix:
+        os:
+          - deb
+        platform:
+          - amd64
+          - armhf
+    with:
+      RUNNER: ubuntu-latest
+      CREATE_DESTINATION_FOLDERS: false
+      EXEC_COMMANDS: 'echo "${{ github.sha }}" > /var/www/signalwire-c-${{ github.ref_name }}-${{ matrix.os }}-${{ matrix.platform }}/${{ github.run_id }}-${{ github.run_number }}/hash.txt'
+    secrets:
+      PROXY_URL: ${{ secrets.PROXY_URL }}
+      USERNAME: ${{ secrets.USERNAME }}
+      HOSTNAME: ${{ secrets.HOSTNAME }}
+      TELEPORT_TOKEN: ${{ secrets.TELEPORT_TOKEN }}
