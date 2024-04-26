@@ -4,10 +4,10 @@ on:
   pull_request:
     types: [synchronize, opened]
     branches:
-      - "v2.0"
+      - "master"
   push:
     branches:
-      - "v2.0"
+      - "master"
 
 jobs:
   scan_build:

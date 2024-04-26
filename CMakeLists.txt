@@ -17,7 +17,7 @@ if (WIN32)
 endif()
 
 # Declare our project, SignalWire-Client-C2
-project(SignalWire-Client-C2 VERSION 2.0.0 LANGUAGES C)
+project(SignalWire-Client-C2 VERSION 2.0.1 LANGUAGES C)
 message("SignalWire-Client-C2 ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
 
 # Set package version
