@@ -37,10 +37,10 @@ jobs:
             runner: ubuntu-latest
           - name: arm64v8
             runner: ubuntu-latest
-        exclude:
-          - version: bookworm
-            platform:
-              name: arm32v7
+        # exclude:
+        #   - version: bookworm
+        #     platform:
+        #       name: arm32v7
     with:
       RUNNER: ${{ matrix.platform.runner }}
       ARTIFACTS_PATTERN: '.*\.(deb)$'
