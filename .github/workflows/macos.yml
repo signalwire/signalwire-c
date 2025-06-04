@@ -1,0 +1,53 @@
+name: MacOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - release
+  pull_request:
+    branches:
+      - master
+      - release
+
+jobs:
+  build:
+    name: Build signalwire-c MacOS
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          brew update
+          brew install ossp-uuid signalwire/homebrew-signalwire/libks2
+          brew reinstall openssl@3
+
+      - name: Configure with CMake
+        run: |
+          cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=./install
+
+      - name: Build
+        run: |
+          make
+
+      - name: Install to local folder
+        run: |
+          make install
+
+      # - name: Debug - List all files
+      #   run: |
+      #     find . -type f | sort
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signalwire-c-macos-build
+          path: |
+            install/
