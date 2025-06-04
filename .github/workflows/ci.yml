@@ -20,10 +20,10 @@ jobs:
           apt-get update && apt-get install -yq build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-7
           apt-get install -yq cmake uuid-dev libssl-dev
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - run: pwd
       - name: clone libks
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: signalwire/libks
           ref: v2.0
@@ -53,14 +53,14 @@ jobs:
           fi
       - name: Upload artifacts
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.tar.outputs.ARTIFACT }}-${{ github.sha }}-${{ github.run_id }}
           path: ${{ steps.tar.outputs.ARTIFACT_PATH }}
           retention-days: 5
       - name: comment on PR
         if: ${{ failure() && github.event_name == 'pull_request' }}
-        uses: thollander/actions-comment-pull-request@v2
+        uses: thollander/actions-comment-pull-request@v3
         with:
           message: |
             scan_build _*failed*_.
