@@ -2,7 +2,9 @@ name: CI
 
 on:
   pull_request:
-    types: [synchronize, opened]
+    types:
+      - synchronize
+      - opened
     branches:
       - "master"
   push:
@@ -14,51 +16,80 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: debian:buster
+
     steps:
-      - name: install deps
+      - name: Install Deps
         run: |
-          apt-get update && apt-get install -yq build-essential autotools-dev lsb-release pkg-config automake autoconf libtool-bin clang-tools-7
-          apt-get install -yq cmake uuid-dev libssl-dev
+          cat << 'EOF' | tee /etc/apt/sources.list
+          deb http://archive.debian.org/debian buster main contrib
+          deb http://archive.debian.org/debian-security buster/updates main contrib
+          deb http://archive.debian.org/debian buster-updates main contrib
+          EOF
+
+          apt-get update && apt-get upgrade -y
+
+          apt-get install -y \
+            autoconf \
+            automake \
+            autotools-dev \
+            build-essential \
+            clang-tools-7 \
+            cmake \
+            libssl-dev \
+            libtool-bin \
+            lsb-release \
+            pkg-config \
+            uuid-dev
+
       - name: Checkout
-        uses: actions/checkout@v4
-      - run: pwd
-      - name: clone libks
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Сlone libks
+        uses: actions/checkout@v5
         with:
           repository: signalwire/libks
           ref: v2.0
           path: /__w/signalwire-c/signalwire-c/libks
-      - name: build libks
-        run: cd /__w/signalwire-c/signalwire-c/libks && cmake . -DCMAKE_BUILD_TYPE=Release && make && make install && cd ..
-      - id: scan_build
-        run: /__w/signalwire-c/signalwire-c/scan_build.sh
+
+      - name: Build libks
+        working-directory: /__w/signalwire-c/signalwire-c/libks
+        run: cmake . -DCMAKE_BUILD_TYPE=Release && make && make install
+
+      - name: Scan build
+        id: scan_build
+        working-directory: /__w/signalwire-c/signalwire-c/
+        run: ./scan_build.sh
+
       - name: Tar logs
         id: tar
         if: failure()
+        shell: bash
+        working-directory: /__w/signalwire-c/signalwire-c/
         env:
           COMPILATION_FAILED: ${{ steps.scan_build.outputs.COMPILATION_FAILED }}
           BUGS_FOUND: ${{ steps.scan_build.outputs.BUGS_FOUND }}
         run: |
-          cd /__w/signalwire-c/signalwire-c
-          ls -l
-          if [ "true" -eq $COMPILATION_FAILED ]; then
+          if [ "$COMPILATION_FAILED" = "true" ]; then
             tar czvf scan-build-result.tar.gz ./scan-build-result.txt;
             echo "ARTIFACT_PATH=scan-build-result.tar.gz" >> $GITHUB_OUTPUT;
             echo "ARTIFACT=scan-build-result" >> $GITHUB_OUTPUT;
           fi
-          if [ "true" -eq $BUGS_FOUND ]; then
+
+          if [ "$BUGS_FOUND" = "true" ]; then
             tar czvf reports.tar.gz $REPORT;
             echo "ARTIFACT_PATH=reports.tar.gz" >> $GITHUB_OUTPUT;
             echo "ARTIFACT=reports" >> $GITHUB_OUTPUT;
           fi
+
       - name: Upload artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.tar.outputs.ARTIFACT }}-${{ github.sha }}-${{ github.run_id }}
-          path: ${{ steps.tar.outputs.ARTIFACT_PATH }}
+          path: /__w/signalwire-c/signalwire-c/${{ steps.tar.outputs.ARTIFACT_PATH }}
           retention-days: 5
-      - name: comment on PR
+
+      - name: Comment on PR
         if: ${{ failure() && github.event_name == 'pull_request' }}
         uses: thollander/actions-comment-pull-request@v3
         with:
@@ -66,8 +97,8 @@ jobs:
             scan_build _*failed*_.
             Please checkout the results.
             Action Run: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          pr_number: 123 # This will comment on pull request #123
-      - name: notify slack
+
+      - name: Notify Slack
         if: ${{ failure() && github.event_name == 'push' }}
         uses: signalwire/actions-template/.github/actions/slack@main
         with:
