@@ -312,7 +312,7 @@ SWCLT_DECLARE(void) swclt_wss_destroy(swclt_wss_t **wss)
 		if ((*wss)->reader_thread) {
 			ks_thread_request_stop((*wss)->reader_thread);
 		}
-		ks_socket_close(&(*wss)->socket);
+
 		if ((*wss)->reader_thread) {
 			ks_thread_join((*wss)->reader_thread);
 			ks_thread_destroy(&(*wss)->reader_thread);
