@@ -672,10 +672,23 @@ SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn)
 		if ((*conn)->blade_connect_rpl) {
 			BLADE_CONNECT_RPL_DESTROY(&(*conn)->blade_connect_rpl);
 		}
-		swclt_wss_destroy(&(*conn)->wss);
+		/* Stop the websocket reader thread FIRST to prevent new jobs from being
+		 * added to the incoming_frame_pool. The reader thread calls on_incoming_frame
+		 * which adds jobs to the pool, so we must stop it before destroying the pool. */
+		if ((*conn)->wss && (*conn)->wss->reader_thread) {
+			ks_thread_request_stop((*conn)->wss->reader_thread);
+			ks_thread_join((*conn)->wss->reader_thread);
+			ks_thread_destroy(&(*conn)->wss->reader_thread);
+		}
+		/* Now destroy the incoming frame thread pool. This waits for all pending
+		 * jobs to complete. These jobs may call swclt_wss_write() which uses the
+		 * websocket mutex, so we must do this BEFORE destroying the websocket. */
 		if ((*conn)->incoming_frame_pool) {
 			ks_thread_pool_destroy(&(*conn)->incoming_frame_pool);
 		}
+		/* Now safe to destroy the websocket - no threads are using it anymore.
+		 * swclt_wss_destroy will see reader_thread already stopped/joined. */
+		swclt_wss_destroy(&(*conn)->wss);
 		ttl_tracker_destroy(&(*conn)->ttl);
 		ks_hash_destroy(&(*conn)->outstanding_requests);
 		ks_mutex_destroy(&(*conn)->failed_mutex);
