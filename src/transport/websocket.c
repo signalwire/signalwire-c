@@ -263,6 +263,7 @@ static ks_status_t __connect_socket(swclt_wss_t *ctx)
 {
 	ks_status_t status;
 	char buf[256];
+	ks_bool_t kws_init_called = KS_FALSE;
 
 	ctx->socket = ks_socket_connect_ex(SOCK_STREAM, IPPROTO_TCP,
 			&ctx->addr, ctx->info.connect_timeout_ms);
@@ -273,7 +274,7 @@ static ks_status_t __connect_socket(swclt_wss_t *ctx)
 	}
 
 	snprintf(buf, sizeof(buf), "/%s:%s:swclt", ctx->info.path, ctx->info.address);
-	
+	kws_init_called = KS_TRUE;
 	if (status = kws_init(&ctx->wss, ctx->socket,
 			ctx->info.ssl, buf, KWS_BLOCK | KWS_CLOSE_SOCK, ctx->pool))
 		goto done;
@@ -293,7 +294,14 @@ done:
 		if (ctx->reader_thread) {
 			ks_thread_request_stop(ctx->reader_thread);
 		}
-		ks_socket_close(&ctx->socket);
+
+		/* kws_init with KWS_CLOSE_SOCK takes ownership of the socket and handles
+		 * cleanup via kws_destroy (even on failure). Only close socket directly
+		 * if kws_init was never called. */
+		if (!kws_init_called) {
+			ks_socket_close(&ctx->socket);
+		}
+
 		if (ctx->reader_thread) {
 			ks_thread_join(ctx->reader_thread);
 			ks_thread_destroy(&ctx->reader_thread);
