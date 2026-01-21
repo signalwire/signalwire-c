@@ -312,19 +312,22 @@ done:
 	return status;
 }
 
+SWCLT_DECLARE(void) swclt_wss_stop(swclt_wss_t *wss)
+{
+	if (wss && wss->reader_thread) {
+		ks_log(KS_LOG_DEBUG, "Stopping websocket reader thread");
+		ks_thread_request_stop(wss->reader_thread);
+		ks_thread_join(wss->reader_thread);
+		ks_thread_destroy(&wss->reader_thread);
+	}
+}
+
 SWCLT_DECLARE(void) swclt_wss_destroy(swclt_wss_t **wss)
 {
 	if (wss && *wss) {
 		ks_pool_t *pool = (*wss)->pool;
 		ks_log(KS_LOG_INFO, "Shutting down websocket");
-		if ((*wss)->reader_thread) {
-			ks_thread_request_stop((*wss)->reader_thread);
-		}
-
-		if ((*wss)->reader_thread) {
-			ks_thread_join((*wss)->reader_thread);
-			ks_thread_destroy(&(*wss)->reader_thread);
-		}
+		swclt_wss_stop(*wss);
 		if ((*wss)->wss_mutex) {
 			ks_mutex_destroy(&(*wss)->wss_mutex);
 		}

@@ -97,6 +97,7 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 	uint32_t timeout_ms,
 	const SSL_CTX *ssl);
 
+SWCLT_DECLARE(void) swclt_wss_stop(swclt_wss_t *wss);
 SWCLT_DECLARE(void) swclt_wss_destroy(swclt_wss_t **wss);
 
 SWCLT_DECLARE(ks_status_t) swclt_wss_write(swclt_wss_t *wss, char *data);
