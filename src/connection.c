@@ -672,10 +672,17 @@ SWCLT_DECLARE(void) swclt_conn_destroy(swclt_conn_t **conn)
 		if ((*conn)->blade_connect_rpl) {
 			BLADE_CONNECT_RPL_DESTROY(&(*conn)->blade_connect_rpl);
 		}
-		swclt_wss_destroy(&(*conn)->wss);
+
+		/* 1. Stop websocket reader: prevents new jobs from being queued
+		 * 2. Drain thread pool: lets pending jobs finish (they use wss_mutex)
+		 * 3. Destroy websocket: now safe to free the mutex
+		 */
+
+		swclt_wss_stop((*conn)->wss);
 		if ((*conn)->incoming_frame_pool) {
 			ks_thread_pool_destroy(&(*conn)->incoming_frame_pool);
 		}
+		swclt_wss_destroy(&(*conn)->wss);
 		ttl_tracker_destroy(&(*conn)->ttl);
 		ks_hash_destroy(&(*conn)->outstanding_requests);
 		ks_mutex_destroy(&(*conn)->failed_mutex);
