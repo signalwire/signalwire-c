@@ -565,7 +565,6 @@ static void __remove_provider_from_protocols(swclt_store_t *store, const char *n
 static ks_status_t __select_random_protocol_provider(swclt_store_t *store, const char *name, ks_pool_t *pool, char **providerid)
 {
 	blade_protocol_t *protocol = NULL;
-	int32_t count = 0;
 	int32_t index = 0;
 	ks_json_t *entry = NULL;
 	blade_provider_t *provider = NULL;
@@ -580,7 +579,7 @@ static ks_status_t __select_random_protocol_provider(swclt_store_t *store, const
 		goto done;
 
 	// get provider count
-	if ((count = ks_json_get_array_size(protocol->providers)) == 0) {
+	if (ks_json_get_array_size(protocol->providers) == 0) {
 		status = KS_STATUS_NOT_FOUND;
 		goto done;
 	}
