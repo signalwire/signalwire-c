@@ -72,7 +72,15 @@ static ks_status_t __write_pong(swclt_wss_t *ctx, swclt_frame_t *frame)
 
 static ks_status_t __poll_read(swclt_wss_t *ctx, uint32_t *poll_flagsP)
 {
-	*poll_flagsP = ks_wait_sock(ctx->socket, 1000, KS_POLL_READ);
+	/* SSL object only under wss_mutex; the long wait is fd-only */
+	ks_mutex_lock(ctx->wss_mutex);
+	*poll_flagsP = kws_wait_sock(ctx->wss, 0, KS_POLL_READ);
+	ks_mutex_unlock(ctx->wss_mutex);
+
+	if (!*poll_flagsP) {
+		*poll_flagsP = ks_wait_sock(ctx->socket, 1000, KS_POLL_READ);
+	}
+
 	if (*poll_flagsP & KS_POLL_ERROR) {
 		return KS_STATUS_FAIL;
 	}

@@ -22,6 +22,7 @@
 #include "swclt_test.h"
 
 DECLARE_TEST(json);
+DECLARE_TEST(websocket);
 DECLARE_TEST(command);
 DECLARE_TEST(execute);
 DECLARE_TEST(connection);
@@ -31,6 +32,7 @@ DECLARE_TEST(uncert_exp);
 
 test_entry_t g_test_methods[] = {
 	TEST_ENTRY(json),
+	TEST_ENTRY(websocket),
 	TEST_ENTRY(command),
 	TEST_ENTRY(execute),
 	TEST_ENTRY(connection),
