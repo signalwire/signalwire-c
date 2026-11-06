@@ -28,3 +28,4 @@ inc/signalwire-client-c/version.h
 _CPack_Packages/
 install_manifest_runtime.txt
 *.deb
+.DS_Store

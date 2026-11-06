@@ -348,7 +348,7 @@ static ks_status_t submit_request(swclt_conn_t *ctx, swclt_cmd_t **cmdP, swclt_c
 	if (!(cmd->flags & SWCLT_CMD_FLAG_NOREPLY)) {
 		if (!cmd->cb && cmd_future) {
 			/* set up our own callbacks to wait if none exist */
-			if (status = swclt_cmd_future_create(cmd_future, cmd)) {
+			if (swclt_cmd_future_create(cmd_future, cmd)) {
 				ks_log(KS_LOG_CRIT, "Failed to create command cmd_future");
 				swclt_cmd_destroy(&cmd);
 				ks_pool_free(&data);

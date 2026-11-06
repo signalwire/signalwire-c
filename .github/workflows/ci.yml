@@ -15,17 +15,11 @@ jobs:
   scan_build:
     runs-on: ubuntu-latest
     container:
-      image: debian:buster
+      image: debian:trixie
 
     steps:
       - name: Install Deps
         run: |
-          cat << 'EOF' | tee /etc/apt/sources.list
-          deb http://archive.debian.org/debian buster main contrib
-          deb http://archive.debian.org/debian-security buster/updates main contrib
-          deb http://archive.debian.org/debian buster-updates main contrib
-          EOF
-
           apt-get update && apt-get upgrade -y
 
           apt-get install -y \
@@ -33,7 +27,7 @@ jobs:
             automake \
             autotools-dev \
             build-essential \
-            clang-tools-7 \
+            clang-tools \
             cmake \
             libssl-dev \
             libtool-bin \

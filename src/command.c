@@ -227,7 +227,7 @@ static void __report_failure(swclt_cmd_t *cmd, ks_status_t failure_status, const
 
 static ks_status_t __init_frame(swclt_cmd_t *cmd, swclt_frame_t *frame)
 {
-	const char *method, *jsonrpc;
+	const char *method;
 	ks_json_t *original_json;
 	ks_status_t status;
 	ks_json_t *params;
@@ -255,7 +255,7 @@ static ks_status_t __init_frame(swclt_cmd_t *cmd, swclt_frame_t *frame)
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
 	}
-	if (!(jsonrpc = ks_json_get_object_string(original_json, "jsonrpc", NULL))) {
+	if (!ks_json_get_object_string(original_json, "jsonrpc", NULL)) {
 		ks_log(KS_LOG_WARNING, "Invalid frame given to command %s construction, no jsonrpc field present", ks_uuid_thr_str(&cmd->id));
 		status = KS_STATUS_INVALID_ARGUMENT;
 		goto done;
