@@ -72,16 +72,34 @@ static ks_status_t __write_pong(swclt_wss_t *ctx, swclt_frame_t *frame)
 
 static ks_status_t __poll_read(swclt_wss_t *ctx, uint32_t *poll_flagsP)
 {
+	const char *wait = "kws_wait_sock";
+	int r;
+
 	/* SSL object only under wss_mutex; the long wait is fd-only */
 	ks_mutex_lock(ctx->wss_mutex);
-	*poll_flagsP = kws_wait_sock(ctx->wss, 0, KS_POLL_READ);
+	r = kws_wait_sock(ctx->wss, 0, KS_POLL_READ);
 	ks_mutex_unlock(ctx->wss_mutex);
 
-	if (!*poll_flagsP) {
-		*poll_flagsP = ks_wait_sock(ctx->socket, 1000, KS_POLL_READ);
+	if (!r) {
+		wait = "ks_wait_sock";
+		r = ks_wait_sock(ctx->socket, 1000, KS_POLL_READ);
 	}
 
+	*poll_flagsP = (uint32_t)r;
+
 	if (*poll_flagsP & KS_POLL_ERROR) {
+		/* -1 is a failed wait (libks logs the errno), not a set of flags: say which it was */
+		if (r < 0) {
+			ks_log(KS_LOG_WARNING, "Read wait on socket %d failed: %s returned %d (libks logs the cause)",
+				(int)ctx->socket, wait, r);
+		} else {
+			ks_log(KS_LOG_WARNING, "Read wait on socket %d reported an error: %s returned 0x%x (%s%s%s%s)",
+				(int)ctx->socket, wait, (unsigned)r,
+				"ERROR",
+				(r & KS_POLL_HUP) ? "|HUP" : "",
+				(r & KS_POLL_INVALID) ? "|INVALID" : "",
+				(r & KS_POLL_READ) ? "|READ" : "");
+		}
 		return KS_STATUS_FAIL;
 	}
 
