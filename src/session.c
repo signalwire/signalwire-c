@@ -453,7 +453,7 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 
 		status = BLADE_EXECUTE_RQU_PARSE(cmd_pool, request, &rqu);
 
-		ks_log(KS_LOG_INFO, "RX: %s", cmd_str);
+		ks_log(KS_LOG_DEBUG, "RX: %s", cmd_str);
 
 		if (status) {
 			ks_log(KS_LOG_WARNING, "Failed to parse execute payload: %s (%lu)", cmd_str, status);
@@ -479,13 +479,13 @@ static ks_status_t __on_incoming_cmd(swclt_conn_t *conn, swclt_cmd_t *cmd, swclt
 			ks_rwl_read_unlock(sess->rwlock);
 			if (status == KS_STATUS_DISCONNECTED) {
 				/* send after reconnection */
-				ks_log(KS_LOG_INFO, "(Not connected) TX ENQUEUE: %s", reply_str);
+				ks_log(KS_LOG_DEBUG, "(Not connected) TX ENQUEUE: %s", reply_str);
 				enqueue_result(sess, cmd);
 				status = KS_STATUS_SUCCESS;
 			} else if (status) {
 				ks_log(KS_LOG_ERROR, "TX FAILED %s, status: %lu", reply_str, status);
 			} else {
-				ks_log(KS_LOG_INFO, "TX: %s", reply_str);
+				ks_log(KS_LOG_DEBUG, "TX: %s", reply_str);
 			}
 			ks_pool_free(&reply_str);
 		}
@@ -1564,7 +1564,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_async(
 	if (status) {
 		ks_log(KS_LOG_WARNING, "FAILED TX: %s", request_str);
 	} else {
-		ks_log(KS_LOG_INFO, "TX: %s", request_str);
+		ks_log(KS_LOG_DEBUG, "TX: %s", request_str);
 	}
 	free(request_str);
 
@@ -1614,7 +1614,7 @@ SWCLT_DECLARE(ks_status_t) swclt_sess_execute_with_id_async(
 	if (status) {
 		ks_log(KS_LOG_WARNING, "FAILED TX: %s", request_str);
 	} else {
-		ks_log(KS_LOG_INFO, "TX: %s", request_str);
+		ks_log(KS_LOG_DEBUG, "TX: %s", request_str);
 	}
 	free(request_str);
 
