@@ -43,6 +43,7 @@ typedef struct wss_test_srv {
 	int with_handshake;		/* frames go in the same write as the 101 */
 	volatile int client_up;
 	volatile int done;
+	char req[4096];			/* the handshake request of the client */
 } wss_test_srv_t;
 
 typedef struct wss_test_rx {
@@ -102,7 +103,7 @@ static void *wss_test_server_thread(ks_thread_t *thread, void *thread_data)
 	wss_test_srv_t *srv = (wss_test_srv_t *)thread_data;
 	ks_socket_t sock;
 	SSL *ssl = NULL;
-	char req[4096] = "", key[128] = "", src[256], out[1024];
+	char *req = srv->req, key[128] = "", src[256], out[1024];
 	unsigned char sha[SHA_DIGEST_LENGTH], accept_key[64] = "";
 	ks_size_t got = 0;
 	char *k, *e;
@@ -125,8 +126,8 @@ static void *wss_test_server_thread(ks_thread_t *thread, void *thread_data)
 		}
 	}
 
-	while (got < sizeof(req) - 1 && !strstr(req, "\r\n\r\n")) {
-		ks_ssize_t r = srv_read(ssl, sock, req + got, sizeof(req) - 1 - got);
+	while (got < sizeof(srv->req) - 1 && !strstr(req, "\r\n\r\n")) {
+		ks_ssize_t r = srv_read(ssl, sock, req + got, sizeof(srv->req) - 1 - got);
 
 		if (r <= 0) {
 			goto end;
@@ -230,7 +231,41 @@ static ks_status_t __on_incoming_frame(swclt_wss_t *wss, swclt_frame_t **frame, 
 	return KS_STATUS_SUCCESS;
 }
 
-static int run_case(ks_pool_t *pool, const char *name, SSL_CTX *server_ctx, SSL_CTX *client_ctx, int with_handshake)
+/* The handshake request carries the whole path, the whole address and the protocol. */
+static int request_is_whole(const char *req, const char *address, const char *path)
+{
+	char line[512];
+
+	ks_snprintf(line, sizeof(line), "GET /%s HTTP/1.1\r\n", path);
+	if (strncmp(req, line, strlen(line))) {
+		return 0;
+	}
+
+	ks_snprintf(line, sizeof(line), "\r\nHost: %s\r\n", address);
+	if (!strstr(req, line)) {
+		return 0;
+	}
+
+	return strstr(req, "\r\nSec-WebSocket-Protocol: swclt\r\n") != NULL;
+}
+
+/*
+ * Fills the longest address and path the client keeps. The address is 127.0.0.1 with its first
+ * number written in octal and padded with zeros, which getaddrinfo() resolves without a lookup.
+ */
+static void longest_target(char *address, ks_size_t address_size, char *path, ks_size_t path_size)
+{
+	static const char tail[] = "177.0.0.1";
+
+	memset(address, '0', address_size - 1);
+	memcpy(address + address_size - sizeof(tail), tail, sizeof(tail));
+
+	memset(path, 'p', path_size - 1);
+	path[path_size - 1] = '\0';
+}
+
+static int run_case(ks_pool_t *pool, const char *name, SSL_CTX *server_ctx, SSL_CTX *client_ctx, int with_handshake,
+	const char *address, const char *path)
 {
 	wss_test_srv_t srv = { 0 };
 	wss_test_rx_t rx = { 0 };
@@ -238,7 +273,7 @@ static int run_case(ks_pool_t *pool, const char *name, SSL_CTX *server_ctx, SSL_
 	swclt_wss_t *wss = NULL;
 	ks_sockaddr_t addr;
 	socklen_t addr_len = sizeof(addr.v.v4);
-	int waited, count = 0, ok;
+	int waited, count = 0, whole, ok;
 
 	srv.ssl_ctx = server_ctx;
 	srv.with_handshake = with_handshake;
@@ -253,7 +288,7 @@ static int run_case(ks_pool_t *pool, const char *name, SSL_CTX *server_ctx, SSL_
 	REQUIRE(!ks_thread_create(&server_thread, wss_test_server_thread, &srv, pool));
 
 	REQUIRE(!swclt_wss_connect(&wss, __on_incoming_frame, &rx, NULL, NULL,
-		"127.0.0.1", (short)ks_addr_get_port(&addr), "websocket_test", 2000, client_ctx));
+		address, (short)ks_addr_get_port(&addr), path, 2000, client_ctx));
 	srv.client_up = 1;
 
 	for (waited = 0; waited < WSS_TEST_WAIT_MS; waited += 10) {
@@ -273,11 +308,15 @@ static int run_case(ks_pool_t *pool, const char *name, SSL_CTX *server_ctx, SSL_
 	ks_thread_join(server_thread);
 	ks_thread_destroy(&server_thread);
 
-	ok = count == 2 && !strcmp(rx.text[0], TWO_FRAMES_TEXT[0]) && !strcmp(rx.text[1], TWO_FRAMES_TEXT[1]);
+	/* The server thread is joined, its copy of the request is complete. */
+	whole = request_is_whole(srv.req, address, path);
+
+	ok = whole && count == 2 && !strcmp(rx.text[0], TWO_FRAMES_TEXT[0]) && !strcmp(rx.text[1], TWO_FRAMES_TEXT[1]);
 	if (ok) {
 		ks_log(KS_LOG_INFO, "%s: PASS, %d of 2 frames within %d ms", name, count, waited);
 	} else {
-		ks_log(KS_LOG_ERROR, "%s: FAIL, %d of 2 frames within %d ms", name, count, waited);
+		ks_log(KS_LOG_ERROR, "%s: FAIL, %d of 2 frames within %d ms, the handshake request is %s",
+			name, count, waited, whole ? "whole" : "cut");
 	}
 
 	ks_mutex_destroy(&rx.mutex);
@@ -289,16 +328,22 @@ void test_websocket(ks_pool_t *pool)
 {
 	SSL_CTX *server_ctx = create_server_ssl_context();
 	SSL_CTX *client_ctx = NULL;
-	int tls_ok, plain_ok;
+	swclt_wss_info_t info;
+	char address[sizeof(info.address)], path[sizeof(info.path)];
+	int tls_ok, plain_ok, longest_ok;
 
 	REQUIRE(!swclt_ssl_create_context(NULL, NULL, NULL, &client_ctx));
 
-	tls_ok = run_case(pool, "two frames in one TLS record", server_ctx, client_ctx, 0);
-	plain_ok = run_case(pool, "two frames with the handshake response", NULL, NULL, 1);
+	longest_target(address, sizeof(address), path, sizeof(path));
+
+	tls_ok = run_case(pool, "two frames in one TLS record", server_ctx, client_ctx, 0, "127.0.0.1", "websocket_test");
+	plain_ok = run_case(pool, "two frames with the handshake response", NULL, NULL, 1, "127.0.0.1", "websocket_test");
+	longest_ok = run_case(pool, "the longest path and address", NULL, NULL, 0, address, path);
 
 	swclt_ssl_destroy_context(&client_ctx);
 	SSL_CTX_free(server_ctx);
 
 	REQUIRE(tls_ok);
 	REQUIRE(plain_ok);
+	REQUIRE(longest_ok);
 }
