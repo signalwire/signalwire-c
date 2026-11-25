@@ -288,7 +288,8 @@ SWCLT_DECLARE(char *) swclt_wss_describe(swclt_wss_t *ctx)
 static ks_status_t __connect_socket(swclt_wss_t *ctx)
 {
 	ks_status_t status;
-	char buf[256];
+	/* Holds "/<path>:<address>:swclt". */
+	char buf[sizeof(ctx->info.path) + sizeof(ctx->info.address) + sizeof("/::swclt")];
 	ks_bool_t kws_init_called = KS_FALSE;
 
 	ctx->socket = ks_socket_connect_ex(SOCK_STREAM, IPPROTO_TCP,
@@ -407,7 +408,7 @@ SWCLT_DECLARE(ks_status_t) swclt_wss_connect(
 		goto done;
 
 	for (uint32_t tryCount = 0; tryCount < 2; tryCount++) {
-		ks_log(KS_LOG_INFO, "Performing connect try: %lu to: %s:%d/%s", tryCount, new_wss->info.address, new_wss->info.port, new_wss->info.path);
+		ks_log(KS_LOG_INFO, "Performing connect try: %u to: %s:%d/%s", tryCount, new_wss->info.address, new_wss->info.port, new_wss->info.path);
 
 		if (status = __connect_socket(new_wss)) {
 			ks_sleep_ms(1000);
